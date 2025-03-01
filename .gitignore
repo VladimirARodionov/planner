@@ -169,3 +169,13 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+/.idea/
+/*.iml
+/.gigaide/
+logs.log.*
+/backend/db.sqlite3
+/templates/*
+
+# PostgreSQL backups
+/pg_backups/*
