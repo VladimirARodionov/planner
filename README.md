@@ -1,14 +1,66 @@
-# planner
+# Планировщик задач через Telegram
 
+Приложение для планирования задач с использованием Telegram бота.
+
+## Функциональность
+
+- Список задач с возможностью фильтрации (на день, на месяц, на год)
+- Добавление, изменение и удаление задач
+- Планирование напоминаний по календарю
+- Типы задач: срочные-несрочные, важные-неважные
+- Категории задач: личные, семейные, рабочие (редактируемый список)
+
+## Требования
+
+- Python 3.8+
+- Django 3.2+
+- Telegram API токен
+
+## Установка
+
+1. Клонировать репозиторий:
 ```
+git clone https://github.com/yourusername/planner.git
+cd planner
+```
+
+2. Создать виртуальное окружение и установить зависимости:
+```
+python -m venv venv
+source venv/bin/activate  # На Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cd backend 
-python manage.py makemigrations
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py runserver
-
-cd frontend
-npm install
-yarn dev
 ```
+
+3. Применить миграции:
+```
+cd backend
+python manage.py migrate
+```
+
+4. Создать суперпользователя:
+```
+python manage.py createsuperuser
+```
+
+## Запуск
+
+1. Запустить Telegram бота:
+```
+cd backend
+python run_bot
+```
+
+## Использование
+
+1. Найдите своего бота в Telegram по имени пользователя
+2. Отправьте команду `/start` для начала работы
+3. Используйте команду `/help` для получения списка доступных команд
+
+## Команды бота
+
+- `/start` - Начать работу с ботом
+- `/help` - Показать справку
+- `/tasks` - Показать список задач
+- `/add_task` - Добавить новую задачу
+- `/edit_types` - Редактировать типы задач
+- `/edit_priorities` - Редактировать приоритеты задач

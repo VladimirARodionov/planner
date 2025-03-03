@@ -1,3 +1,10 @@
-aiogram
-aiohttp
 django
+python-telegram-bot
+telegram_django_bot @ git+https://github.com/vladimirarodionov/telegram_django_bot@fix_model
+django-json-widget
+django-environ
+python-dateutil
+psycopg2-binary
+python-decouple==3.8
+
+

@@ -9,8 +9,37 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
-
+import pathlib
 from pathlib import Path
+import os
+
+import decouple
+
+# Build paths inside the project like this: os.path.join(BASE_DIR, ...)
+#BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+ENVIRONMENT = os.getenv("ENVIRONMENT", default="DEVELOPMENT")
+
+def get_env_config() -> decouple.Config:
+    """
+    Creates and returns a Config object based on the environment setting.
+    It uses .env.dev for development and .env for production.
+    """
+    env_files = {
+        "DEVELOPMENT": ".env.dev",
+        "PRODUCTION": ".env",
+    }
+
+    app_dir_path = pathlib.Path(__file__).resolve().parent.parent.parent
+    env_file_name = env_files.get(ENVIRONMENT, ".env.dev")
+    file_path = app_dir_path / env_file_name
+
+    if not file_path.is_file():
+        raise FileNotFoundError(f"Environment file not found: {file_path}")
+
+    return decouple.Config(decouple.RepositoryEnv(file_path))
+
+env_config = get_env_config()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,21 +52,24 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-fq!q%4@n_f2+h1-_t)kk!^3npy8g-dm7w%wg4vhy^pi(m=&^ya'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_config.get('DJANGO_DEBUG', default=True)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
+AUTH_USER_MODEL = 'backend_app.User'
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    'backend_app.apps.BackendAppConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'telegram_django_bot',
+    'django_json_widget',
+    'backend_app',
 ]
 
 MIDDLEWARE = [
@@ -77,7 +109,7 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
     }
 }
 
@@ -106,7 +138,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'ru-ru'
 
-TIME_ZONE = 'UTC+3'
+TIME_ZONE = 'Europe/Moscow'
 
 USE_I18N = True
 
@@ -122,3 +154,16 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Настройки для Telegram бота
+TELEGRAM_TOKEN = env_config.get('TELEGRAM_TOKEN')
+TELEGRAM_SUPERUSER_IDS = [int(id) for id in env_config.get('SUPERUSERS', '').split(',') if id]
+
+MAIN_BOT_USERNAME = env_config.get('TELEGRAM_BOT_NAME', default='')
+TELEGRAM_LOG = env_config.get('TELEGRAM_LOG', default='/web/logs/bot.log')
+HOST = env_config.get('WEB_HOST', default='http://127.0.0.1:8000')
+
+TELEGRAM_ROOT_UTRLCONF = 'backend_app.utrls'
+
+
+TELEGRAM_BOT_MAIN_MENU_CALLBACK = 'main_menu'  # usually you need return button to main menu
