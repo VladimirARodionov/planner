@@ -76,11 +76,31 @@ def create_app():
     """Create and configure an instance of the Flask application."""
     app = Flask(__name__, instance_relative_config=True)
     cache.init_app(app, config={'CACHE_TYPE': 'SimpleCache'})
-    # cors = CORS(app, origins=[origin for origin in env_config.get('CORS_ALLOWED_ORIGINS').split(',')]) # resources={r"/api/*": {"origins": "*"}}
-    # app.config['CORS_HEADERS'] = 'Content-Type'
+    
+    # Настройка CORS
+    CORS(app, 
+         resources={
+             r"/api/*": {
+                 "origins": ["http://localhost:3000"],
+                 "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+                 "allow_headers": ["Content-Type", "Authorization"],
+                 "supports_credentials": True,
+                 "expose_headers": ["Content-Range", "X-Content-Range"]
+             }
+         },
+         allow_headers=["Content-Type", "Authorization"],
+         expose_headers=["Content-Range", "X-Content-Range"],
+         supports_credentials=True
+    )
+    
     app.config.from_mapping(
         SECRET_KEY=env_config.get('SECRET_KEY'),
         JWT_SECRET_KEY=env_config.get('JWT_SECRET_KEY'),
+        JWT_ACCESS_TOKEN_EXPIRES=3600,  # 1 hour
+        JWT_REFRESH_TOKEN_EXPIRES=2592000,  # 30 days
+        JWT_TOKEN_LOCATION=["headers"],
+        JWT_HEADER_NAME="Authorization",
+        JWT_HEADER_TYPE="Bearer"
     )
     # apply the blueprints to the app
     from backend.blueprints import auth_bp, planner_bp

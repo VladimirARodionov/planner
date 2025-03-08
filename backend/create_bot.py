@@ -43,10 +43,17 @@ if ENVIRONMENT == 'PRODUCTION':
     db_host = 'plannerdb'
     db_port = env_config.get('POSTGRES_PORT') or '5432'
     db_string = 'postgresql+asyncpg://{}:{}@{}:{}/{}'.format(db_user, db_pass, db_host, db_port, db_name)
+    db_string_sync = 'postgresql://{}:{}@{}:{}/{}'.format(db_user, db_pass, db_host, db_port, db_name)
 else:
     db_string = 'sqlite+aiosqlite:///local.db'
+    db_string_sync = 'sqlite:///local.db'
 
-
+db = create_engine(
+    db_string_sync,
+    **(
+        dict(pool_recycle=100, pool_size=10, max_overflow=3)
+    )
+)
 # инициируем объект бота, передавая ему parse_mode=ParseMode.HTML по умолчанию
 main_bot = Bot(token=env_config.get('TELEGRAM_TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
