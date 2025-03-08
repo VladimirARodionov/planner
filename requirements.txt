@@ -1,3 +1,12 @@
 aiogram
 aiohttp
-django
+python-decouple
+Flask
+flask-cors
+Flask-JWT-Extended
+Flask-Caching
+alembic==1.14.1
+APScheduler==3.11.0
+python-dotenv
+fluent.runtime==0.4.0
+
