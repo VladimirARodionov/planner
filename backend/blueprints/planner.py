@@ -3,26 +3,14 @@ import logging
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from functools import wraps
 
+from backend.blueprints.wrapper import async_route
 from backend.database import get_session
 from backend.services.task_service import TaskService
 from backend.services.settings_service import SettingsService
 
 bp = Blueprint("planner", __name__)
 logger = logging.getLogger(__name__)
-
-def async_route(f):
-    @wraps(f)
-    def wrapped(*args, **kwargs):
-        import asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(f(*args, **kwargs))
-        finally:
-            loop.close()
-    return wrapped
 
 # Маршруты для работы с задачами
 @bp.route('/api/tasks/', methods=['GET', 'OPTIONS'])
