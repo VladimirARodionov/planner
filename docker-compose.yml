@@ -13,6 +13,8 @@ services:
       - WEBDAV_URL=${WEBDAV_URL}
       - COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
       - TZ=${TZ}
+    ports:
+      - "${POSTGRES_PORT}:5432"
     restart: always
     volumes:
       - postgres_data:/var/lib/postgresql/data

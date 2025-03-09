@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Планировщик задач - Frontend
 
-## Getting Started
+Фронтенд-часть приложения для планирования задач, написанная на React с использованием TypeScript и Material-UI.
 
-First, run the development server:
+## Требования
 
+- Node.js 16.x или выше
+- npm 8.x или выше
+
+## Установка
+
+1. Установите зависимости:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Создайте файл .env в корневой директории проекта и добавьте необходимые переменные окружения:
+```bash
+REACT_APP_API_URL=http://localhost:5000/api
+REACT_APP_TITLE=Планировщик задач
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Запуск
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Для запуска приложения в режиме разработки:
+```bash
+npm start
+```
 
-## Learn More
+Приложение будет доступно по адресу [http://localhost:3000](http://localhost:3000).
 
-To learn more about Next.js, take a look at the following resources:
+## Сборка
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Для создания production-сборки:
+```bash
+npm run build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Собранные файлы будут находиться в директории `build`.
 
-## Deploy on Vercel
+## Тестирование
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Для запуска тестов:
+```bash
+npm test
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Структура проекта
+
+```
+src/
+  ├── api/          # API клиенты
+  ├── components/   # React компоненты
+  ├── types/        # TypeScript типы
+  ├── theme.ts      # Настройки темы Material-UI
+  ├── App.tsx       # Главный компонент приложения
+  └── index.tsx     # Точка входа
+```
+
+## Основные технологии
+
+- React 18
+- TypeScript 4
+- Material-UI 5
+- Axios
+- React Testing Library
