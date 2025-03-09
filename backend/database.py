@@ -3,15 +3,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 import json
+import logging
 
 from backend.create_bot import db_string
-from backend.db.models import DurationType, TaskTypeSetting, DefaultSettings, GlobalSettings
-
-# Создаем базовый класс для моделей
-Base = declarative_base()
+from backend.db.models import DurationType, TaskTypeSetting
 
 # Создаем асинхронный движок SQLAlchemy
-
 engine = create_async_engine(db_string, echo=True)
 
 # Создаем фабрику асинхронных сессий
@@ -33,10 +30,6 @@ async def get_session() -> AsyncSession:
 # Функция для инициализации базы данных
 async def init_db():
     from backend.db.models import DefaultSettings, GlobalSettings
-    
-    async with engine.begin() as conn:
-        # Создаем все таблицы
-        await conn.run_sync(Base.metadata.create_all)
     
     # Создаем настройки по умолчанию, если их еще нет
     async with async_session() as session:
@@ -91,6 +84,10 @@ async def create_initial_global_settings(session: AsyncSession):
 # Функция для создания начальных настроек по умолчанию
 async def create_initial_default_settings(session: AsyncSession):
     from backend.db.models import DefaultSettings
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    logger.info("Создание настроек по умолчанию")
     
     # Создаем стандартные статусы
     default_statuses = [
@@ -278,10 +275,28 @@ async def create_initial_default_settings(session: AsyncSession):
         session.add(db_setting)
     
     await session.commit()
+    logger.info("Настройки по умолчанию успешно созданы")
 
 # Функция для создания настроек пользователя на основе настроек по умолчанию
 async def create_user_settings(user_id: int, session: AsyncSession):
     from backend.db.models import DefaultSettings, StatusSetting, PrioritySetting, DurationSetting, TaskTypeSetting
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"Создание настроек для пользователя {user_id}")
+    
+    # Проверяем, есть ли уже настройки у пользователя
+    existing_statuses = await session.execute(
+        select(StatusSetting).where(StatusSetting.user_id == user_id)
+    )
+    if existing_statuses.first() is not None:
+        logger.info(f"У пользователя {user_id} уже есть настройки, пропускаем создание")
+        return
+    
+    # Проверяем, есть ли настройки по умолчанию
+    default_settings_count = await session.execute(select(DefaultSettings))
+    if default_settings_count.first() is None:
+        logger.warning("Настройки по умолчанию не найдены, создаем их")
+        await create_initial_default_settings(session)
     
     # Получаем все активные настройки по умолчанию
     default_statuses = await session.execute(
@@ -310,6 +325,7 @@ async def create_user_settings(user_id: int, session: AsyncSession):
     )
     
     # Создаем статусы для пользователя
+    status_count = 0
     for default_status in default_statuses.scalars():
         status_data = json.loads(default_status.value)
         db_status = StatusSetting(
@@ -323,8 +339,10 @@ async def create_user_settings(user_id: int, session: AsyncSession):
             is_active=status_data["is_active"]
         )
         session.add(db_status)
+        status_count += 1
     
     # Создаем приоритеты для пользователя
+    priority_count = 0
     for default_priority in default_priorities.scalars():
         priority_data = json.loads(default_priority.value)
         db_priority = PrioritySetting(
@@ -336,8 +354,10 @@ async def create_user_settings(user_id: int, session: AsyncSession):
             is_active=priority_data["is_active"]
         )
         session.add(db_priority)
+        priority_count += 1
     
     # Создаем продолжительности для пользователя
+    duration_count = 0
     for default_duration in default_durations.scalars():
         duration_data = json.loads(default_duration.value)
         db_duration = DurationSetting(
@@ -349,8 +369,10 @@ async def create_user_settings(user_id: int, session: AsyncSession):
             is_active=duration_data["is_active"]
         )
         session.add(db_duration)
+        duration_count += 1
 
     # Создаем типы задач для пользователя
+    task_type_count = 0
     for default_task_type in default_task_types.scalars():
         task_type_data = json.loads(default_task_type.value)
         db_task_type = TaskTypeSetting(
@@ -363,5 +385,14 @@ async def create_user_settings(user_id: int, session: AsyncSession):
             is_active=task_type_data["is_active"]
         )
         session.add(db_task_type)
+        task_type_count += 1
     
-    await session.commit() 
+    try:
+        await session.commit()
+        logger.info(f"Созданы настройки для пользователя {user_id}: "
+                    f"{status_count} статусов, {priority_count} приоритетов, "
+                    f"{duration_count} длительностей, {task_type_count} типов задач")
+    except Exception as e:
+        logger.error(f"Ошибка при создании настроек для пользователя {user_id}: {e}")
+        await session.rollback()
+        raise 

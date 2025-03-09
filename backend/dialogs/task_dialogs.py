@@ -6,6 +6,7 @@ from aiogram_dialog.widgets.input import TextInput
 from aiogram_dialog import DialogManager
 from typing import Any
 from aiogram.types import Message, CallbackQuery
+from aiogram_dialog.widgets.widget_event import SimpleEventProcessor
 
 from backend.locale_config import i18n
 from backend.services.task_service import TaskService
@@ -73,11 +74,16 @@ async def on_task_created(event, widget, manager: DialogManager):
         else:
             await event.answer(i18n.format_value("error"))
 
-async def on_title_success(event: Message, widget: Any, manager: DialogManager):
-    manager.dialog_data["title"] = event.text
+async def on_title_success(event: Message, source: Any, manager: DialogManager, *args, **kwargs):
+    if event.text and event.text.strip():
+        manager.dialog_data["title"] = event.text.strip()
+    else:
+        manager.dialog_data["title"] = "Новая задача"
+    await manager.next()
 
-async def on_description_success(event: Message, widget: Any, manager: DialogManager):
+async def on_description_success(event: Message, source: Any, manager: DialogManager, *args, **kwargs):
     manager.dialog_data["description"] = None if event.text == '-' else event.text
+    await manager.next()
 
 async def on_type_selected(callback: CallbackQuery, widget: Any, manager: DialogManager, item_id: str):
     manager.dialog_data["type_id"] = item_id
@@ -94,13 +100,13 @@ async def on_duration_selected(callback: CallbackQuery, widget: Any, manager: Di
 task_dialog = Dialog(
     Window(
         Const(i18n.format_value("task-title")),
-        TextInput(id="title", on_success=Next()),
+        TextInput(id="title", on_success=SimpleEventProcessor(on_title_success)),
         Next(Const(i18n.format_value("next"))),
         state=TaskDialog.title,
     ),
     Window(
         Const(i18n.format_value("task-description")),
-        TextInput(id="description", on_success=Next()),
+        TextInput(id="description", on_success=SimpleEventProcessor(on_description_success)),
         Row(
             Back(Const(i18n.format_value("back"))),
             Next(Const(i18n.format_value("next"))),

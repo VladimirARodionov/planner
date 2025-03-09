@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from backend.db.models import Task, DurationSetting, TaskTypeSetting
+from backend.db.models import Task, DurationSetting, TaskTypeSetting, StatusSetting, PrioritySetting
 from backend.services.auth_service import AuthService
 
 class TaskService:
@@ -21,7 +21,7 @@ class TaskService:
         if not user:
             return []
 
-        query = select(Task).where(Task.user_id == user.id)
+        query = select(Task).where(Task.user_id == user.telegram_id)
 
         if filters:
             if filters.get('status_id'):
@@ -54,19 +54,56 @@ class TaskService:
         user = await self.auth_service.get_user_by_id(user_id)
         if not user:
             return None
+            
+        # Проверяем наличие обязательного поля title
+        if 'title' not in task_data:
+            task_data['title'] = "Новая задача"  # Устанавливаем значение по умолчанию только если поле отсутствует
+        elif not task_data['title']:  # Если поле есть, но пустое
+            task_data['title'] = "Новая задача"
 
         # Проверяем, принадлежит ли тип задачи пользователю
         if task_data.get('type_id'):
             type_query = select(TaskTypeSetting).where(
                 TaskTypeSetting.id == task_data['type_id'],
-                TaskTypeSetting.user_id == user.id
+                TaskTypeSetting.user_id == user.telegram_id
             )
             type_result = await self.session.execute(type_query)
             if not type_result.scalar_one_or_none():
                 return None
 
+        # Получаем настройки по умолчанию, если они не указаны
+        if not task_data.get('status_id'):
+            status_query = select(StatusSetting).where(
+                StatusSetting.user_id == user.telegram_id,
+                StatusSetting.is_default == True
+            )
+            status_result = await self.session.execute(status_query)
+            status = status_result.scalar_one_or_none()
+            if status:
+                task_data['status_id'] = status.id
+                
+        if not task_data.get('priority_id'):
+            priority_query = select(PrioritySetting).where(
+                PrioritySetting.user_id == user.telegram_id,
+                PrioritySetting.is_default == True
+            )
+            priority_result = await self.session.execute(priority_query)
+            priority = priority_result.scalar_one_or_none()
+            if priority:
+                task_data['priority_id'] = priority.id
+                
+        if not task_data.get('type_id'):
+            type_query = select(TaskTypeSetting).where(
+                TaskTypeSetting.user_id == user.telegram_id,
+                TaskTypeSetting.is_default == True
+            )
+            type_result = await self.session.execute(type_query)
+            task_type = type_result.scalar_one_or_none()
+            if task_type:
+                task_data['type_id'] = task_type.id
+
         task = Task(
-            user_id=user.id,
+            user_id=user.telegram_id,
             title=task_data['title'],
             description=task_data.get('description'),
             type_id=task_data.get('type_id'),
@@ -98,14 +135,14 @@ class TaskService:
             return None
 
         task = await self.session.get(Task, task_id)
-        if not task or task.user_id != user.id:
+        if not task or task.user_id != user.telegram_id:
             return None
 
         # Проверяем, принадлежит ли тип задачи пользователю
         if task_data.get('type_id'):
             type_query = select(TaskTypeSetting).where(
                 TaskTypeSetting.id == task_data['type_id'],
-                TaskTypeSetting.user_id == user.id
+                TaskTypeSetting.user_id == user.telegram_id
             )
             type_result = await self.session.execute(type_query)
             if not type_result.scalar_one_or_none():
@@ -139,7 +176,7 @@ class TaskService:
             return False
 
         task = await self.session.get(Task, task_id)
-        if not task or task.user_id != user.id:
+        if not task or task.user_id != user.telegram_id:
             return False
 
         await self.session.delete(task)

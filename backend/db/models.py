@@ -42,8 +42,7 @@ class User(Base):
     """Модель пользователя"""
     __tablename__ = 'users'
 
-    id = Column(BigInteger, primary_key=True)
-    telegram_id = Column(BigInteger, unique=True, nullable=False)
+    telegram_id = Column(BigInteger, primary_key=True)
     username = Column(String(100))
     first_name = Column(String(100))
     last_name = Column(String(100))
@@ -55,13 +54,14 @@ class User(Base):
     priority_settings = relationship('PrioritySetting', back_populates='user')
     duration_settings = relationship('DurationSetting', back_populates='user')
     status_settings = relationship('StatusSetting', back_populates='user')
+    task_type_settings = relationship('TaskTypeSetting', back_populates='user')
 
 class StatusSetting(Base):
     """Настройки статусов задач для пользователя"""
     __tablename__ = 'status_settings'
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(BigInteger, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    user_id = Column(BigInteger, ForeignKey('users.telegram_id', ondelete='CASCADE'), nullable=False)
     name = Column(String(100), nullable=False)  # Название статуса
     code = Column(String(50), nullable=False)  # Код статуса для программной обработки
     color = Column(String(7))  # HEX код цвета для отображения
@@ -81,7 +81,7 @@ class PrioritySetting(Base):
     __tablename__ = 'priority_settings'
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(BigInteger, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    user_id = Column(BigInteger, ForeignKey('users.telegram_id', ondelete='CASCADE'), nullable=False)
     name = Column(String(100), nullable=False)  # Название приоритета
     color = Column(String(7))  # HEX код цвета для отображения
     order = Column(Integer, default=0)  # Порядок сортировки
@@ -99,7 +99,7 @@ class DurationSetting(Base):
     __tablename__ = 'duration_settings'
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(BigInteger, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    user_id = Column(BigInteger, ForeignKey('users.telegram_id', ondelete='CASCADE'), nullable=False)
     name = Column(String(100), nullable=False)  # Название (день, месяц, год)
     duration_type = Column(Enum(DurationType), nullable=False, default=DurationType.DAYS)  # Тип продолжительности
     value = Column(Integer, nullable=False)  # Значение (количество дней, месяцев, лет)
@@ -138,7 +138,7 @@ class Task(Base):
     __tablename__ = 'tasks'
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(BigInteger, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    user_id = Column(BigInteger, ForeignKey('users.telegram_id', ondelete='CASCADE'), nullable=False)
     title = Column(String(200), nullable=False)
     description = Column(String(1000))
 
@@ -150,7 +150,7 @@ class Task(Base):
 
     # Даты
     created_at = Column(DateTime(timezone=True), default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
     deadline = Column(DateTime(timezone=True))
     completed_at = Column(DateTime(timezone=True))
 
@@ -211,7 +211,7 @@ class TaskTypeSetting(Base):
     __tablename__ = "task_type_settings"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, index=True)
+    user_id = Column(BigInteger, ForeignKey('users.telegram_id', ondelete='CASCADE'), nullable=False, index=True)
     name = Column(String)
     description = Column(Text, nullable=True)
     color = Column(String, nullable=True)
@@ -222,3 +222,4 @@ class TaskTypeSetting(Base):
     updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
 
     tasks = relationship("Task", back_populates="type")
+    user = relationship('User', back_populates='task_type_settings')

@@ -1,8 +1,8 @@
 """initial
 
-Revision ID: 351bdca3f9e4
+Revision ID: bf61ce821156
 Revises: 
-Create Date: 2025-03-09 12:38:12.300112
+Create Date: 2025-03-09 20:01:34.232093
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '351bdca3f9e4'
+revision: str = 'bf61ce821156'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -40,31 +40,14 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('key')
     )
-    op.create_table('task_type_settings',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('user_id', sa.String(), nullable=True),
-    sa.Column('name', sa.String(), nullable=True),
-    sa.Column('description', sa.Text(), nullable=True),
-    sa.Column('color', sa.String(), nullable=True),
-    sa.Column('order', sa.Integer(), nullable=True),
-    sa.Column('is_default', sa.Boolean(), nullable=True),
-    sa.Column('is_active', sa.Boolean(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_task_type_settings_id'), 'task_type_settings', ['id'], unique=False)
-    op.create_index(op.f('ix_task_type_settings_user_id'), 'task_type_settings', ['user_id'], unique=False)
     op.create_table('users',
-    sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('telegram_id', sa.BigInteger(), nullable=False),
     sa.Column('username', sa.String(length=100), nullable=True),
     sa.Column('first_name', sa.String(length=100), nullable=True),
     sa.Column('last_name', sa.String(length=100), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('settings', sa.JSON(), nullable=True),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('telegram_id')
+    sa.PrimaryKeyConstraint('telegram_id')
     )
     op.create_table('duration_settings',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -76,7 +59,7 @@ def upgrade() -> None:
     sa.Column('is_active', sa.Boolean(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['user_id'], ['users.telegram_id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('priority_settings',
@@ -89,7 +72,7 @@ def upgrade() -> None:
     sa.Column('is_default', sa.Boolean(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['user_id'], ['users.telegram_id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('status_settings',
@@ -104,9 +87,25 @@ def upgrade() -> None:
     sa.Column('is_final', sa.Boolean(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['user_id'], ['users.telegram_id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('task_type_settings',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.BigInteger(), nullable=False),
+    sa.Column('name', sa.String(), nullable=True),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('color', sa.String(), nullable=True),
+    sa.Column('order', sa.Integer(), nullable=True),
+    sa.Column('is_default', sa.Boolean(), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.telegram_id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_task_type_settings_id'), 'task_type_settings', ['id'], unique=False)
+    op.create_index(op.f('ix_task_type_settings_user_id'), 'task_type_settings', ['user_id'], unique=False)
     op.create_table('tasks',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.BigInteger(), nullable=False),
@@ -128,7 +127,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['priority_id'], ['priority_settings.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['status_id'], ['status_settings.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['type_id'], ['task_type_settings.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['user_id'], ['users.telegram_id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     # ### end Alembic commands ###
@@ -137,13 +136,13 @@ def upgrade() -> None:
 def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_table('tasks')
+    op.drop_index(op.f('ix_task_type_settings_user_id'), table_name='task_type_settings')
+    op.drop_index(op.f('ix_task_type_settings_id'), table_name='task_type_settings')
+    op.drop_table('task_type_settings')
     op.drop_table('status_settings')
     op.drop_table('priority_settings')
     op.drop_table('duration_settings')
     op.drop_table('users')
-    op.drop_index(op.f('ix_task_type_settings_user_id'), table_name='task_type_settings')
-    op.drop_index(op.f('ix_task_type_settings_id'), table_name='task_type_settings')
-    op.drop_table('task_type_settings')
     op.drop_table('global_settings')
     op.drop_table('default_settings')
     # ### end Alembic commands ###

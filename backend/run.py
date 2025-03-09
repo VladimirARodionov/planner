@@ -48,6 +48,10 @@ async def start_bot(bot: Bot):
 async def set_commands(bot: Bot):
     commands = [BotCommand(command='start', description=i18n.format_value("start_menu")),
                 BotCommand(command='profile', description=i18n.format_value("my_profile_text")),
+                BotCommand(command='tasks', description=i18n.format_value("tasks-header")),
+                BotCommand(command='add_task', description=i18n.format_value("help-add-task")),
+                BotCommand(command='settings', description=i18n.format_value("settings_menu")),
+                BotCommand(command='help', description=i18n.format_value("help-help")),
                 BotCommand(command='stop', description=i18n.format_value("stop_menu"))]
     await bot.set_my_commands(commands, BotCommandScopeDefault())
 
@@ -56,6 +60,10 @@ async def stop_bot(bot: Bot):
     logger.info('Бот остановлен')
 
 async def main():
+    # Инициализируем базу данных
+    from backend.database import init_db
+    await init_db()
+    
     # Регистрируем роутеры
     dp.include_router(task_handlers.router)
     dp.include_router(task_dialog)

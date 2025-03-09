@@ -11,6 +11,23 @@ create = Создать
 error = ❌ Ошибка
 success = ✅ Успешно
 
+# Настройки
+settings_menu = ⚙️ Настройки
+settings_header = ⚙️ Ваши настройки:
+settings_statuses = 📊 Статусы задач
+settings_priorities = 🔔 Приоритеты задач
+settings_durations = ⏱️ Длительности задач
+settings_task_types = 📁 Типы задач
+settings_not_found = Настройки не найдены
+
+# Команды настроек
+settings_command_help = /settings - Просмотр и редактирование настроек
+settings_statuses_command_help = /settings_statuses - Управление статусами задач
+settings_priorities_command_help = /settings_priorities - Управление приоритетами задач
+settings_durations_command_help = /settings_durations - Управление длительностями задач
+settings_task_types_command_help = /settings_types - Управление типами задач
+create_settings_command_help = /create_settings - Принудительное создание настроек
+
 # Задачи
 task-title = Введите название задачи:
 task-description = Введите описание задачи (или отправьте '-' чтобы пропустить):
@@ -22,7 +39,7 @@ task-duration = Выберите длительность задачи:
 # Список задач
 tasks-empty = У вас пока нет задач. Создайте новую задачу командой /add_task
 tasks-header = 📋 Ваши задачи:
-task-item = {$status_emoji} {$priority_emoji} {$title}
+task-item = {$status_emoji} {$priority_emoji} #{$id} {$title}
 task-description-line = 📝 {$description}
 task-deadline-line = ⏰ Дедлайн: {$deadline}
 

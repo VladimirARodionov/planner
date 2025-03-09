@@ -2,6 +2,7 @@ from typing import List, Optional, Dict, Any, Type
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import json
+import logging
 
 from backend.db.models import (
     StatusSetting, PrioritySetting, DurationSetting, DurationType,
@@ -67,7 +68,7 @@ class SettingsService:
         # Сначала пробуем получить пользовательские настройки
         result = await self.session.execute(
             select(TaskTypeSetting).where(
-                TaskTypeSetting.user_id == user.id,
+                TaskTypeSetting.user_id == user.telegram_id,
                 TaskTypeSetting.is_active == True
             ).order_by(TaskTypeSetting.order)
         )
@@ -416,28 +417,38 @@ class SettingsService:
 
     async def get_statuses(self, user_id: str) -> List[Dict[str, Any]]:
         """Получить список статусов пользователя"""
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"Получение статусов для пользователя {user_id}")
+        
         user = await self.auth_service.get_user_by_id(user_id)
         if not user:
+            logger.warning(f"Пользователь {user_id} не найден")
             return []
 
         # Сначала пробуем получить пользовательские настройки
         result = await self.session.execute(
             select(StatusSetting).where(
-                StatusSetting.user_id == user.id,
+                StatusSetting.user_id == user.telegram_id,
                 StatusSetting.is_active == True
             ).order_by(StatusSetting.order)
         )
-        statuses = result.scalars().all()
+        statuses = list(result.scalars())
+        
+        logger.info(f"Найдено {len(statuses)} пользовательских статусов для пользователя {user_id}")
 
         # Если пользовательских настроек нет, берем настройки по умолчанию
         if not statuses:
+            logger.info(f"Пользовательские статусы не найдены, получаем статусы по умолчанию")
             default_statuses = await self.session.execute(
                 select(DefaultSettings).where(
                     DefaultSettings.setting_type == "status",
                     DefaultSettings.is_active == True
                 )
             )
-            return [json.loads(status.value) for status in default_statuses.scalars()]
+            default_statuses_list = [json.loads(status.value) for status in default_statuses.scalars()]
+            logger.info(f"Найдено {len(default_statuses_list)} статусов по умолчанию")
+            return default_statuses_list
 
         return [
             {
@@ -462,7 +473,7 @@ class SettingsService:
         # Сначала пробуем получить пользовательские настройки
         result = await self.session.execute(
             select(PrioritySetting).where(
-                PrioritySetting.user_id == user.id,
+                PrioritySetting.user_id == user.telegram_id,
                 PrioritySetting.is_active == True
             ).order_by(PrioritySetting.order)
         )
@@ -492,37 +503,23 @@ class SettingsService:
 
     async def get_durations(self, user_id: str) -> List[Dict[str, Any]]:
         """Получить список длительностей пользователя"""
+        logger = logging.getLogger(__name__)
+        logger.info(f"Получение длительностей для пользователя {user_id}")
+        
         user = await self.auth_service.get_user_by_id(user_id)
         if not user:
+            logger.warning(f"Пользователь {user_id} не найден")
             return []
 
-        # Сначала пробуем получить пользовательские настройки
-        result = await self.session.execute(
-            select(DurationSetting).where(
-                DurationSetting.user_id == user.id,
-                DurationSetting.is_active == True
-            ).order_by(DurationSetting.value)
-        )
-        durations = result.scalars().all()
-
-        # Если пользовательских настроек нет, берем настройки по умолчанию
-        if not durations:
-            default_durations = await self.session.execute(
-                select(DefaultSettings).where(
-                    DefaultSettings.setting_type == "duration",
-                    DefaultSettings.is_active == True
-                )
+        # Получаем настройки по умолчанию
+        default_durations = await self.session.execute(
+            select(DefaultSettings).where(
+                DefaultSettings.setting_type == "duration",
+                DefaultSettings.is_active == True
             )
-            return [json.loads(duration.value) for duration in default_durations.scalars()]
-
-        return [
-            {
-                "id": duration.id,
-                "name": duration.name,
-                "type": duration.duration_type.value,
-                "value": duration.value,
-                "is_default": duration.is_default,
-                "is_active": duration.is_active
-            }
-            for duration in durations
-        ] 
+        )
+        default_durations_list = [json.loads(duration.value) for duration in default_durations.scalars()]
+        logger.info(f"Найдено {len(default_durations_list)} длительностей по умолчанию")
+        
+        # Возвращаем настройки по умолчанию
+        return default_durations_list 
