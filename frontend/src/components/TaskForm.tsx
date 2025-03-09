@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Task, Status, Priority, Duration } from '../types/task';
+import { Task, Status, Priority, Duration, TaskType } from '../types/task';
 import { TasksAPI, CreateTaskDto, UpdateTaskDto } from '../api/tasks';
 import {
     Box,
@@ -27,6 +27,7 @@ interface TaskFormProps {
 type FormData = {
     title: string;
     description: string;
+    type_id: string;
     status_id: number | '';
     priority_id: number | '';
     duration_id: number | '';
@@ -41,10 +42,12 @@ export const TaskForm: React.FC<TaskFormProps> = ({
     const [formData, setFormData] = useState<FormData>({
         title: '',
         description: '',
+        type_id: '',
         status_id: '',
         priority_id: '',
         duration_id: ''
     });
+    const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
     const [statuses, setStatuses] = useState<Status[]>([]);
     const [priorities, setPriorities] = useState<Priority[]>([]);
     const [durations, setDurations] = useState<Duration[]>([]);
@@ -58,6 +61,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 setFormData({
                     title: task.title,
                     description: task.description || '',
+                    type_id: task.type?.id?.toString() || '',
                     status_id: task.status?.id || '',
                     priority_id: task.priority?.id || '',
                     duration_id: task.duration?.id || ''
@@ -66,6 +70,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 setFormData({
                     title: '',
                     description: '',
+                    type_id: '',
                     status_id: '',
                     priority_id: '',
                     duration_id: ''
@@ -77,7 +82,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({
     const loadSettings = async () => {
         try {
             setLoading(true);
-            const settings = await TasksAPI.getSettings();
+            const [types, settings] = await Promise.all([
+                TasksAPI.getTaskTypes(),
+                TasksAPI.getSettings()
+            ]);
+            setTaskTypes(types);
             setStatuses(settings.statuses);
             setPriorities(settings.priorities);
             setDurations(settings.durations);
@@ -115,6 +124,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         const submitData: CreateTaskDto | UpdateTaskDto = {
             title: formData.title,
             description: formData.description || null,
+            type_id: formData.type_id ? parseInt(formData.type_id) : undefined,
             status_id: formData.status_id !== '' ? formData.status_id : undefined,
             priority_id: formData.priority_id !== '' ? formData.priority_id : undefined,
             duration_id: formData.duration_id !== '' ? formData.duration_id : undefined
@@ -154,12 +164,28 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                             fullWidth
                         />
                         <FormControl fullWidth>
+                            <InputLabel>Тип задачи</InputLabel>
+                            <Select
+                                value={formData.type_id}
+                                onChange={(e) => setFormData({ ...formData, type_id: e.target.value })}
+                                label="Тип задачи"
+                            >
+                                <MenuItem value="">Не выбран</MenuItem>
+                                {taskTypes.map((type) => (
+                                    <MenuItem key={type.id} value={type.id}>
+                                        {type.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                        <FormControl fullWidth>
                             <InputLabel>Статус</InputLabel>
                             <Select
                                 value={formData.status_id}
                                 onChange={(e) => handleSelectChange(e, 'status_id')}
                                 label="Статус"
                             >
+                                <MenuItem value="">Не выбран</MenuItem>
                                 {statuses.map((status) => (
                                     <MenuItem
                                         key={status.id}
@@ -185,6 +211,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                                 onChange={(e) => handleSelectChange(e, 'priority_id')}
                                 label="Приоритет"
                             >
+                                <MenuItem value="">Не выбран</MenuItem>
                                 {priorities.map((priority) => (
                                     <MenuItem
                                         key={priority.id}
@@ -210,6 +237,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                                 onChange={(e) => handleSelectChange(e, 'duration_id')}
                                 label="Длительность"
                             >
+                                <MenuItem value="">Не выбран</MenuItem>
                                 {durations.map((duration) => (
                                     <MenuItem key={duration.id} value={duration.id}>
                                         {duration.name}

@@ -145,6 +145,7 @@ class Task(Base):
     # Связи с настройками
     status_id = Column(Integer, ForeignKey('status_settings.id', ondelete='SET NULL'))
     priority_id = Column(Integer, ForeignKey('priority_settings.id', ondelete='SET NULL'))
+    type_id = Column(Integer, ForeignKey("task_type_settings.id"), nullable=True)
     duration_id = Column(Integer, ForeignKey('duration_settings.id', ondelete='SET NULL'))
 
     # Даты
@@ -165,6 +166,7 @@ class Task(Base):
     user = relationship('User', back_populates='tasks')
     status = relationship('StatusSetting', back_populates='tasks')
     priority = relationship('PrioritySetting', back_populates='tasks')
+    type = relationship("TaskTypeSetting", back_populates="tasks")
     duration = relationship('DurationSetting', back_populates='tasks')
 
     def add_reminder(self, reminder_date: datetime):
@@ -203,3 +205,20 @@ class Task(Base):
         if not self.deadline or self.status.is_final:
             return False
         return datetime.now() > self.deadline
+
+
+class TaskTypeSetting(Base):
+    __tablename__ = "task_type_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True)
+    name = Column(String)
+    description = Column(Text, nullable=True)
+    color = Column(String, nullable=True)
+    order = Column(Integer, default=0)
+    is_default = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), default=func.now())
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
+
+    tasks = relationship("Task", back_populates="type")

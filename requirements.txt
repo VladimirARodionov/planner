@@ -13,4 +13,6 @@ psycopg2-binary
 sqlalchemy>=2.0.0
 aiosqlite
 asyncpg
+aiogram-dialog
+pydantic
 

@@ -5,7 +5,7 @@ from sqlalchemy.orm import declarative_base
 import json
 
 from backend.create_bot import db_string
-from backend.db.models import DurationType
+from backend.db.models import DurationType, TaskTypeSetting, DefaultSettings, GlobalSettings
 
 # Создаем базовый класс для моделей
 Base = declarative_base()
@@ -231,12 +231,57 @@ async def create_initial_default_settings(session: AsyncSession):
             is_active=True
         )
         session.add(db_setting)
+
+    # Создаем типы задач по умолчанию
+    default_task_types = [
+        {
+            "name": "Личные",
+            "description": "Личные задачи и дела",
+            "color": "#FF69B4",  # Розовый
+            "order": 1,
+            "is_default": True,
+            "is_active": True
+        },
+        {
+            "name": "Семейные",
+            "description": "Задачи, связанные с семьей",
+            "color": "#4169E1",  # Синий
+            "order": 2,
+            "is_default": False,
+            "is_active": True
+        },
+        {
+            "name": "Рабочие",
+            "description": "Рабочие задачи и проекты",
+            "color": "#32CD32",  # Зеленый
+            "order": 3,
+            "is_default": False,
+            "is_active": True
+        },
+        {
+            "name": "Для отдыха",
+            "description": "Задачи для отдыха и развлечений",
+            "color": "#FFA500",  # Оранжевый
+            "order": 4,
+            "is_default": False,
+            "is_active": True
+        }
+    ]
+
+    for task_type in default_task_types:
+        db_setting = DefaultSettings(
+            setting_type="task_type",
+            name=task_type["name"],
+            value=json.dumps(task_type),
+            is_active=True
+        )
+        session.add(db_setting)
     
     await session.commit()
 
 # Функция для создания настроек пользователя на основе настроек по умолчанию
 async def create_user_settings(user_id: int, session: AsyncSession):
-    from backend.db.models import DefaultSettings, StatusSetting, PrioritySetting, DurationSetting
+    from backend.db.models import DefaultSettings, StatusSetting, PrioritySetting, DurationSetting, TaskTypeSetting
     
     # Получаем все активные настройки по умолчанию
     default_statuses = await session.execute(
@@ -254,6 +299,12 @@ async def create_user_settings(user_id: int, session: AsyncSession):
     default_durations = await session.execute(
         select(DefaultSettings).where(
             DefaultSettings.setting_type == "duration",
+            DefaultSettings.is_active == True
+        )
+    )
+    default_task_types = await session.execute(
+        select(DefaultSettings).where(
+            DefaultSettings.setting_type == "task_type",
             DefaultSettings.is_active == True
         )
     )
@@ -298,5 +349,19 @@ async def create_user_settings(user_id: int, session: AsyncSession):
             is_active=duration_data["is_active"]
         )
         session.add(db_duration)
+
+    # Создаем типы задач для пользователя
+    for default_task_type in default_task_types.scalars():
+        task_type_data = json.loads(default_task_type.value)
+        db_task_type = TaskTypeSetting(
+            user_id=user_id,
+            name=task_type_data["name"],
+            description=task_type_data["description"],
+            color=task_type_data["color"],
+            order=task_type_data["order"],
+            is_default=task_type_data["is_default"],
+            is_active=task_type_data["is_active"]
+        )
+        session.add(db_task_type)
     
     await session.commit() 

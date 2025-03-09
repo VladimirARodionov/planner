@@ -6,6 +6,7 @@ from multiprocessing import Process
 
 from aiogram import Bot
 from aiogram.types import BotCommand, BotCommandScopeDefault
+from aiogram_dialog import setup_dialogs
 from flask import Flask
 from flask_jwt_extended import JWTManager
 
@@ -13,6 +14,8 @@ from flask_cors import CORS
 
 from backend.cache_config import cache
 from backend.create_bot import main_bot, dp
+from backend.dialogs.task_dialogs import task_dialog
+from backend.handlers import task_handlers
 from backend.load_env import env_config
 from backend.locale_config import i18n
 
@@ -53,8 +56,11 @@ async def stop_bot(bot: Bot):
     logger.info('Бот остановлен')
 
 async def main():
-    # регистрация роутеров
-    #dp.include_router(user_router)
+    # Регистрируем роутеры
+    dp.include_router(task_handlers.router)
+    dp.include_router(task_dialog)
+    # Регистрируем диалоги
+    setup_dialogs(dp)
 
     # регистрация функций
     dp.startup.register(start_bot)

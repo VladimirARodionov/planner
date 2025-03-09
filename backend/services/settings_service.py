@@ -1,34 +1,190 @@
 from typing import List, Optional, Dict, Any, Type
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+import json
 
 from backend.db.models import (
-    StatusSetting, PrioritySetting, DurationSetting, DurationType
+    StatusSetting, PrioritySetting, DurationSetting, DurationType,
+    DefaultSettings, TaskTypeSetting
 )
 from backend.services.auth_service import AuthService
+from backend.models.settings import Settings
+from backend.models.status import Status
+from backend.models.priority import Priority
+from backend.models.duration import Duration
+from backend.models.task_type import TaskType
 
 class SettingsService:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.auth_service = AuthService(session)
 
-    async def get_settings(self) -> Dict[str, List[Dict[str, Any]]]:
-        """Получить все активные настройки"""
-        statuses = await self.session.execute(
-            select(StatusSetting).where(StatusSetting.is_active == True)
+    async def get_settings(self) -> Dict[str, Any]:
+        """Получить все настройки пользователя"""
+        user = await self.auth_service.get_user_by_id("system")
+        if not user:
+            return {}
+
+        # Получаем все настройки по умолчанию
+        default_statuses = await self.session.execute(
+            select(DefaultSettings).where(
+                DefaultSettings.setting_type == "status",
+                DefaultSettings.is_active == True
+            )
         )
-        priorities = await self.session.execute(
-            select(PrioritySetting).where(PrioritySetting.is_active == True)
+        default_priorities = await self.session.execute(
+            select(DefaultSettings).where(
+                DefaultSettings.setting_type == "priority",
+                DefaultSettings.is_active == True
+            )
         )
-        durations = await self.session.execute(
-            select(DurationSetting).where(DurationSetting.is_active == True)
+        default_durations = await self.session.execute(
+            select(DefaultSettings).where(
+                DefaultSettings.setting_type == "duration",
+                DefaultSettings.is_active == True
+            )
+        )
+        default_task_types = await self.session.execute(
+            select(DefaultSettings).where(
+                DefaultSettings.setting_type == "task_type",
+                DefaultSettings.is_active == True
+            )
         )
 
         return {
-            'statuses': [status.to_dict() for status in statuses.scalars()],
-            'priorities': [priority.to_dict() for priority in priorities.scalars()],
-            'durations': [duration.to_dict() for duration in durations.scalars()]
+            "statuses": [json.loads(status.value) for status in default_statuses.scalars()],
+            "priorities": [json.loads(priority.value) for priority in default_priorities.scalars()],
+            "durations": [json.loads(duration.value) for duration in default_durations.scalars()],
+            "task_types": [json.loads(task_type.value) for task_type in default_task_types.scalars()]
         }
+
+    async def get_task_types(self, user_id: str) -> List[Dict[str, Any]]:
+        """Получить список типов задач пользователя"""
+        user = await self.auth_service.get_user_by_id(user_id)
+        if not user:
+            return []
+
+        # Сначала пробуем получить пользовательские настройки
+        result = await self.session.execute(
+            select(TaskTypeSetting).where(
+                TaskTypeSetting.user_id == user.id,
+                TaskTypeSetting.is_active == True
+            ).order_by(TaskTypeSetting.order)
+        )
+        task_types = result.scalars().all()
+
+        # Если пользовательских настроек нет, берем настройки по умолчанию
+        if not task_types:
+            default_task_types = await self.session.execute(
+                select(DefaultSettings).where(
+                    DefaultSettings.setting_type == "task_type",
+                    DefaultSettings.is_active == True
+                )
+            )
+            return [json.loads(task_type.value) for task_type in default_task_types.scalars()]
+
+        return [
+            {
+                "id": task_type.id,
+                "name": task_type.name,
+                "description": task_type.description,
+                "color": task_type.color,
+                "order": task_type.order,
+                "is_default": task_type.is_default,
+                "is_active": task_type.is_active
+            }
+            for task_type in task_types
+        ]
+
+    async def create_task_type(
+        self,
+        user_id: str,
+        task_type_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Создать новый тип задачи"""
+        user = await self.auth_service.get_user_by_id(user_id)
+        if not user:
+            return None
+
+        task_type = TaskTypeSetting(
+            user_id=user.id,
+            name=task_type_data["name"],
+            description=task_type_data.get("description"),
+            color=task_type_data.get("color"),
+            order=task_type_data.get("order", 0),
+            is_default=task_type_data.get("is_default", False),
+            is_active=task_type_data.get("is_active", True)
+        )
+
+        self.session.add(task_type)
+        await self.session.commit()
+        await self.session.refresh(task_type)
+
+        return {
+            "id": task_type.id,
+            "name": task_type.name,
+            "description": task_type.description,
+            "color": task_type.color,
+            "order": task_type.order,
+            "is_default": task_type.is_default,
+            "is_active": task_type.is_active
+        }
+
+    async def update_task_type(
+        self,
+        user_id: str,
+        task_type_id: int,
+        task_type_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Обновить тип задачи"""
+        user = await self.auth_service.get_user_by_id(user_id)
+        if not user:
+            return None
+
+        task_type = await self.session.get(TaskTypeSetting, task_type_id)
+        if not task_type or task_type.user_id != user.id:
+            return None
+
+        if "name" in task_type_data:
+            task_type.name = task_type_data["name"]
+        if "description" in task_type_data:
+            task_type.description = task_type_data["description"]
+        if "color" in task_type_data:
+            task_type.color = task_type_data["color"]
+        if "order" in task_type_data:
+            task_type.order = task_type_data["order"]
+        if "is_default" in task_type_data:
+            task_type.is_default = task_type_data["is_default"]
+        if "is_active" in task_type_data:
+            task_type.is_active = task_type_data["is_active"]
+
+        await self.session.commit()
+        await self.session.refresh(task_type)
+
+        return {
+            "id": task_type.id,
+            "name": task_type.name,
+            "description": task_type.description,
+            "color": task_type.color,
+            "order": task_type.order,
+            "is_default": task_type.is_default,
+            "is_active": task_type.is_active
+        }
+
+    async def delete_task_type(self, user_id: str, task_type_id: int) -> bool:
+        """Удалить тип задачи"""
+        user = await self.auth_service.get_user_by_id(user_id)
+        if not user:
+            return False
+
+        task_type = await self.session.get(TaskTypeSetting, task_type_id)
+        if not task_type or task_type.user_id != user.id:
+            return False
+
+        await self.session.delete(task_type)
+        await self.session.commit()
+
+        return True
 
     async def create_setting(
         self,
@@ -175,4 +331,198 @@ class SettingsService:
             'priority': PrioritySetting,
             'duration': DurationSetting
         }
-        return setting_classes.get(setting_type) 
+        return setting_classes.get(setting_type)
+
+    async def get_settings_from_models(self):
+        # Получаем все настройки
+        result = await self.session.execute(select(Settings))
+        settings = result.scalar_one_or_none()
+
+        if not settings:
+            # Создаем настройки по умолчанию
+            settings = Settings()
+            self.session.add(settings)
+            await self.session.commit()
+
+        # Получаем статусы
+        result = await self.session.execute(select(Status))
+        statuses = result.scalars().all()
+
+        # Получаем приоритеты
+        result = await self.session.execute(select(Priority))
+        priorities = result.scalars().all()
+
+        # Получаем длительности
+        result = await self.session.execute(select(Duration))
+        durations = result.scalars().all()
+
+        # Получаем типы задач
+        result = await self.session.execute(select(TaskType))
+        task_types = result.scalars().all()
+
+        return {
+            'statuses': [{"id": s.id, "name": s.name} for s in statuses],
+            'priorities': [{"id": p.id, "name": p.name} for p in priorities],
+            'durations': [{"id": d.id, "name": d.name} for d in durations],
+            'task_types': [{"id": t.id, "name": t.name} for t in task_types],
+        }
+
+    async def create_default_settings(self):
+        # Создаем статусы по умолчанию
+        default_statuses = [
+            Status(name="Новая"),
+            Status(name="В процессе"),
+            Status(name="Завершена"),
+            Status(name="Отменена"),
+        ]
+        for status in default_statuses:
+            self.session.add(status)
+
+        # Создаем приоритеты по умолчанию
+        default_priorities = [
+            Priority(name="Высокий"),
+            Priority(name="Средний"),
+            Priority(name="Низкий"),
+        ]
+        for priority in default_priorities:
+            self.session.add(priority)
+
+        # Создаем длительности по умолчанию
+        default_durations = [
+            Duration(name="День"),
+            Duration(name="Неделя"),
+            Duration(name="Месяц"),
+            Duration(name="Квартал"),
+            Duration(name="Год"),
+        ]
+        for duration in default_durations:
+            self.session.add(duration)
+
+        # Создаем типы задач по умолчанию
+        default_task_types = [
+            TaskType(name="Личные", description="Личные задачи"),
+            TaskType(name="Семейные", description="Семейные задачи"),
+            TaskType(name="Рабочие", description="Рабочие задачи"),
+            TaskType(name="Для отдыха", description="Задачи для отдыха"),
+        ]
+        for task_type in default_task_types:
+            self.session.add(task_type)
+
+        # Создаем настройки по умолчанию
+        settings = Settings()
+        self.session.add(settings)
+
+        await self.session.commit()
+
+    async def get_statuses(self, user_id: str) -> List[Dict[str, Any]]:
+        """Получить список статусов пользователя"""
+        user = await self.auth_service.get_user_by_id(user_id)
+        if not user:
+            return []
+
+        # Сначала пробуем получить пользовательские настройки
+        result = await self.session.execute(
+            select(StatusSetting).where(
+                StatusSetting.user_id == user.id,
+                StatusSetting.is_active == True
+            ).order_by(StatusSetting.order)
+        )
+        statuses = result.scalars().all()
+
+        # Если пользовательских настроек нет, берем настройки по умолчанию
+        if not statuses:
+            default_statuses = await self.session.execute(
+                select(DefaultSettings).where(
+                    DefaultSettings.setting_type == "status",
+                    DefaultSettings.is_active == True
+                )
+            )
+            return [json.loads(status.value) for status in default_statuses.scalars()]
+
+        return [
+            {
+                "id": status.id,
+                "name": status.name,
+                "code": status.code,
+                "color": status.color,
+                "order": status.order,
+                "is_default": status.is_default,
+                "is_final": status.is_final,
+                "is_active": status.is_active
+            }
+            for status in statuses
+        ]
+
+    async def get_priorities(self, user_id: str) -> List[Dict[str, Any]]:
+        """Получить список приоритетов пользователя"""
+        user = await self.auth_service.get_user_by_id(user_id)
+        if not user:
+            return []
+
+        # Сначала пробуем получить пользовательские настройки
+        result = await self.session.execute(
+            select(PrioritySetting).where(
+                PrioritySetting.user_id == user.id,
+                PrioritySetting.is_active == True
+            ).order_by(PrioritySetting.order)
+        )
+        priorities = result.scalars().all()
+
+        # Если пользовательских настроек нет, берем настройки по умолчанию
+        if not priorities:
+            default_priorities = await self.session.execute(
+                select(DefaultSettings).where(
+                    DefaultSettings.setting_type == "priority",
+                    DefaultSettings.is_active == True
+                )
+            )
+            return [json.loads(priority.value) for priority in default_priorities.scalars()]
+
+        return [
+            {
+                "id": priority.id,
+                "name": priority.name,
+                "color": priority.color,
+                "order": priority.order,
+                "is_default": priority.is_default,
+                "is_active": priority.is_active
+            }
+            for priority in priorities
+        ]
+
+    async def get_durations(self, user_id: str) -> List[Dict[str, Any]]:
+        """Получить список длительностей пользователя"""
+        user = await self.auth_service.get_user_by_id(user_id)
+        if not user:
+            return []
+
+        # Сначала пробуем получить пользовательские настройки
+        result = await self.session.execute(
+            select(DurationSetting).where(
+                DurationSetting.user_id == user.id,
+                DurationSetting.is_active == True
+            ).order_by(DurationSetting.value)
+        )
+        durations = result.scalars().all()
+
+        # Если пользовательских настроек нет, берем настройки по умолчанию
+        if not durations:
+            default_durations = await self.session.execute(
+                select(DefaultSettings).where(
+                    DefaultSettings.setting_type == "duration",
+                    DefaultSettings.is_active == True
+                )
+            )
+            return [json.loads(duration.value) for duration in default_durations.scalars()]
+
+        return [
+            {
+                "id": duration.id,
+                "name": duration.name,
+                "type": duration.duration_type.value,
+                "value": duration.value,
+                "is_default": duration.is_default,
+                "is_active": duration.is_active
+            }
+            for duration in durations
+        ] 

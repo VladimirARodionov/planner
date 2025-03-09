@@ -1,8 +1,8 @@
 """initial
 
-Revision ID: 76b2099a5a86
+Revision ID: 351bdca3f9e4
 Revises: 
-Create Date: 2025-03-08 21:27:24.200735
+Create Date: 2025-03-09 12:38:12.300112
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '76b2099a5a86'
+revision: str = '351bdca3f9e4'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -40,6 +40,21 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('key')
     )
+    op.create_table('task_type_settings',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.String(), nullable=True),
+    sa.Column('name', sa.String(), nullable=True),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('color', sa.String(), nullable=True),
+    sa.Column('order', sa.Integer(), nullable=True),
+    sa.Column('is_default', sa.Boolean(), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_task_type_settings_id'), 'task_type_settings', ['id'], unique=False)
+    op.create_index(op.f('ix_task_type_settings_user_id'), 'task_type_settings', ['user_id'], unique=False)
     op.create_table('users',
     sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('telegram_id', sa.BigInteger(), nullable=False),
@@ -99,6 +114,7 @@ def upgrade() -> None:
     sa.Column('description', sa.String(length=1000), nullable=True),
     sa.Column('status_id', sa.Integer(), nullable=True),
     sa.Column('priority_id', sa.Integer(), nullable=True),
+    sa.Column('type_id', sa.Integer(), nullable=True),
     sa.Column('duration_id', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
@@ -111,6 +127,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['duration_id'], ['duration_settings.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['priority_id'], ['priority_settings.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['status_id'], ['status_settings.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['type_id'], ['task_type_settings.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -124,6 +141,9 @@ def downgrade() -> None:
     op.drop_table('priority_settings')
     op.drop_table('duration_settings')
     op.drop_table('users')
+    op.drop_index(op.f('ix_task_type_settings_user_id'), table_name='task_type_settings')
+    op.drop_index(op.f('ix_task_type_settings_id'), table_name='task_type_settings')
+    op.drop_table('task_type_settings')
     op.drop_table('global_settings')
     op.drop_table('default_settings')
     # ### end Alembic commands ###

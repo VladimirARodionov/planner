@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from backend.db.models import Task, DurationSetting
+from backend.db.models import Task, DurationSetting, TaskTypeSetting
 from backend.services.auth_service import AuthService
 
 class TaskService:
@@ -30,11 +30,14 @@ class TaskService:
                 query = query.where(Task.priority_id == filters['priority_id'])
             if filters.get('duration_id'):
                 query = query.where(Task.duration_id == filters['duration_id'])
+            if filters.get('type_id'):
+                query = query.where(Task.type_id == filters['type_id'])
 
         query = query.options(
             selectinload(Task.status),
             selectinload(Task.priority),
-            selectinload(Task.duration)
+            selectinload(Task.duration),
+            selectinload(Task.type)
         )
 
         result = await self.session.execute(query)
@@ -52,10 +55,21 @@ class TaskService:
         if not user:
             return None
 
+        # Проверяем, принадлежит ли тип задачи пользователю
+        if task_data.get('type_id'):
+            type_query = select(TaskTypeSetting).where(
+                TaskTypeSetting.id == task_data['type_id'],
+                TaskTypeSetting.user_id == user.id
+            )
+            type_result = await self.session.execute(type_query)
+            if not type_result.scalar_one_or_none():
+                return None
+
         task = Task(
             user_id=user.id,
             title=task_data['title'],
             description=task_data.get('description'),
+            type_id=task_data.get('type_id'),
             status_id=task_data.get('status_id'),
             priority_id=task_data.get('priority_id'),
             duration_id=task_data.get('duration_id')
@@ -87,10 +101,22 @@ class TaskService:
         if not task or task.user_id != user.id:
             return None
 
+        # Проверяем, принадлежит ли тип задачи пользователю
+        if task_data.get('type_id'):
+            type_query = select(TaskTypeSetting).where(
+                TaskTypeSetting.id == task_data['type_id'],
+                TaskTypeSetting.user_id == user.id
+            )
+            type_result = await self.session.execute(type_query)
+            if not type_result.scalar_one_or_none():
+                return None
+
         if 'title' in task_data:
             task.title = task_data['title']
         if 'description' in task_data:
             task.description = task_data['description']
+        if 'type_id' in task_data:
+            task.type_id = task_data['type_id']
         if 'status_id' in task_data:
             task.status_id = task_data['status_id']
         if 'priority_id' in task_data:
@@ -127,6 +153,11 @@ class TaskService:
             'id': task.id,
             'title': task.title,
             'description': task.description,
+            'type': {
+                'id': task.type.id,
+                'name': task.type.name,
+                'color': task.type.color
+            } if task.type else None,
             'status': {
                 'id': task.status.id,
                 'name': task.status.name,

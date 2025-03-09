@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Task, Settings, Status, Priority, Duration } from '../types/task';
+import { Task, Settings, Status, Priority, Duration, TaskType } from '../types/task';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -22,6 +22,7 @@ api.interceptors.request.use((config: any) => {
 export interface CreateTaskDto {
     title: string;
     description?: string | null;
+    type_id?: number;
     status_id?: number;
     priority_id?: number;
     duration_id?: number;
@@ -30,6 +31,7 @@ export interface CreateTaskDto {
 export interface UpdateTaskDto {
     title?: string;
     description?: string | null;
+    type_id?: number;
     status_id?: number;
     priority_id?: number;
     duration_id?: number;
@@ -41,6 +43,7 @@ export const TasksAPI = {
         status_id?: number;
         priority_id?: number;
         duration_id?: number;
+        type_id?: number;
         is_completed?: boolean;
     }) => {
         const response = await api.get<{ tasks: Task[] }>('/tasks/', { params: filters });
@@ -127,5 +130,32 @@ export const TasksAPI = {
 
     deleteDuration: async (durationId: number) => {
         await api.delete(`/settings/duration/${durationId}`);
+    },
+
+    // Типы задач
+    getTaskTypes: async () => {
+        const response = await api.get<TaskType[]>('/settings/task-types/');
+        return response.data;
+    },
+
+    createTaskType: async (taskType: {
+        name: string;
+        description?: string;
+        color?: string;
+        order?: number;
+        is_active?: boolean;
+        is_default?: boolean;
+    }) => {
+        const response = await api.post<TaskType>('/settings/task-types/', taskType);
+        return response.data;
+    },
+
+    updateTaskType: async (taskTypeId: number, taskType: Partial<TaskType>) => {
+        const response = await api.put<TaskType>(`/settings/task-types/${taskTypeId}`, taskType);
+        return response.data;
+    },
+
+    deleteTaskType: async (taskTypeId: number) => {
+        await api.delete(`/settings/task-types/${taskTypeId}`);
     },
 }; 

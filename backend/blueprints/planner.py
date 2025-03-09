@@ -170,3 +170,76 @@ async def delete_setting(setting_type, setting_id):
         if not success:
             return jsonify({'error': 'Setting not found'}), 404
         return '', 204
+
+# Маршруты для работы с типами задач
+@bp.route('/api/settings/task-types/', methods=['GET', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+@async_route
+async def get_task_types():
+    """Получить список типов задач пользователя"""
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    current_user = get_jwt_identity()
+    
+    async with get_session() as session:
+        settings_service = SettingsService(session)
+        task_types = await settings_service.get_task_types(current_user)
+        return jsonify(task_types)
+
+@bp.route('/api/settings/task-types/', methods=['POST', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+@async_route
+async def create_task_type():
+    """Создать новый тип задачи"""
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    current_user = get_jwt_identity()
+    task_type_data = request.get_json()
+    
+    async with get_session() as session:
+        settings_service = SettingsService(session)
+        task_type = await settings_service.create_task_type(current_user, task_type_data)
+        if not task_type:
+            return jsonify({'error': 'Failed to create task type'}), 400
+        return jsonify(task_type), 201
+
+@bp.route('/api/settings/task-types/<int:task_type_id>', methods=['PUT', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+@async_route
+async def update_task_type(task_type_id):
+    """Обновить тип задачи"""
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    current_user = get_jwt_identity()
+    task_type_data = request.get_json()
+    
+    async with get_session() as session:
+        settings_service = SettingsService(session)
+        task_type = await settings_service.update_task_type(current_user, task_type_id, task_type_data)
+        if not task_type:
+            return jsonify({'error': 'Task type not found'}), 404
+        return jsonify(task_type)
+
+@bp.route('/api/settings/task-types/<int:task_type_id>', methods=['DELETE', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+@async_route
+async def delete_task_type(task_type_id):
+    """Удалить тип задачи"""
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    current_user = get_jwt_identity()
+    
+    async with get_session() as session:
+        settings_service = SettingsService(session)
+        success = await settings_service.delete_task_type(current_user, task_type_id)
+        if not success:
+            return jsonify({'error': 'Task type not found'}), 404
+        return '', 204
