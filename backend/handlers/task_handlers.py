@@ -1,4 +1,9 @@
 import logging
+import time
+import json
+import os
+import jwt
+from datetime import datetime, timedelta
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
@@ -10,7 +15,102 @@ from backend.services.task_service import TaskService
 from backend.services.auth_service import AuthService
 from backend.services.settings_service import SettingsService
 from backend.dialogs.task_dialogs import TaskDialog
+from backend.load_env import env_config
 
+# Путь к файлу с состояниями авторизации
+AUTH_STATES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'auth_states.json')
+
+# Время жизни состояния авторизации в секундах (10 минут)
+AUTH_STATE_TTL = 600
+
+# Функция для создания access token
+def create_custom_access_token(identity):
+    """Создает JWT access token"""
+    expires = datetime.utcnow() + timedelta(hours=1)  # Токен действителен 1 час
+    payload = {
+        'sub': identity,  # Используем 'sub' вместо 'identity' для совместимости с Flask JWT Extended
+        'exp': expires,
+        'type': 'access'
+    }
+    return jwt.encode(payload, env_config.get('JWT_SECRET_KEY'), algorithm='HS256')
+
+# Функция для создания refresh token
+def create_custom_refresh_token(identity):
+    """Создает JWT refresh token"""
+    expires = datetime.utcnow() + timedelta(days=30)  # Токен действителен 30 дней
+    payload = {
+        'sub': identity,  # Используем 'sub' вместо 'identity' для совместимости с Flask JWT Extended
+        'exp': expires,
+        'type': 'refresh'
+    }
+    return jwt.encode(payload, env_config.get('JWT_SECRET_KEY'), algorithm='HS256')
+
+# Функция для загрузки состояний авторизации из файла
+def load_auth_states():
+    """Загружает состояния авторизации из файла"""
+    if not os.path.exists(AUTH_STATES_FILE):
+        return {}
+    
+    try:
+        with open(AUTH_STATES_FILE, 'r') as f:
+            auth_states = json.load(f)
+        
+        # Преобразуем строковые ключи timestamp обратно в числа
+        for state, data in auth_states.items():
+            auth_states[state] = (data[0], float(data[1]))
+        
+        return auth_states
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f"Ошибка при загрузке состояний авторизации: {e}")
+        return {}
+
+# Функция для сохранения состояний авторизации в файл
+def save_auth_states(auth_states):
+    """Сохраняет состояния авторизации в файл"""
+    try:
+        with open(AUTH_STATES_FILE, 'w') as f:
+            json.dump(auth_states, f)
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f"Ошибка при сохранении состояний авторизации: {e}")
+
+# Функция для добавления состояния авторизации
+def add_auth_state(state, redirect_url):
+    """Добавляет состояние авторизации"""
+    auth_states = load_auth_states()
+    auth_states[state] = (redirect_url, time.time())
+    save_auth_states(auth_states)
+
+# Функция для получения и удаления состояния авторизации
+def get_and_remove_auth_state(state):
+    """Получает и удаляет состояние авторизации"""
+    auth_states = load_auth_states()
+    if state in auth_states:
+        redirect_url, timestamp = auth_states.pop(state)
+        save_auth_states(auth_states)
+        
+        # Проверяем, не истекло ли состояние
+        if time.time() - timestamp <= AUTH_STATE_TTL:
+            return redirect_url
+    
+    return None
+
+# Функция для очистки старых состояний авторизации
+def cleanup_auth_states():
+    """Очищает старые состояния авторизации"""
+    auth_states = load_auth_states()
+    current_time = time.time()
+    expired_states = []
+    
+    for state, (_, timestamp) in auth_states.items():
+        if current_time - timestamp > AUTH_STATE_TTL:
+            expired_states.append(state)
+    
+    if expired_states:
+        for state in expired_states:
+            auth_states.pop(state)
+        save_auth_states(auth_states)
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -18,10 +118,25 @@ logger = logging.getLogger(__name__)
 @router.message(Command("start"))
 async def start_command(message: Message):
     """Обработчик команды /start, создает нового пользователя"""
+    # Очищаем старые состояния авторизации
+    cleanup_auth_states()
+    
     user_id = message.from_user.id
     username = message.from_user.username
     first_name = message.from_user.first_name
     last_name = message.from_user.last_name
+    
+    # Проверяем, есть ли параметр авторизации
+    auth_state = None
+    if message.text and len(message.text.split()) > 1:
+        param = message.text.split()[1]
+        # Проверяем, начинается ли параметр с auth_
+        if param.startswith('auth_'):
+            auth_state = param[5:]  # Убираем префикс auth_
+            logger.debug(f"Получен параметр авторизации: {auth_state}")
+        else:
+            auth_state = param
+            logger.debug(f"Получен параметр: {param}")
     
     logger.debug(f"Команда /start от пользователя {user_id} ({username})")
     
@@ -59,9 +174,76 @@ async def start_command(message: Message):
                     logger.debug(f"Настройки для пользователя {user_id} созданы успешно")
                 except Exception as e:
                     logger.error(f"Ошибка при создании настроек для пользователя {user_id}: {e}")
+    
+    # Если есть параметр авторизации, генерируем токены и отправляем ссылку для входа
+    if auth_state:
+        # Получаем URL для редиректа
+        redirect_url = get_and_remove_auth_state(auth_state)
         
-    await message.answer(i18n.format_value("started"))
-
+        if redirect_url:
+            # Проверяем URL и заменяем localhost на публичный домен для Telegram
+            if "localhost" in redirect_url:
+                # Telegram не принимает URL с localhost, заменяем на публичный домен
+                # В продакшене нужно использовать реальный домен
+                public_url = env_config.get('PUBLIC_URL')
+                redirect_url = redirect_url.replace("http://localhost:3000", public_url)
+                logger.debug(f"Заменен localhost URL на публичный домен: {redirect_url}")
+            
+            # Создаем токены с помощью собственных функций
+            access_token = create_custom_access_token(str(user_id))
+            refresh_token = create_custom_refresh_token(str(user_id))
+            
+            # Логируем URL для редиректа и токены
+            logger.debug(f"Redirect URL: {redirect_url}")
+            logger.debug(f"Access token created")
+            logger.debug(f"Refresh token created")
+            
+            # Формируем прямую ссылку на веб-приложение с токенами
+            auth_url = f"{redirect_url}?access_token={access_token}&refresh_token={refresh_token}&user_id={user_id}"
+            
+            # Логируем URL для авторизации
+            logger.debug(f"Auth URL created: {auth_url}")
+            
+            # Создаем клавиатуру с кнопкой для входа
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text=i18n.format_value("login-to-web"),
+                    url=auth_url
+                )]
+            ])
+            
+            # Создаем клавиатуру с кнопкой для входа через Mini App
+            mini_app_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text=i18n.format_value("login-to-web-mini-app"),
+                    web_app={"url": auth_url}
+                )]
+            ])
+            
+            # Отправляем сообщение с кнопкой для входа
+            await message.answer(
+                i18n.format_value("web-auth-success"),
+                reply_markup=keyboard
+            )
+            
+            # Отправляем сообщение с кнопкой для входа через Mini App
+            await message.answer(
+                i18n.format_value("web-auth-mini-app"),
+                reply_markup=mini_app_keyboard
+            )
+        else:
+            logger.error(f"Не найдено состояние авторизации для {auth_state}")
+            await message.answer(i18n.format_value("web-auth-error"))
+    else:
+        # Отправляем приветственное сообщение
+        await message.answer(
+            i18n.format_value(
+                "welcome-message",
+                {"name": first_name or username or ""}
+            )
+        )
+        # Отправляем сообщение с помощью
+        await show_help(message)
 
 @router.message(Command("stop"))
 async def stop_command(message: Message):

@@ -1,6 +1,7 @@
 import logging
+import secrets
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, redirect
 from flask_cors import cross_origin
 from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required
 
@@ -8,6 +9,8 @@ from backend.blueprints.wrapper import async_route
 from backend.cache_config import cache
 from backend.database import get_session
 from backend.services.auth_service import AuthService
+from backend.load_env import env_config
+from backend.handlers.task_handlers import add_auth_state
 
 
 bp = Blueprint("auth", __name__)
@@ -63,4 +66,35 @@ def user_logout():
     current_user = request.json['user']
     cache.delete("current_user_" + current_user)
     return jsonify({'message': "success"}), 204
+
+
+@bp.route('/api/auth/telegram/login', methods=['GET'])
+@cross_origin()
+def telegram_login():
+    """Инициировать авторизацию через Telegram"""
+    # Генерируем случайную строку для защиты от CSRF
+    auth_state = secrets.token_hex(16)
+    
+    # Получаем redirect_url из параметров запроса или используем значение по умолчанию
+    redirect_url = request.args.get('redirect_url', env_config.get('FRONTEND_URL', 'http://localhost:3000'))
+    
+    # Проверяем, содержит ли URL localhost, и заменяем его на публичный домен
+    # Telegram не принимает URL с localhost в качестве параметра для кнопок
+    if "localhost" in redirect_url:
+        # В продакшене нужно заменить на реальный домен
+        public_domain = env_config.get('PUBLIC_DOMAIN', 'https://viewstore-planner.example.com')
+        redirect_url = redirect_url.replace("http://localhost:3000", public_domain)
+        logger.info(f"Заменен localhost URL на публичный домен: {redirect_url}")
+    
+    # Сохраняем состояние авторизации и URL для редиректа
+    add_auth_state(auth_state, redirect_url)
+    
+    # Получаем данные для авторизации
+    bot_username = env_config.get('TELEGRAM_BOT_USERNAME')
+    
+    # Формируем URL для перехода в Telegram бота
+    telegram_auth_url = f"https://t.me/{bot_username}?start=auth_{auth_state}"
+    
+    logger.info(f"Redirecting to Telegram auth: {telegram_auth_url}")
+    return redirect(telegram_auth_url)
 

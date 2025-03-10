@@ -5,6 +5,7 @@ import {
     TextField,
     Typography,
     Paper,
+    Divider,
 } from '@mui/material';
 import { AuthAPI } from '../api/auth';
 
@@ -26,6 +27,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
         try {
             const response = await AuthAPI.login(username, password);
             localStorage.setItem('token', response.access);
+            localStorage.setItem('refreshToken', response.refresh);
+            localStorage.setItem('user', response.user);
             onLoginSuccess(response.access);
         } catch (err) {
             setError('Ошибка авторизации. Проверьте логин и пароль.');
@@ -33,6 +36,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleTelegramLogin = () => {
+        // Получаем URL для авторизации через Telegram и перенаправляем пользователя
+        const telegramAuthUrl = AuthAPI.getTelegramAuthUrl();
+        window.location.href = telegramAuthUrl;
     };
 
     return (
@@ -92,6 +101,24 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                         </Button>
                     </Box>
                 </form>
+                
+                <Divider sx={{ my: 2 }}>или</Divider>
+                
+                <Button
+                    variant="outlined"
+                    color="primary"
+                    fullWidth
+                    onClick={handleTelegramLogin}
+                    sx={{
+                        bgcolor: '#0088cc',
+                        color: 'white',
+                        '&:hover': {
+                            bgcolor: '#0077b5',
+                        }
+                    }}
+                >
+                    Войти через Telegram
+                </Button>
             </Paper>
         </Box>
     );

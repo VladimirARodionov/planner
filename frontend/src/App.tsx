@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { TaskList } from './components/TaskList';
 import { TaskForm } from './components/TaskForm';
 import { LoginForm } from './components/LoginForm';
+import TelegramCallback from './components/TelegramCallback';
 import { Task } from './types/task';
 import { TasksAPI, CreateTaskDto, UpdateTaskDto } from './api/tasks';
 import {
@@ -18,8 +20,14 @@ import {
 } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 
-export const App: React.FC = () => {
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
+// Компонент для защищенных маршрутов
+const ProtectedRoute: React.FC<{ element: React.ReactNode }> = ({ element }) => {
+    const isAuthenticated = localStorage.getItem('token') !== null;
+    return isAuthenticated ? <>{element}</> : <Navigate to="/login" />;
+};
+
+// Основной компонент приложения
+const MainApp: React.FC = () => {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState<Task | undefined>();
     const [notification, setNotification] = useState<{
@@ -27,20 +35,11 @@ export const App: React.FC = () => {
         type: AlertProps['severity'];
     } | null>(null);
 
-    useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            setIsAuthenticated(true);
-        }
-    }, []);
-
-    const handleLoginSuccess = (token: string) => {
-        setIsAuthenticated(true);
-    };
-
     const handleLogout = () => {
         localStorage.removeItem('token');
-        setIsAuthenticated(false);
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
     };
 
     const handleCreateTask = () => {
@@ -103,10 +102,6 @@ export const App: React.FC = () => {
         setNotification(null);
     };
 
-    if (!isAuthenticated) {
-        return <LoginForm onLoginSuccess={handleLoginSuccess} />;
-    }
-
     return (
         <Box sx={{ flexGrow: 1 }}>
             <AppBar position="static">
@@ -161,5 +156,33 @@ export const App: React.FC = () => {
                 </Box>
             </Snackbar>
         </Box>
+    );
+};
+
+// Компонент для страницы входа
+const LoginPage: React.FC = () => {
+    const isAuthenticated = localStorage.getItem('token') !== null;
+    
+    if (isAuthenticated) {
+        return <Navigate to="/" />;
+    }
+    
+    const handleLoginSuccess = () => {
+        window.location.href = '/';
+    };
+    
+    return <LoginForm onLoginSuccess={handleLoginSuccess} />;
+};
+
+// Главный компонент с маршрутизацией
+export const App: React.FC = () => {
+    return (
+        <Router>
+            <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/auth/callback" element={<TelegramCallback />} />
+                <Route path="/" element={<ProtectedRoute element={<MainApp />} />} />
+            </Routes>
+        </Router>
     );
 }; 

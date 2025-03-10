@@ -20,4 +20,10 @@ export const AuthAPI = {
         const response = await api.post<LoginResponse>('/auth/login/', { username, password });
         return response.data;
     },
+    
+    // Метод для получения URL для авторизации через Telegram
+    getTelegramAuthUrl: (): string => {
+        const currentUrl = window.location.origin;
+        return `${API_URL}/auth/telegram/login?redirect_url=${encodeURIComponent(currentUrl + '/auth/callback')}`;
+    }
 }; 
