@@ -62,6 +62,11 @@ async def start_command(message: Message):
         
     await message.answer(i18n.format_value("started"))
 
+
+@router.message(Command("stop"))
+async def stop_command(message: Message):
+    await message.answer(i18n.format_value("stopped"))
+
 @router.message(Command("tasks"))
 async def list_tasks(message: Message):
     """Показать список задач"""

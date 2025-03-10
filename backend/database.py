@@ -10,6 +10,7 @@ from backend.db.models import DurationType, TaskTypeSetting
 
 # Создаем асинхронный движок SQLAlchemy
 engine = create_async_engine(db_string, echo=True)
+logger = logging.getLogger(__name__)
 
 # Создаем фабрику асинхронных сессий
 async_session = async_sessionmaker(
@@ -86,7 +87,6 @@ async def create_initial_default_settings(session: AsyncSession):
     from backend.db.models import DefaultSettings
     import logging
     
-    logger = logging.getLogger(__name__)
     logger.info("Создание настроек по умолчанию")
     
     # Создаем стандартные статусы
@@ -281,7 +281,6 @@ async def create_initial_default_settings(session: AsyncSession):
 async def create_user_settings(user_id: int, session: AsyncSession):
     from backend.db.models import DefaultSettings, StatusSetting, PrioritySetting, DurationSetting, TaskTypeSetting
     
-    logger = logging.getLogger(__name__)
     logger.info(f"Создание настроек для пользователя {user_id}")
     
     # Проверяем, есть ли уже настройки у пользователя

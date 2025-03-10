@@ -15,6 +15,8 @@ from backend.models.priority import Priority
 from backend.models.duration import Duration
 from backend.models.task_type import TaskType
 
+logger = logging.getLogger(__name__)
+
 class SettingsService:
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -417,8 +419,6 @@ class SettingsService:
 
     async def get_statuses(self, user_id: str) -> List[Dict[str, Any]]:
         """Получить список статусов пользователя"""
-        logger = logging.getLogger(__name__)
-        
         logger.info(f"Получение статусов для пользователя {user_id}")
         
         user = await self.auth_service.get_user_by_id(user_id)
@@ -503,7 +503,6 @@ class SettingsService:
 
     async def get_durations(self, user_id: str) -> List[Dict[str, Any]]:
         """Получить список длительностей пользователя"""
-        logger = logging.getLogger(__name__)
         logger.info(f"Получение длительностей для пользователя {user_id}")
         
         user = await self.auth_service.get_user_by_id(user_id)

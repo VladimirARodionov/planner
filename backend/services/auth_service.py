@@ -5,14 +5,14 @@ import logging
 
 from backend.db.models import User
 
+logger = logging.getLogger(__name__)
+
 class AuthService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
     async def get_user_by_id(self, user_id: str) -> Optional[User]:
         """Получить пользователя по ID"""
-        logger = logging.getLogger(__name__)
-        
         logger.info(f"Поиск пользователя с ID {user_id}")
         
         result = await self.session.execute(
@@ -29,8 +29,6 @@ class AuthService:
 
     async def create_user(self, telegram_id: int, username: str = None, first_name: str = None, last_name: str = None) -> User:
         """Создать нового пользователя"""
-        logger = logging.getLogger(__name__)
-        
         logger.info(f"Создание нового пользователя с telegram_id={telegram_id}, username={username}")
         
         user = User(
