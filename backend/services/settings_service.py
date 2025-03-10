@@ -22,12 +22,46 @@ class SettingsService:
         self.session = session
         self.auth_service = AuthService(session)
 
-    async def get_settings(self) -> Dict[str, Any]:
-        """Получить все настройки пользователя"""
-        user = await self.auth_service.get_user_by_id("system")
-        if not user:
-            return {}
+    async def get_settings(self, user_id: Optional[str] = None) -> Dict[str, Any]:
+        """Получить все настройки пользователя
+        
+        Args:
+            user_id: ID пользователя. Если не указан, возвращаются настройки по умолчанию.
+        
+        Returns:
+            Dict[str, Any]: Словарь с настройками пользователя
+        """
 
+        # Если указан ID пользователя, пробуем получить пользовательские настройки
+        if user_id:
+            logger.info(f"Получение настроек для пользователя {user_id}")
+            user = await self.auth_service.get_user_by_id(user_id)
+            
+            if user:
+                logger.info(f"Пользователь {user_id} найден, получаем его настройки")
+                
+                # Получаем пользовательские настройки
+                statuses = await self.get_statuses(user_id)
+                priorities = await self.get_priorities(user_id)
+                durations = await self.get_durations(user_id)
+                task_types = await self.get_task_types(user_id)
+                
+                # Если у пользователя есть хотя бы одна настройка, возвращаем их
+                if statuses or priorities or durations or task_types:
+                    logger.info(f"Найдены пользовательские настройки для пользователя {user_id}")
+                    return {
+                        "statuses": statuses,
+                        "priorities": priorities,
+                        "durations": durations,
+                        "task_types": task_types
+                    }
+                else:
+                    logger.info(f"Пользовательские настройки не найдены для пользователя {user_id}, возвращаем настройки по умолчанию")
+            else:
+                logger.warning(f"Пользователь {user_id} не найден, возвращаем настройки по умолчанию")
+        else:
+            logger.info("ID пользователя не указан, возвращаем настройки по умолчанию")
+        
         # Получаем все настройки по умолчанию
         default_statuses = await self.session.execute(
             select(DefaultSettings).where(
@@ -54,6 +88,7 @@ class SettingsService:
             )
         )
 
+        logger.info("Возвращаем настройки по умолчанию")
         return {
             "statuses": [json.loads(status.value) for status in default_statuses.scalars()],
             "priorities": [json.loads(priority.value) for priority in default_priorities.scalars()],
@@ -63,8 +98,12 @@ class SettingsService:
 
     async def get_task_types(self, user_id: str) -> List[Dict[str, Any]]:
         """Получить список типов задач пользователя"""
+        logger = logging.getLogger(__name__)
+        logger.info(f"Получение типов задач для пользователя {user_id}")
+        
         user = await self.auth_service.get_user_by_id(user_id)
         if not user:
+            logger.warning(f"Пользователь {user_id} не найден")
             return []
 
         # Сначала пробуем получить пользовательские настройки
@@ -74,17 +113,30 @@ class SettingsService:
                 TaskTypeSetting.is_active == True
             ).order_by(TaskTypeSetting.order)
         )
-        task_types = result.scalars().all()
+        task_types = list(result.scalars())
+        
+        logger.info(f"Найдено {len(task_types)} пользовательских типов задач для пользователя {user_id}")
 
         # Если пользовательских настроек нет, берем настройки по умолчанию
         if not task_types:
+            logger.info(f"Пользовательские типы задач не найдены, получаем типы задач по умолчанию")
             default_task_types = await self.session.execute(
                 select(DefaultSettings).where(
                     DefaultSettings.setting_type == "task_type",
                     DefaultSettings.is_active == True
                 )
             )
-            return [json.loads(task_type.value) for task_type in default_task_types.scalars()]
+            
+            # Используем ID из базы данных
+            default_task_types_list = []
+            for task_type in default_task_types.scalars():
+                task_type_data = json.loads(task_type.value)
+                # Используем ID записи из таблицы DefaultSettings
+                task_type_data["id"] = task_type.id
+                default_task_types_list.append(task_type_data)
+            
+            logger.info(f"Найдено {len(default_task_types_list)} типов задач по умолчанию")
+            return default_task_types_list
 
         return [
             {
@@ -419,6 +471,7 @@ class SettingsService:
 
     async def get_statuses(self, user_id: str) -> List[Dict[str, Any]]:
         """Получить список статусов пользователя"""
+        logger = logging.getLogger(__name__)
         logger.info(f"Получение статусов для пользователя {user_id}")
         
         user = await self.auth_service.get_user_by_id(user_id)
@@ -446,7 +499,15 @@ class SettingsService:
                     DefaultSettings.is_active == True
                 )
             )
-            default_statuses_list = [json.loads(status.value) for status in default_statuses.scalars()]
+            
+            # Используем ID из базы данных
+            default_statuses_list = []
+            for status in default_statuses.scalars():
+                status_data = json.loads(status.value)
+                # Используем ID записи из таблицы DefaultSettings
+                status_data["id"] = status.id
+                default_statuses_list.append(status_data)
+            
             logger.info(f"Найдено {len(default_statuses_list)} статусов по умолчанию")
             return default_statuses_list
 
@@ -466,8 +527,12 @@ class SettingsService:
 
     async def get_priorities(self, user_id: str) -> List[Dict[str, Any]]:
         """Получить список приоритетов пользователя"""
+        logger = logging.getLogger(__name__)
+        logger.info(f"Получение приоритетов для пользователя {user_id}")
+        
         user = await self.auth_service.get_user_by_id(user_id)
         if not user:
+            logger.warning(f"Пользователь {user_id} не найден")
             return []
 
         # Сначала пробуем получить пользовательские настройки
@@ -477,17 +542,30 @@ class SettingsService:
                 PrioritySetting.is_active == True
             ).order_by(PrioritySetting.order)
         )
-        priorities = result.scalars().all()
+        priorities = list(result.scalars())
+        
+        logger.info(f"Найдено {len(priorities)} пользовательских приоритетов для пользователя {user_id}")
 
         # Если пользовательских настроек нет, берем настройки по умолчанию
         if not priorities:
+            logger.info(f"Пользовательские приоритеты не найдены, получаем приоритеты по умолчанию")
             default_priorities = await self.session.execute(
                 select(DefaultSettings).where(
                     DefaultSettings.setting_type == "priority",
                     DefaultSettings.is_active == True
                 )
             )
-            return [json.loads(priority.value) for priority in default_priorities.scalars()]
+            
+            # Используем ID из базы данных
+            default_priorities_list = []
+            for priority in default_priorities.scalars():
+                priority_data = json.loads(priority.value)
+                # Используем ID записи из таблицы DefaultSettings
+                priority_data["id"] = priority.id
+                default_priorities_list.append(priority_data)
+            
+            logger.info(f"Найдено {len(default_priorities_list)} приоритетов по умолчанию")
+            return default_priorities_list
 
         return [
             {
@@ -503,6 +581,7 @@ class SettingsService:
 
     async def get_durations(self, user_id: str) -> List[Dict[str, Any]]:
         """Получить список длительностей пользователя"""
+        logger = logging.getLogger(__name__)
         logger.info(f"Получение длительностей для пользователя {user_id}")
         
         user = await self.auth_service.get_user_by_id(user_id)
@@ -517,8 +596,20 @@ class SettingsService:
                 DefaultSettings.is_active == True
             )
         )
-        default_durations_list = [json.loads(duration.value) for duration in default_durations.scalars()]
-        logger.info(f"Найдено {len(default_durations_list)} длительностей по умолчанию")
         
-        # Возвращаем настройки по умолчанию
+        # Создаем список длительностей с уникальными идентификаторами
+        default_durations_list = []
+        for duration in default_durations.scalars():
+            duration_data = json.loads(duration.value)
+            # Используем ID записи из таблицы DefaultSettings
+            duration_data["id"] = duration.id
+            
+            # Проверяем, что duration_type существует и является строкой
+            if "duration_type" in duration_data and isinstance(duration_data["duration_type"], str):
+                # Оставляем duration_type как есть, это строковое значение из перечисления
+                pass
+            
+            default_durations_list.append(duration_data)
+        
+        logger.info(f"Найдено {len(default_durations_list)} длительностей по умолчанию")
         return default_durations_list 

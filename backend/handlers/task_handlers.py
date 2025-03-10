@@ -80,7 +80,7 @@ async def list_tasks(message: Message):
 
         response = i18n.format_value("tasks-header") + "\n\n"
         for task in tasks:
-            status_emoji = "✅" if task['status'] and task['status']['code'] == 'completed' else "⏳"
+            status_emoji = "✅" if task['status'] and task['status']['name'].lower() == 'завершено' else "⏳"
             priority_emoji = "🔴" if task['priority'] and task['priority']['name'].lower() == 'высокий' else "🟡" if task['priority'] and task['priority']['name'].lower() == 'средний' else "🟢"
             
             response += i18n.format_value("task-item", {
