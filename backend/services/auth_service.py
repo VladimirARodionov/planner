@@ -13,7 +13,7 @@ class AuthService:
 
     async def get_user_by_id(self, user_id: str) -> Optional[User]:
         """Получить пользователя по ID"""
-        logger.info(f"Поиск пользователя с ID {user_id}")
+        logger.debug(f"Поиск пользователя с ID {user_id}")
         
         result = await self.session.execute(
             select(User).where(User.telegram_id == user_id)
@@ -21,15 +21,15 @@ class AuthService:
         user = result.scalar_one_or_none()
         
         if user:
-            logger.info(f"Пользователь с ID {user_id} найден")
+            logger.debug(f"Пользователь с ID {user_id} найден")
         else:
-            logger.info(f"Пользователь с ID {user_id} не найден")
+            logger.debug(f"Пользователь с ID {user_id} не найден")
         
         return user
 
     async def create_user(self, telegram_id: int, username: str = None, first_name: str = None, last_name: str = None) -> User:
         """Создать нового пользователя"""
-        logger.info(f"Создание нового пользователя с telegram_id={telegram_id}, username={username}")
+        logger.debug(f"Создание нового пользователя с telegram_id={telegram_id}, username={username}")
         
         user = User(
             telegram_id=telegram_id,
@@ -42,7 +42,7 @@ class AuthService:
         try:
             await self.session.commit()
             await self.session.refresh(user)
-            logger.info(f"Пользователь с telegram_id={telegram_id} успешно создан")
+            logger.debug(f"Пользователь с telegram_id={telegram_id} успешно создан")
         except Exception as e:
             logger.error(f"Ошибка при создании пользователя с telegram_id={telegram_id}: {e}")
             await self.session.rollback()

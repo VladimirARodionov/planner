@@ -34,11 +34,11 @@ class SettingsService:
 
         # Если указан ID пользователя, пробуем получить пользовательские настройки
         if user_id:
-            logger.info(f"Получение настроек для пользователя {user_id}")
+            logger.debug(f"Получение настроек для пользователя {user_id}")
             user = await self.auth_service.get_user_by_id(user_id)
             
             if user:
-                logger.info(f"Пользователь {user_id} найден, получаем его настройки")
+                logger.debug(f"Пользователь {user_id} найден, получаем его настройки")
                 
                 # Получаем пользовательские настройки
                 statuses = await self.get_statuses(user_id)
@@ -48,7 +48,7 @@ class SettingsService:
                 
                 # Если у пользователя есть хотя бы одна настройка, возвращаем их
                 if statuses or priorities or durations or task_types:
-                    logger.info(f"Найдены пользовательские настройки для пользователя {user_id}")
+                    logger.debug(f"Найдены пользовательские настройки для пользователя {user_id}")
                     return {
                         "statuses": statuses,
                         "priorities": priorities,
@@ -56,11 +56,11 @@ class SettingsService:
                         "task_types": task_types
                     }
                 else:
-                    logger.info(f"Пользовательские настройки не найдены для пользователя {user_id}, возвращаем настройки по умолчанию")
+                    logger.debug(f"Пользовательские настройки не найдены для пользователя {user_id}, возвращаем настройки по умолчанию")
             else:
                 logger.warning(f"Пользователь {user_id} не найден, возвращаем настройки по умолчанию")
         else:
-            logger.info("ID пользователя не указан, возвращаем настройки по умолчанию")
+            logger.debug("ID пользователя не указан, возвращаем настройки по умолчанию")
         
         # Получаем все настройки по умолчанию
         default_statuses = await self.session.execute(
@@ -88,7 +88,7 @@ class SettingsService:
             )
         )
 
-        logger.info("Возвращаем настройки по умолчанию")
+        logger.debug("Возвращаем настройки по умолчанию")
         return {
             "statuses": [json.loads(status.value) for status in default_statuses.scalars()],
             "priorities": [json.loads(priority.value) for priority in default_priorities.scalars()],
@@ -98,8 +98,7 @@ class SettingsService:
 
     async def get_task_types(self, user_id: str) -> List[Dict[str, Any]]:
         """Получить список типов задач пользователя"""
-        logger = logging.getLogger(__name__)
-        logger.info(f"Получение типов задач для пользователя {user_id}")
+        logger.debug(f"Получение типов задач для пользователя {user_id}")
         
         user = await self.auth_service.get_user_by_id(user_id)
         if not user:
@@ -115,11 +114,11 @@ class SettingsService:
         )
         task_types = list(result.scalars())
         
-        logger.info(f"Найдено {len(task_types)} пользовательских типов задач для пользователя {user_id}")
+        logger.debug(f"Найдено {len(task_types)} пользовательских типов задач для пользователя {user_id}")
 
         # Если пользовательских настроек нет, берем настройки по умолчанию
         if not task_types:
-            logger.info(f"Пользовательские типы задач не найдены, получаем типы задач по умолчанию")
+            logger.debug(f"Пользовательские типы задач не найдены, получаем типы задач по умолчанию")
             default_task_types = await self.session.execute(
                 select(DefaultSettings).where(
                     DefaultSettings.setting_type == "task_type",
@@ -135,7 +134,7 @@ class SettingsService:
                 task_type_data["id"] = task_type.id
                 default_task_types_list.append(task_type_data)
             
-            logger.info(f"Найдено {len(default_task_types_list)} типов задач по умолчанию")
+            logger.debug(f"Найдено {len(default_task_types_list)} типов задач по умолчанию")
             return default_task_types_list
 
         return [
@@ -471,8 +470,7 @@ class SettingsService:
 
     async def get_statuses(self, user_id: str) -> List[Dict[str, Any]]:
         """Получить список статусов пользователя"""
-        logger = logging.getLogger(__name__)
-        logger.info(f"Получение статусов для пользователя {user_id}")
+        logger.debug(f"Получение статусов для пользователя {user_id}")
         
         user = await self.auth_service.get_user_by_id(user_id)
         if not user:
@@ -488,11 +486,11 @@ class SettingsService:
         )
         statuses = list(result.scalars())
         
-        logger.info(f"Найдено {len(statuses)} пользовательских статусов для пользователя {user_id}")
+        logger.debug(f"Найдено {len(statuses)} пользовательских статусов для пользователя {user_id}")
 
         # Если пользовательских настроек нет, берем настройки по умолчанию
         if not statuses:
-            logger.info(f"Пользовательские статусы не найдены, получаем статусы по умолчанию")
+            logger.debug(f"Пользовательские статусы не найдены, получаем статусы по умолчанию")
             default_statuses = await self.session.execute(
                 select(DefaultSettings).where(
                     DefaultSettings.setting_type == "status",
@@ -508,7 +506,7 @@ class SettingsService:
                 status_data["id"] = status.id
                 default_statuses_list.append(status_data)
             
-            logger.info(f"Найдено {len(default_statuses_list)} статусов по умолчанию")
+            logger.debug(f"Найдено {len(default_statuses_list)} статусов по умолчанию")
             return default_statuses_list
 
         return [
@@ -527,8 +525,7 @@ class SettingsService:
 
     async def get_priorities(self, user_id: str) -> List[Dict[str, Any]]:
         """Получить список приоритетов пользователя"""
-        logger = logging.getLogger(__name__)
-        logger.info(f"Получение приоритетов для пользователя {user_id}")
+        logger.debug(f"Получение приоритетов для пользователя {user_id}")
         
         user = await self.auth_service.get_user_by_id(user_id)
         if not user:
@@ -544,11 +541,11 @@ class SettingsService:
         )
         priorities = list(result.scalars())
         
-        logger.info(f"Найдено {len(priorities)} пользовательских приоритетов для пользователя {user_id}")
+        logger.debug(f"Найдено {len(priorities)} пользовательских приоритетов для пользователя {user_id}")
 
         # Если пользовательских настроек нет, берем настройки по умолчанию
         if not priorities:
-            logger.info(f"Пользовательские приоритеты не найдены, получаем приоритеты по умолчанию")
+            logger.debug(f"Пользовательские приоритеты не найдены, получаем приоритеты по умолчанию")
             default_priorities = await self.session.execute(
                 select(DefaultSettings).where(
                     DefaultSettings.setting_type == "priority",
@@ -564,7 +561,7 @@ class SettingsService:
                 priority_data["id"] = priority.id
                 default_priorities_list.append(priority_data)
             
-            logger.info(f"Найдено {len(default_priorities_list)} приоритетов по умолчанию")
+            logger.debug(f"Найдено {len(default_priorities_list)} приоритетов по умолчанию")
             return default_priorities_list
 
         return [
@@ -581,8 +578,7 @@ class SettingsService:
 
     async def get_durations(self, user_id: str) -> List[Dict[str, Any]]:
         """Получить список длительностей пользователя"""
-        logger = logging.getLogger(__name__)
-        logger.info(f"Получение длительностей для пользователя {user_id}")
+        logger.debug(f"Получение длительностей для пользователя {user_id}")
         
         user = await self.auth_service.get_user_by_id(user_id)
         if not user:
@@ -611,5 +607,5 @@ class SettingsService:
             
             default_durations_list.append(duration_data)
         
-        logger.info(f"Найдено {len(default_durations_list)} длительностей по умолчанию")
+        logger.debug(f"Найдено {len(default_durations_list)} длительностей по умолчанию")
         return default_durations_list 
