@@ -3,7 +3,7 @@ import logging
 from aiogram.fsm.state import State, StatesGroup
 from aiogram_dialog import Dialog, Window, Data
 from aiogram_dialog.widgets.text import Format, Const
-from aiogram_dialog.widgets.kbd import Button, Select, Back, Next, Row
+from aiogram_dialog.widgets.kbd import Button, Select, Back, Next, Row, Group
 from aiogram_dialog.widgets.input import TextInput
 from aiogram_dialog import DialogManager
 from typing import Any
@@ -255,13 +255,15 @@ task_dialog = Dialog(
     ),
     Window(
         Format(i18n.format_value("task-type")),
-        Select(
-            Format("{item[name]}"),
-            id="type",
-            item_id_getter=lambda x: x["id"],
-            items="task_types",
-            on_click=on_type_selected,
-        ),
+        Group(
+            Select(
+                Format("{item[name]}"),
+                id="type",
+                item_id_getter=lambda x: x["id"],
+                items="task_types",
+                on_click=on_type_selected,
+            ),
+            width=2,),
         Row(
             Back(Const(i18n.format_value("back"))),
             Next(Const(i18n.format_value("next"))),
@@ -271,13 +273,15 @@ task_dialog = Dialog(
     ),
     Window(
         Format(i18n.format_value("task-status")),
-        Select(
-            Format("{item[name]}"),
-            id="status",
-            item_id_getter=lambda x: x["id"],
-            items="statuses",
-            on_click=on_status_selected,
-        ),
+        Group(
+            Select(
+                Format("{item[name]}"),
+                id="status",
+                item_id_getter=lambda x: x["id"],
+                items="statuses",
+                on_click=on_status_selected,
+            ),
+            width=2,),
         Row(
             Back(Const(i18n.format_value("back"))),
             Next(Const(i18n.format_value("next"))),
@@ -287,13 +291,15 @@ task_dialog = Dialog(
     ),
     Window(
         Format(i18n.format_value("task-priority")),
-        Select(
-            Format("{item[name]}"),
-            id="priority",
-            item_id_getter=lambda x: x["id"],
-            items="priorities",
-            on_click=on_priority_selected,
-        ),
+        Group(
+            Select(
+                Format("{item[name]}"),
+                id="priority",
+                item_id_getter=lambda x: x["id"],
+                items="priorities",
+                on_click=on_priority_selected,
+            ),
+            width=2,),
         Row(
             Back(Const(i18n.format_value("back"))),
             Next(Const(i18n.format_value("next"))),
@@ -303,13 +309,15 @@ task_dialog = Dialog(
     ),
     Window(
         Format(i18n.format_value("task-duration")),
-        Select(
-            Format("{item[name]}"),
-            id="duration",
-            item_id_getter=lambda x: x["id"],
-            items="durations",
-            on_click=on_duration_selected,
-        ),
+        Group(
+            Select(
+                Format("{item[name]}"),
+                id="duration",
+                item_id_getter=lambda x: x["id"],
+                items="durations",
+                on_click=on_duration_selected,
+            ),
+            width=2,),
         Row(
             Back(Const(i18n.format_value("back"))),
             Next(Const(i18n.format_value("next"))),
