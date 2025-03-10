@@ -1,12 +1,13 @@
 from contextlib import asynccontextmanager
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base
 import json
 import logging
 
 from backend.create_bot import db_string
-from backend.db.models import DurationType, TaskTypeSetting
+from backend.db.models import DurationType, DefaultSettings, GlobalSettings, StatusSetting, PrioritySetting, DurationSetting, TaskTypeSetting
+
+
 
 # Создаем асинхронный движок SQLAlchemy
 engine = create_async_engine(db_string, echo=True)
@@ -30,8 +31,6 @@ async def get_session() -> AsyncSession:
 
 # Функция для инициализации базы данных
 async def init_db():
-    from backend.db.models import DefaultSettings, GlobalSettings
-    
     # Создаем настройки по умолчанию, если их еще нет
     async with async_session() as session:
         # Проверяем, есть ли уже настройки по умолчанию
@@ -46,8 +45,6 @@ async def init_db():
 
 # Функция для создания начальных глобальных настроек
 async def create_initial_global_settings(session: AsyncSession):
-    from backend.db.models import GlobalSettings
-    
     # Создаем базовые глобальные настройки
     global_settings = [
         {
@@ -84,10 +81,7 @@ async def create_initial_global_settings(session: AsyncSession):
 
 # Функция для создания начальных настроек по умолчанию
 async def create_initial_default_settings(session: AsyncSession):
-    from backend.db.models import DefaultSettings
-    import logging
-    
-    logger.info("Создание настроек по умолчанию")
+    logger.debug("Создание настроек по умолчанию")
     
     # Создаем стандартные статусы
     default_statuses = [
@@ -292,20 +286,18 @@ async def create_initial_default_settings(session: AsyncSession):
         session.add(db_setting)
     
     await session.commit()
-    logger.info("Настройки по умолчанию успешно созданы")
+    logger.debug("Настройки по умолчанию успешно созданы")
 
 # Функция для создания настроек пользователя на основе настроек по умолчанию
 async def create_user_settings(user_id: int, session: AsyncSession):
-    from backend.db.models import DefaultSettings, StatusSetting, PrioritySetting, DurationSetting, TaskTypeSetting
-    
-    logger.info(f"Создание настроек для пользователя {user_id}")
+    logger.debug(f"Создание настроек для пользователя {user_id}")
     
     # Проверяем, есть ли уже настройки у пользователя
     existing_statuses = await session.execute(
         select(StatusSetting).where(StatusSetting.user_id == user_id)
     )
     if existing_statuses.first() is not None:
-        logger.info(f"У пользователя {user_id} уже есть настройки, пропускаем создание")
+        logger.debug(f"У пользователя {user_id} уже есть настройки, пропускаем создание")
         return
     
     # Проверяем, есть ли настройки по умолчанию
@@ -405,10 +397,10 @@ async def create_user_settings(user_id: int, session: AsyncSession):
     
     try:
         await session.commit()
-        logger.info(f"Созданы настройки для пользователя {user_id}: "
+        logger.debug(f"Созданы настройки для пользователя {user_id}: "
                     f"{status_count} статусов, {priority_count} приоритетов, "
                     f"{duration_count} длительностей, {task_type_count} типов задач")
     except Exception as e:
-        logger.error(f"Ошибка при создании настроек для пользователя {user_id}: {e}")
+        logger.exception(f"Ошибка при создании настроек для пользователя {user_id}: {e}")
         await session.rollback()
         raise 

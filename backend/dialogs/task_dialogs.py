@@ -60,15 +60,15 @@ async def get_durations(dialog_manager: DialogManager, **kwargs):
 
 async def on_task_created(event, widget, manager: DialogManager):
     # Закрываем диалог с передачей данных в результат
-    logger.info("on_task_created called, dialog data: %s", manager.dialog_data)
+    logger.debug("on_task_created called, dialog data: %s", manager.dialog_data)
     try:
         # Вызываем main_process_result напрямую
         await main_process_result(start_data=None, result=manager.dialog_data, dialog_manager=manager)
         # Закрываем диалог без результата, чтобы не вызывать main_process_result второй раз
         await manager.done()
-        logger.info("Dialog closed successfully")
+        logger.debug("Dialog closed successfully")
     except Exception as e:
-        logger.error(f"Error in on_task_created: {e}")
+        logger.exception(f"Error in on_task_created: {e}")
 
 async def on_title_success(event: Message, source: Any, manager: DialogManager, *args, **kwargs):
     if event.text and event.text.strip():
@@ -82,63 +82,63 @@ async def on_description_success(event: Message, source: Any, manager: DialogMan
     await manager.next()
 
 async def on_type_selected(callback: CallbackQuery, widget: Any, manager: DialogManager, item_id: str):
-    logger.info(f"on_type_selected called with item_id: {item_id}, type: {type(item_id)}")
+    logger.debug(f"on_type_selected called with item_id: {item_id}, type: {type(item_id)}")
     manager.dialog_data["type_id"] = str(item_id)
-    logger.info(f"Selected type_id: {item_id}, dialog_data: {manager.dialog_data}")
+    logger.debug(f"Selected type_id: {item_id}, dialog_data: {manager.dialog_data}")
     await manager.next()
 
 async def on_status_selected(callback: CallbackQuery, widget: Any, manager: DialogManager, item_id: str):
-    logger.info(f"on_status_selected called with item_id: {item_id}, type: {type(item_id)}")
+    logger.debug(f"on_status_selected called with item_id: {item_id}, type: {type(item_id)}")
     manager.dialog_data["status_id"] = str(item_id)
-    logger.info(f"Selected status_id: {item_id}, dialog_data: {manager.dialog_data}")
+    logger.debug(f"Selected status_id: {item_id}, dialog_data: {manager.dialog_data}")
     await manager.next()
 
 async def on_priority_selected(callback: CallbackQuery, widget: Any, manager: DialogManager, item_id: str):
-    logger.info(f"on_priority_selected called with item_id: {item_id}, type: {type(item_id)}")
+    logger.debug(f"on_priority_selected called with item_id: {item_id}, type: {type(item_id)}")
     manager.dialog_data["priority_id"] = str(item_id)
-    logger.info(f"Selected priority_id: {item_id}, dialog_data: {manager.dialog_data}")
+    logger.debug(f"Selected priority_id: {item_id}, dialog_data: {manager.dialog_data}")
     await manager.next()
 
 async def on_duration_selected(callback: CallbackQuery, widget: Any, manager: DialogManager, item_id: str):
-    logger.info(f"on_duration_selected called with item_id: {item_id}, type: {type(item_id)}")
+    logger.debug(f"on_duration_selected called with item_id: {item_id}, type: {type(item_id)}")
     manager.dialog_data["duration_id"] = str(item_id)
-    logger.info(f"Selected duration_id: {item_id}, dialog_data: {manager.dialog_data}")
+    logger.debug(f"Selected duration_id: {item_id}, dialog_data: {manager.dialog_data}")
     # Переходим к шагу подтверждения
     await manager.next()
 
 async def get_task_summary(dialog_manager: DialogManager, **kwargs):
     """Получить сводку о создаваемой задаче"""
     user_id = dialog_manager.event.from_user.id if hasattr(dialog_manager.event, 'from_user') else None
-    logger.info(f"get_task_summary called, user_id: {user_id}, dialog_data: {dialog_manager.dialog_data}")
+    logger.debug(f"get_task_summary called, user_id: {user_id}, dialog_data: {dialog_manager.dialog_data}")
     
     async with get_session() as session:
         settings_service = SettingsService(session)
         settings = await settings_service.get_settings(str(user_id) if user_id else None)
-        logger.info(f"Settings: {settings}")
+        logger.debug(f"Settings: {settings}")
         
         # Получаем данные о выбранных параметрах
         task_data = dialog_manager.dialog_data
-        logger.info(f"Task data: {task_data}")
+        logger.debug(f"Task data: {task_data}")
         
         # Выводим типы данных ID
         if task_data.get("type_id"):
-            logger.info(f"type_id: {task_data['type_id']}, type: {type(task_data['type_id'])}")
+            logger.debug(f"type_id: {task_data['type_id']}, type: {type(task_data['type_id'])}")
         if task_data.get("status_id"):
-            logger.info(f"status_id: {task_data['status_id']}, type: {type(task_data['status_id'])}")
+            logger.debug(f"status_id: {task_data['status_id']}, type: {type(task_data['status_id'])}")
         if task_data.get("priority_id"):
-            logger.info(f"priority_id: {task_data['priority_id']}, type: {type(task_data['priority_id'])}")
+            logger.debug(f"priority_id: {task_data['priority_id']}, type: {type(task_data['priority_id'])}")
         if task_data.get("duration_id"):
-            logger.info(f"duration_id: {task_data['duration_id']}, type: {type(task_data['duration_id'])}")
+            logger.debug(f"duration_id: {task_data['duration_id']}, type: {type(task_data['duration_id'])}")
         
         # Выводим типы данных ID в настройках
         if settings.get("task_types") and len(settings["task_types"]) > 0:
-            logger.info(f"First task_type id: {settings['task_types'][0]['id']}, type: {type(settings['task_types'][0]['id'])}")
+            logger.debug(f"First task_type id: {settings['task_types'][0]['id']}, type: {type(settings['task_types'][0]['id'])}")
         if settings.get("statuses") and len(settings["statuses"]) > 0:
-            logger.info(f"First status id: {settings['statuses'][0]['id']}, type: {type(settings['statuses'][0]['id'])}")
+            logger.debug(f"First status id: {settings['statuses'][0]['id']}, type: {type(settings['statuses'][0]['id'])}")
         if settings.get("priorities") and len(settings["priorities"]) > 0:
-            logger.info(f"First priority id: {settings['priorities'][0]['id']}, type: {type(settings['priorities'][0]['id'])}")
+            logger.debug(f"First priority id: {settings['priorities'][0]['id']}, type: {type(settings['priorities'][0]['id'])}")
         if settings.get("durations") and len(settings["durations"]) > 0:
-            logger.info(f"First duration id: {settings['durations'][0]['id']}, type: {type(settings['durations'][0]['id'])}")
+            logger.debug(f"First duration id: {settings['durations'][0]['id']}, type: {type(settings['durations'][0]['id'])}")
         
         # Находим названия выбранных параметров
         type_name = "Не выбран"
@@ -147,35 +147,35 @@ async def get_task_summary(dialog_manager: DialogManager, **kwargs):
         duration_name = "Не выбрана"
         
         if task_data.get("type_id"):
-            logger.info(f"Looking for type_id: {task_data['type_id']} in {len(settings['task_types'])} task types")
+            logger.debug(f"Looking for type_id: {task_data['type_id']} in {len(settings['task_types'])} task types")
             for task_type in settings["task_types"]:
                 if str(task_type["id"]) == str(task_data["type_id"]):
                     type_name = task_type["name"]
-                    logger.info(f"Found type name: {type_name}")
+                    logger.debug(f"Found type name: {type_name}")
                     break
                     
         if task_data.get("status_id"):
-            logger.info(f"Looking for status_id: {task_data['status_id']} in {len(settings['statuses'])} statuses")
+            logger.debug(f"Looking for status_id: {task_data['status_id']} in {len(settings['statuses'])} statuses")
             for status in settings["statuses"]:
                 if str(status["id"]) == str(task_data["status_id"]):
                     status_name = status["name"]
-                    logger.info(f"Found status name: {status_name}")
+                    logger.debug(f"Found status name: {status_name}")
                     break
                     
         if task_data.get("priority_id"):
-            logger.info(f"Looking for priority_id: {task_data['priority_id']} in {len(settings['priorities'])} priorities")
+            logger.debug(f"Looking for priority_id: {task_data['priority_id']} in {len(settings['priorities'])} priorities")
             for priority in settings["priorities"]:
                 if str(priority["id"]) == str(task_data["priority_id"]):
                     priority_name = priority["name"]
-                    logger.info(f"Found priority name: {priority_name}")
+                    logger.debug(f"Found priority name: {priority_name}")
                     break
                     
         if task_data.get("duration_id"):
-            logger.info(f"Looking for duration_id: {task_data['duration_id']} in {len(settings['durations'])} durations")
+            logger.debug(f"Looking for duration_id: {task_data['duration_id']} in {len(settings['durations'])} durations")
             for duration in settings["durations"]:
                 if str(duration["id"]) == str(task_data["duration_id"]):
                     duration_name = duration["name"]
-                    logger.info(f"Found duration name: {duration_name}")
+                    logger.debug(f"Found duration name: {duration_name}")
                     break
         
         result = {
@@ -186,30 +186,29 @@ async def get_task_summary(dialog_manager: DialogManager, **kwargs):
             "priority_name": priority_name,
             "duration_name": duration_name
         }
-        logger.info(f"get_task_summary result: {result}")
+        logger.debug(f"get_task_summary result: {result}")
         return result
 
 async def main_process_result(start_data: Data, result: Any,
                               dialog_manager: DialogManager):
-    logger.info("main_process_result called!")
-    print("We have result:", result)
-    logger.info("Start data: %s", start_data)
-    logger.info("Result: %s", result)
-    logger.info("Dialog data: %s", dialog_manager.dialog_data)
+    logger.debug("main_process_result called!")
+    logger.debug("Start data: %s", start_data)
+    logger.debug("Result: %s", result)
+    logger.debug("Dialog data: %s", dialog_manager.dialog_data)
     
     # Создаем задачу при завершении диалога
     if result:
         try:
-            logger.info("Creating task...")
+            logger.debug("Creating task...")
             async with get_session() as session:
                 task_service = TaskService(session)
                 user_id = str(dialog_manager.event.from_user.id)
-                logger.info(f"User ID: {user_id}")
+                logger.debug(f"User ID: {user_id}")
                 task = await task_service.create_task(
                     user_id,
                     result
                 )
-                logger.info(f"Task created: {task}")
+                logger.debug(f"Task created: {task}")
                 
                 if task:
                     task_type = task['type']['name'] if task['type'] else i18n.format_value("type-not-set")
@@ -218,7 +217,7 @@ async def main_process_result(start_data: Data, result: Any,
                     duration = task['duration']['name'] if task['duration'] else i18n.format_value("duration-not-set")
                     deadline = task['deadline'] if task['deadline'] else i18n.format_value("deadline-not-set")
                     
-                    logger.info(f"Sending task created message...")
+                    logger.debug(f"Sending task created message...")
                     await dialog_manager.event.answer(
                         i18n.format_value("task-created") + "\n\n" +
                         i18n.format_value("task-created-details", {
@@ -231,9 +230,9 @@ async def main_process_result(start_data: Data, result: Any,
                             "deadline": deadline
                         })
                     )
-                    logger.info("Task created message sent")
+                    logger.debug("Task created message sent")
         except Exception as e:
-            logger.error(f"Error creating task: {e}")
+            logger.exception(f"Error creating task: {e}")
             await dialog_manager.event.answer(i18n.format_value("error"))
 
 

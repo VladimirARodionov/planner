@@ -23,7 +23,7 @@ async def start_command(message: Message):
     first_name = message.from_user.first_name
     last_name = message.from_user.last_name
     
-    logger.info(f"Команда /start от пользователя {user_id} ({username})")
+    logger.debug(f"Команда /start от пользователя {user_id} ({username})")
     
     async with get_session() as session:
         auth_service = AuthService(session)
@@ -32,7 +32,7 @@ async def start_command(message: Message):
         
         if not user:
             # Создаем нового пользователя
-            logger.info(f"Создаем нового пользователя {user_id} ({username})")
+            logger.debug(f"Создаем нового пользователя {user_id} ({username})")
             user = await auth_service.create_user(
                 telegram_id=user_id,
                 username=username,
@@ -42,21 +42,21 @@ async def start_command(message: Message):
             # Создаем настройки для нового пользователя
             try:
                 await create_user_settings(user.telegram_id, session)
-                logger.info(f"Настройки для пользователя {user_id} созданы успешно")
+                logger.debug(f"Настройки для пользователя {user_id} созданы успешно")
             except Exception as e:
                 logger.error(f"Ошибка при создании настроек для пользователя {user_id}: {e}")
             
-            logger.info(f"Создан новый пользователь: {user_id} ({username})")
+            logger.debug(f"Создан новый пользователь: {user_id} ({username})")
         else:
-            logger.info(f"Пользователь {user_id} уже существует")
+            logger.debug(f"Пользователь {user_id} уже существует")
             # Проверяем, есть ли у пользователя настройки
             settings_service = SettingsService(session)
             statuses = await settings_service.get_statuses(str(user_id))
             if not statuses:
-                logger.info(f"У пользователя {user_id} нет настроек, создаем их")
+                logger.debug(f"У пользователя {user_id} нет настроек, создаем их")
                 try:
                     await create_user_settings(user.telegram_id, session)
-                    logger.info(f"Настройки для пользователя {user_id} созданы успешно")
+                    logger.debug(f"Настройки для пользователя {user_id} созданы успешно")
                 except Exception as e:
                     logger.error(f"Ошибка при создании настроек для пользователя {user_id}: {e}")
         
@@ -178,13 +178,13 @@ async def on_settings_statuses_callback(callback_query: CallbackQuery):
     await callback_query.answer()
     
     user_id = callback_query.from_user.id
-    logger.info(f"Обработка колбэка settings_statuses от пользователя {user_id}")
+    logger.debug(f"Обработка колбэка settings_statuses от пользователя {user_id}")
     
     async with get_session() as session:
         settings_service = SettingsService(session)
         statuses = await settings_service.get_statuses(str(user_id))
         
-        logger.info(f"Получено {len(statuses) if statuses else 0} статусов для пользователя {user_id}")
+        logger.debug(f"Получено {len(statuses) if statuses else 0} статусов для пользователя {user_id}")
         
         if not statuses:
             logger.warning(f"Статусы для пользователя {user_id} не найдены")
@@ -207,7 +207,7 @@ async def on_settings_priorities_callback(callback_query: CallbackQuery):
     await callback_query.answer()
     
     user_id = callback_query.from_user.id
-    logger.info(f"Обработка колбэка settings_priorities от пользователя {user_id}")
+    logger.debug(f"Обработка колбэка settings_priorities от пользователя {user_id}")
     
     async with get_session() as session:
         settings_service = SettingsService(session)
@@ -231,7 +231,7 @@ async def on_settings_durations_callback(callback_query: CallbackQuery):
     await callback_query.answer()
     
     user_id = callback_query.from_user.id
-    logger.info(f"Обработка колбэка settings_durations от пользователя {user_id}")
+    logger.debug(f"Обработка колбэка settings_durations от пользователя {user_id}")
     
     async with get_session() as session:
         settings_service = SettingsService(session)
@@ -263,7 +263,7 @@ async def on_settings_task_types_callback(callback_query: CallbackQuery):
     await callback_query.answer()
     
     user_id = callback_query.from_user.id
-    logger.info(f"Обработка колбэка settings_task_types от пользователя {user_id}")
+    logger.debug(f"Обработка колбэка settings_task_types от пользователя {user_id}")
     
     async with get_session() as session:
         settings_service = SettingsService(session)
@@ -287,7 +287,7 @@ async def on_settings_task_types_callback(callback_query: CallbackQuery):
 async def create_settings_command(message: Message):
     """Принудительно создает настройки для пользователя"""
     user_id = message.from_user.id
-    logger.info(f"Команда /create_settings от пользователя {user_id}")
+    logger.debug(f"Команда /create_settings от пользователя {user_id}")
     
     async with get_session() as session:
         auth_service = AuthService(session)
@@ -300,7 +300,7 @@ async def create_settings_command(message: Message):
         try:
             # Принудительно создаем настройки для пользователя
             await create_user_settings(user.telegram_id, session)
-            logger.info(f"Настройки для пользователя {user_id} созданы успешно")
+            logger.debug(f"Настройки для пользователя {user_id} созданы успешно")
             await message.answer("Настройки успешно созданы!")
         except Exception as e:
             logger.error(f"Ошибка при создании настроек для пользователя {user_id}: {e}")
@@ -310,13 +310,13 @@ async def create_settings_command(message: Message):
 async def show_statuses_settings(message: Message):
     """Показать настройки статусов задач"""
     user_id = message.from_user.id
-    logger.info(f"Запрос настроек статусов для пользователя {user_id}")
+    logger.debug(f"Запрос настроек статусов для пользователя {user_id}")
     
     async with get_session() as session:
         settings_service = SettingsService(session)
         statuses = await settings_service.get_statuses(str(user_id))
         
-        logger.info(f"Получено {len(statuses) if statuses else 0} статусов для пользователя {user_id}")
+        logger.debug(f"Получено {len(statuses) if statuses else 0} статусов для пользователя {user_id}")
         
         if not statuses:
             logger.warning(f"Статусы для пользователя {user_id} не найдены")
@@ -358,13 +358,13 @@ async def show_priorities_settings(message: Message):
 async def show_durations_settings(message: Message):
     """Показать настройки длительностей задач"""
     user_id = message.from_user.id
-    logger.info(f"Запрос настроек длительностей для пользователя {user_id}")
+    logger.debug(f"Запрос настроек длительностей для пользователя {user_id}")
     
     async with get_session() as session:
         settings_service = SettingsService(session)
         durations = await settings_service.get_durations(str(user_id))
         
-        logger.info(f"Получено {len(durations) if durations else 0} длительностей для пользователя {user_id}")
+        logger.debug(f"Получено {len(durations) if durations else 0} длительностей для пользователя {user_id}")
         
         if not durations:
             logger.warning(f"Длительности для пользователя {user_id} не найдены")

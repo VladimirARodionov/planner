@@ -242,5 +242,5 @@ class TaskService:
             logger.debug(f"Task {task.id} converted to dict successfully")
             return result
         except Exception as e:
-            logger.error(f"Error converting task {task.id} to dict: {e}")
+            logger.exception(f"Error converting task {task.id} to dict: {e}")
             raise 
