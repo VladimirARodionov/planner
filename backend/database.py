@@ -92,6 +92,7 @@ async def create_initial_default_settings(session: AsyncSession):
     # Создаем стандартные статусы
     default_statuses = [
         {
+            "id": 1,
             "name": "Ожидает выполнения",
             "code": "pending",
             "color": "#808080",  # Серый
@@ -101,6 +102,7 @@ async def create_initial_default_settings(session: AsyncSession):
             "is_active": True
         },
         {
+            "id": 2,
             "name": "В процессе",
             "code": "in_progress",
             "color": "#FFA500",  # Оранжевый
@@ -110,6 +112,7 @@ async def create_initial_default_settings(session: AsyncSession):
             "is_active": True
         },
         {
+            "id": 3,
             "name": "На проверке",
             "code": "review",
             "color": "#4169E1",  # Синий
@@ -119,6 +122,7 @@ async def create_initial_default_settings(session: AsyncSession):
             "is_active": True
         },
         {
+            "id": 4,
             "name": "Выполнено",
             "code": "completed",
             "color": "#008000",  # Зеленый
@@ -128,6 +132,7 @@ async def create_initial_default_settings(session: AsyncSession):
             "is_active": True
         },
         {
+            "id": 5,
             "name": "Отменено",
             "code": "cancelled",
             "color": "#FF0000",  # Красный
@@ -150,6 +155,7 @@ async def create_initial_default_settings(session: AsyncSession):
     # Создаем стандартные приоритеты
     default_priorities = [
         {
+            "id": 1,
             "name": "Срочно и важно",
             "color": "#FF0000",
             "order": 1,
@@ -157,6 +163,7 @@ async def create_initial_default_settings(session: AsyncSession):
             "is_active": True
         },
         {
+            "id": 2,
             "name": "Важно, не срочно",
             "color": "#FFA500",
             "order": 2,
@@ -164,6 +171,7 @@ async def create_initial_default_settings(session: AsyncSession):
             "is_active": True
         },
         {
+            "id": 3,
             "name": "Срочно, не важно",
             "color": "#FFFF00",
             "order": 3,
@@ -171,6 +179,7 @@ async def create_initial_default_settings(session: AsyncSession):
             "is_active": True
         },
         {
+            "id": 4,
             "name": "Не срочно и не важно",
             "color": "#00FF00",
             "order": 4,
@@ -191,6 +200,7 @@ async def create_initial_default_settings(session: AsyncSession):
     # Создаем стандартные продолжительности
     default_durations = [
         {
+            "id": 1,
             "name": "На день",
             "duration_type": DurationType.DAYS.value,
             "value": 1,
@@ -198,6 +208,7 @@ async def create_initial_default_settings(session: AsyncSession):
             "is_active": True
         },
         {
+            "id": 2,
             "name": "На неделю",
             "duration_type": DurationType.WEEKS.value,
             "value": 1,
@@ -205,6 +216,7 @@ async def create_initial_default_settings(session: AsyncSession):
             "is_active": True
         },
         {
+            "id": 3,
             "name": "На месяц",
             "duration_type": DurationType.MONTHS.value,
             "value": 1,
@@ -212,6 +224,7 @@ async def create_initial_default_settings(session: AsyncSession):
             "is_active": True
         },
         {
+            "id": 4,
             "name": "На год",
             "duration_type": DurationType.YEARS.value,
             "value": 1,
@@ -232,6 +245,7 @@ async def create_initial_default_settings(session: AsyncSession):
     # Создаем типы задач по умолчанию
     default_task_types = [
         {
+            "id": 1,
             "name": "Личные",
             "description": "Личные задачи и дела",
             "color": "#FF69B4",  # Розовый
@@ -240,6 +254,7 @@ async def create_initial_default_settings(session: AsyncSession):
             "is_active": True
         },
         {
+            "id": 2,
             "name": "Семейные",
             "description": "Задачи, связанные с семьей",
             "color": "#4169E1",  # Синий
@@ -248,6 +263,7 @@ async def create_initial_default_settings(session: AsyncSession):
             "is_active": True
         },
         {
+            "id": 3,
             "name": "Рабочие",
             "description": "Рабочие задачи и проекты",
             "color": "#32CD32",  # Зеленый
@@ -256,6 +272,7 @@ async def create_initial_default_settings(session: AsyncSession):
             "is_active": True
         },
         {
+            "id": 4,
             "name": "Для отдыха",
             "description": "Задачи для отдыха и развлечений",
             "color": "#FFA500",  # Оранжевый
