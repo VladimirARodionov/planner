@@ -62,6 +62,7 @@ async def on_task_created(event, widget, manager: DialogManager):
     # Закрываем диалог с передачей данных в результат
     logger.info("on_task_created called, dialog data: %s", manager.dialog_data)
     try:
+        await main_process_result(start_data = None, result=manager.dialog_data, dialog_manager=manager)
         await manager.done(result=manager.dialog_data)
         logger.info("Dialog closed successfully with result")
     except Exception as e:
