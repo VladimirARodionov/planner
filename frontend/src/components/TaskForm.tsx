@@ -191,9 +191,41 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                                 onChange={(e) => setFormData({ ...formData, type_id: e.target.value })}
                                 label="Тип задачи"
                             >
-                                <MenuItem value="">Не выбран</MenuItem>
+                                <MenuItem 
+                                    value="" 
+                                    sx={{
+                                        '&.Mui-selected': {
+                                            backgroundColor: '#f5f5f5',
+                                            fontWeight: 'bold'
+                                        },
+                                        '&.Mui-selected:hover': {
+                                            backgroundColor: '#e0e0e0'
+                                        }
+                                    }}
+                                >
+                                    Не выбран
+                                </MenuItem>
                                 {taskTypes.map((type) => (
-                                    <MenuItem key={type.id} value={type.id.toString()}>
+                                    <MenuItem 
+                                        key={type.id} 
+                                        value={type.id.toString()}
+                                        sx={{
+                                            backgroundColor: type.color || '#f0f0f0',
+                                            '&:hover': {
+                                                backgroundColor: type.color || '#e0e0e0',
+                                                opacity: 0.9
+                                            },
+                                            '&.Mui-selected': {
+                                                backgroundColor: '#e3f2fd',
+                                                fontWeight: 'bold',
+                                                border: '2px solid #1976d2'
+                                            },
+                                            '&.Mui-selected:hover': {
+                                                backgroundColor: '#bbdefb',
+                                                opacity: 0.9
+                                            }
+                                        }}
+                                    >
                                         {type.name}
                                     </MenuItem>
                                 ))}
@@ -206,7 +238,20 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                                 onChange={(e) => handleSelectChange(e, 'status_id')}
                                 label="Статус"
                             >
-                                <MenuItem value="">Не выбран</MenuItem>
+                                <MenuItem 
+                                    value="" 
+                                    sx={{
+                                        '&.Mui-selected': {
+                                            backgroundColor: '#f5f5f5',
+                                            fontWeight: 'bold'
+                                        },
+                                        '&.Mui-selected:hover': {
+                                            backgroundColor: '#e0e0e0'
+                                        }
+                                    }}
+                                >
+                                    Не выбран
+                                </MenuItem>
                                 {statuses.map((status) => (
                                     <MenuItem
                                         key={status.id}
@@ -214,9 +259,22 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                                         sx={{
                                             backgroundColor: status.color || '#ccc',
                                             color: '#fff',
+                                            textShadow: '0px 0px 2px rgba(0, 0, 0, 0.7)',
                                             '&:hover': {
                                                 backgroundColor: status.color || '#ccc',
-                                                opacity: 0.8
+                                                opacity: 0.9
+                                            },
+                                            '&.Mui-selected': {
+                                                backgroundColor: status.color || '#ccc',
+                                                border: '2px solid #fff',
+                                                boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)',
+                                                fontWeight: 'bold'
+                                            },
+                                            '&.Mui-selected:hover': {
+                                                backgroundColor: status.color || '#ccc',
+                                                opacity: 0.9,
+                                                border: '2px solid #fff',
+                                                boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)'
                                             }
                                         }}
                                     >
@@ -232,7 +290,20 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                                 onChange={(e) => handleSelectChange(e, 'priority_id')}
                                 label="Приоритет"
                             >
-                                <MenuItem value="">Не выбран</MenuItem>
+                                <MenuItem 
+                                    value="" 
+                                    sx={{
+                                        '&.Mui-selected': {
+                                            backgroundColor: '#f5f5f5',
+                                            fontWeight: 'bold'
+                                        },
+                                        '&.Mui-selected:hover': {
+                                            backgroundColor: '#e0e0e0'
+                                        }
+                                    }}
+                                >
+                                    Не выбран
+                                </MenuItem>
                                 {priorities.map((priority) => (
                                     <MenuItem
                                         key={priority.id}
@@ -240,9 +311,22 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                                         sx={{
                                             backgroundColor: priority.color || '#ccc',
                                             color: '#fff',
+                                            textShadow: '0px 0px 2px rgba(0, 0, 0, 0.7)',
                                             '&:hover': {
                                                 backgroundColor: priority.color || '#ccc',
-                                                opacity: 0.8
+                                                opacity: 0.9
+                                            },
+                                            '&.Mui-selected': {
+                                                backgroundColor: priority.color || '#ccc',
+                                                border: '2px solid #fff',
+                                                boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)',
+                                                fontWeight: 'bold'
+                                            },
+                                            '&.Mui-selected:hover': {
+                                                backgroundColor: priority.color || '#ccc',
+                                                opacity: 0.9,
+                                                border: '2px solid #fff',
+                                                boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)'
                                             }
                                         }}
                                     >
@@ -258,9 +342,34 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                                 onChange={(e) => handleSelectChange(e, 'duration_id')}
                                 label="Длительность"
                             >
-                                <MenuItem value="">Не выбран</MenuItem>
+                                <MenuItem 
+                                    value="" 
+                                    sx={{
+                                        '&.Mui-selected': {
+                                            backgroundColor: '#f5f5f5',
+                                            fontWeight: 'bold'
+                                        },
+                                        '&.Mui-selected:hover': {
+                                            backgroundColor: '#e0e0e0'
+                                        }
+                                    }}
+                                >
+                                    Не выбран
+                                </MenuItem>
                                 {durations.map((duration) => (
-                                    <MenuItem key={duration.id} value={duration.id}>
+                                    <MenuItem 
+                                        key={duration.id} 
+                                        value={duration.id}
+                                        sx={{
+                                            '&.Mui-selected': {
+                                                backgroundColor: '#e3f2fd',
+                                                fontWeight: 'bold'
+                                            },
+                                            '&.Mui-selected:hover': {
+                                                backgroundColor: '#bbdefb'
+                                            }
+                                        }}
+                                    >
                                         {duration.name}
                                     </MenuItem>
                                 ))}

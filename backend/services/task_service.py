@@ -1,11 +1,10 @@
 from typing import List, Optional, Dict, Any
 
-from dateutil.relativedelta import relativedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 import logging
-from datetime import datetime, timedelta
+import asyncio
 
 from backend.db.models import Task, DurationSetting, TaskTypeSetting, StatusSetting, PrioritySetting
 from backend.services.auth_service import AuthService
@@ -49,7 +48,8 @@ class TaskService:
         result = await self.session.execute(query)
         tasks = result.scalars().all()
 
-        return [self._task_to_dict(task) for task in tasks]
+        # Используем asyncio.gather для параллельного выполнения
+        return await asyncio.gather(*[self._task_to_dict(task) for task in tasks])
 
     async def create_task(
         self,
@@ -150,7 +150,7 @@ class TaskService:
         await self.session.refresh(task)
         logger.debug(f"Task created with ID: {task.id}")
 
-        return self._task_to_dict(task)
+        return await self._task_to_dict(task)
 
     async def update_task(
         self,
@@ -192,11 +192,11 @@ class TaskService:
             duration = await self.session.get(DurationSetting, task.duration_id)
             if duration:
                 task.deadline = await duration.calculate_deadline_async(self.session)
-
+        self.session.add(task)
         await self.session.commit()
         await self.session.refresh(task)
 
-        return self._task_to_dict(task)
+        return await self._task_to_dict(task)
 
     async def delete_task(self, user_id: str, task_id: int) -> bool:
         """Удалить задачу"""
@@ -213,24 +213,51 @@ class TaskService:
 
         return True
 
-    def _task_to_dict(self, task: Task) -> Dict[str, Any]:
+    async def _task_to_dict(self, task: Task) -> Dict[str, Any]:
         """Преобразовать задачу в словарь"""
         logger.debug(f"Converting task {task.id} to dict")
-        logger.debug(f"Task duration: {task.duration}, duration_id: {task.duration_id}")
+        logger.debug(f"Task duration_id: {task.duration_id}")
         logger.debug(f"Task deadline: {task.deadline}")
         
         try:
+            # Загружаем связанные объекты заранее
+            if task.type_id:
+                type_query = select(TaskTypeSetting).where(TaskTypeSetting.id == task.type_id)
+                type_result = await self.session.execute(type_query)
+                task_type = type_result.scalar_one_or_none()
+            else:
+                task_type = None
+                
+            if task.status_id:
+                status_query = select(StatusSetting).where(StatusSetting.id == task.status_id)
+                status_result = await self.session.execute(status_query)
+                status = status_result.scalar_one_or_none()
+            else:
+                status = None
+                
+            if task.priority_id:
+                priority_query = select(PrioritySetting).where(PrioritySetting.id == task.priority_id)
+                priority_result = await self.session.execute(priority_query)
+                priority = priority_result.scalar_one_or_none()
+            else:
+                priority = None
+                
             # Подготовим данные о длительности, если она есть
             duration_data = None
-            if task.duration:
+            if task.duration_id:
                 try:
-                    duration_data = {
-                        'id': task.duration.id,
-                        'name': task.duration.name,
-                        'type': task.duration.duration_type.value if task.duration.duration_type else None,
-                        'value': task.duration.value
-                    }
-                    logger.debug(f"Duration data: {duration_data}")
+                    duration_query = select(DurationSetting).where(DurationSetting.id == task.duration_id)
+                    duration_result = await self.session.execute(duration_query)
+                    duration = duration_result.scalar_one_or_none()
+                    
+                    if duration:
+                        duration_data = {
+                            'id': duration.id,
+                            'name': duration.name,
+                            'type': duration.duration_type.value if duration.duration_type else None,
+                            'value': duration.value
+                        }
+                        logger.debug(f"Duration data: {duration_data}")
                 except Exception as e:
                     logger.exception(f"Error preparing duration data: {e}")
                     duration_data = None
@@ -240,20 +267,20 @@ class TaskService:
                 'title': task.title,
                 'description': task.description,
                 'type': {
-                    'id': task.type.id,
-                    'name': task.type.name,
-                    'color': task.type.color
-                } if task.type else None,
+                    'id': task_type.id,
+                    'name': task_type.name,
+                    'color': task_type.color
+                } if task_type else None,
                 'status': {
-                    'id': task.status.id,
-                    'name': task.status.name,
-                    'color': task.status.color
-                } if task.status else None,
+                    'id': status.id,
+                    'name': status.name,
+                    'color': status.color
+                } if status else None,
                 'priority': {
-                    'id': task.priority.id,
-                    'name': task.priority.name,
-                    'color': task.priority.color
-                } if task.priority else None,
+                    'id': priority.id,
+                    'name': priority.name,
+                    'color': priority.color
+                } if priority else None,
                 'duration': duration_data,
                 'deadline': task.deadline.isoformat() if task.deadline else None,
                 'created_at': task.created_at.isoformat(),
