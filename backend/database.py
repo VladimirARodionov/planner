@@ -375,7 +375,7 @@ async def create_user_settings(user_id: int, session: AsyncSession):
         
         # Ищем соответствующее значение в перечислении
         for dt in DurationType:
-            if dt.value == duration_type_str:
+            if dt.name == duration_type_str:
                 duration_type = dt
                 break
         

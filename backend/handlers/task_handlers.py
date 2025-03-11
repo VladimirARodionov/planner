@@ -279,21 +279,26 @@ async def list_tasks(message: Message):
 
         response = i18n.format_value("tasks-header") + "\n\n"
         for task in tasks:
-            status_emoji = "✅" if task['status'] and task['status']['name'].lower() == 'завершено' else "⏳"
-            priority_emoji = "🔴" if task['priority'] and task['priority']['name'].lower() == 'высокий' else "🟡" if task['priority'] and task['priority']['name'].lower() == 'средний' else "🟢"
-            
             response += i18n.format_value("task-item", {
-                "status_emoji": status_emoji,
-                "priority_emoji": priority_emoji,
                 "id": task['id'],
                 "title": task['title']
             }) + "\n"
-            
+
             if task['description']:
                 response += i18n.format_value("task-description-line", {
                     "description": task['description']
                 }) + "\n"
-                
+
+            if task['status']:
+                response += i18n.format_value("task-status-line", {
+                    "status": task['status']['name']
+                }) + "\n"
+
+            if task['priority']:
+                response += i18n.format_value("task-priority-line", {
+                    "priority": task['priority']['name']
+                }) + "\n"
+
             if task['duration']:
                 response += i18n.format_value("task-duration-line", {
                     "duration": f"{task['duration']['name']} ({task['duration']['value']} {task['duration']['type']})"
@@ -309,6 +314,13 @@ async def list_tasks(message: Message):
 
 @router.message(Command("add_task"))
 async def start_add_task(message: Message, dialog_manager: DialogManager):
+    async with get_session() as session:
+        auth_service = AuthService(session)
+        user = await auth_service.get_user_by_id(str(message.from_user.id))
+
+        if not user:
+            await message.answer("Пользователь не найден. Сначала выполните команду /start")
+            return
     """Начать процесс создания новой задачи"""
     await dialog_manager.start(TaskDialog.title, mode=StartMode.NORMAL)
 

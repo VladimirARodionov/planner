@@ -48,7 +48,9 @@ task-duration = Выберите длительность задачи:
 # Список задач
 tasks-empty = У вас пока нет задач. Создайте новую задачу командой /add_task
 tasks-header = 📋 Ваши задачи:
-task-item = {$status_emoji} {$priority_emoji} #{$id} {$title}
+task-item = #{$id} {$title}
+task-status-line = Статус: {$status}
+task-priority-line = Приоритет: {$priority}
 task-description-line = 📝 {$description}
 task-duration-line = ⏱️ Длительность: {$duration}
 task-deadline-line = ⏰ Дедлайн: {$deadline}
@@ -58,22 +60,22 @@ tasks-menu = 📋 Список задач
 task-created = ✅ Задача успешно создана!
 task-created-details =
     📝 {$title}
-        Описание: {$description}
-        Тип: {$type}
-        Статус: {$status}
-        Приоритет: {$priority}
-        Длительность: {$duration}
-        Дедлайн: {$deadline}
+    Описание: {$description}
+    Тип: {$type}
+    Статус: {$status}
+    Приоритет: {$priority}
+    Длительность: {$duration}
+    Дедлайн: {$deadline}
 
 # Подтверждение создания задачи
 task-confirm-header = 📋 Подтвердите создание задачи:
 task-confirm-details = 
     📝 {$title}
-        Описание: {$description}
-        Тип: {$type}
-        Статус: {$status}
-        Приоритет: {$priority}
-        Длительность: {$duration}
+    Описание: {$description}
+    Тип: {$type}
+    Статус: {$status}
+    Приоритет: {$priority}
+    Длительность: {$duration}
 
 # Удаление задачи
 task-deleted = ✅ Задача {$id} успешно удалена
