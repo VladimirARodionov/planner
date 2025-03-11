@@ -106,6 +106,11 @@ async def on_duration_selected(callback: CallbackQuery, widget: Any, manager: Di
     # Переходим к шагу подтверждения
     await manager.next()
 
+async def on_skip_duration(event, widget, manager: DialogManager):
+    logger.debug("on_skip_duration called")
+    manager.dialog_data["duration_id"] = None
+    await manager.next()
+
 async def get_task_summary(dialog_manager: DialogManager, **kwargs):
     """Получить сводку о создаваемой задаче"""
     user_id = dialog_manager.event.from_user.id if hasattr(dialog_manager.event, 'from_user') else None
@@ -204,9 +209,22 @@ async def main_process_result(start_data: Data, result: Any,
                 task_service = TaskService(session)
                 user_id = str(dialog_manager.event.from_user.id)
                 logger.debug(f"User ID: {user_id}")
+                
+                # Получаем данные из dialog_data, а не из result
+                task_data = {
+                    "title": dialog_manager.dialog_data.get("title", "Новая задача"),
+                    "description": dialog_manager.dialog_data.get("description"),
+                    "type_id": dialog_manager.dialog_data.get("type_id"),
+                    "status_id": dialog_manager.dialog_data.get("status_id"),
+                    "priority_id": dialog_manager.dialog_data.get("priority_id"),
+                    "duration_id": dialog_manager.dialog_data.get("duration_id")
+                }
+                
+                logger.debug(f"Task data for creation: {task_data}")
+                
                 task = await task_service.create_task(
                     user_id,
-                    result
+                    task_data
                 )
                 logger.debug(f"Task created: {task}")
                 
@@ -320,6 +338,9 @@ task_dialog = Dialog(
         Row(
             Back(Const(i18n.format_value("back"))),
             Next(Const(i18n.format_value("next"))),
+        ),
+        Row(
+            Button(Const("Пропустить"), id="skip_duration", on_click=on_skip_duration),
         ),
         state=TaskDialog.duration,
         getter=get_durations,

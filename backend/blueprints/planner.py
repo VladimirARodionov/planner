@@ -21,19 +21,30 @@ async def get_tasks():
     """Получить список задач пользователя"""
     if request.method == 'OPTIONS':
         return '', 200
-        
-    current_user = get_jwt_identity()
-    filters = {
-        'status_id': request.args.get('status_id', type=int),
-        'priority_id': request.args.get('priority_id', type=int),
-        'duration_id': request.args.get('duration_id', type=int),
-        'is_completed': request.args.get('is_completed', type=bool, default=False)
-    }
     
-    async with get_session() as session:
-        task_service = TaskService(session)
-        tasks = await task_service.get_tasks(current_user, filters)
-        return jsonify({'tasks': tasks})
+    # Добавляем отладочную информацию
+    logger.info(f"Получен запрос на получение задач")
+    logger.info(f"Заголовки запроса: {request.headers}")
+    
+    try:
+        current_user = get_jwt_identity()
+        logger.info(f"Идентификатор пользователя из токена: {current_user}")
+        
+        filters = {
+            'status_id': request.args.get('status_id', type=int),
+            'priority_id': request.args.get('priority_id', type=int),
+            'duration_id': request.args.get('duration_id', type=int),
+            'is_completed': request.args.get('is_completed', type=bool, default=False)
+        }
+        
+        async with get_session() as session:
+            task_service = TaskService(session)
+            tasks = await task_service.get_tasks(current_user, filters)
+            logger.info(f"Получены задачи: {tasks}")
+            return jsonify({'tasks': tasks})
+    except Exception as e:
+        logger.error(f"Ошибка при получении задач: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @bp.route('/api/tasks/', methods=['POST', 'OPTIONS'])
 @cross_origin()

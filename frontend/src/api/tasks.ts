@@ -1,5 +1,6 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { Task, Settings, Status, Priority, Duration, TaskType } from '../types/task';
+import { AuthAPI } from './auth';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -18,6 +19,43 @@ api.interceptors.request.use((config: any) => {
     }
     return config;
 });
+
+// Перехватчик ответов для обработки ошибок авторизации
+api.interceptors.response.use(
+    (response) => response,
+    async (error: AxiosError) => {
+        const originalRequest = error.config;
+        
+        // Если ошибка 401 (Unauthorized) и это не запрос на обновление токена
+        if (error.response?.status === 401 && 
+            originalRequest && 
+            !(originalRequest.url === '/auth/refresh/')) {
+            
+            try {
+                // Пытаемся обновить токен
+                await AuthAPI.refreshToken();
+                
+                // Повторяем исходный запрос с новым токеном
+                const token = localStorage.getItem('token');
+                if (originalRequest.headers) {
+                    originalRequest.headers.Authorization = `Bearer ${token}`;
+                }
+                
+                return axios(originalRequest);
+            } catch (refreshError) {
+                // Если не удалось обновить токен, перенаправляем на страницу входа
+                console.error('Failed to refresh token:', refreshError);
+                localStorage.removeItem('token');
+                localStorage.removeItem('refreshToken');
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+                return Promise.reject(refreshError);
+            }
+        }
+        
+        return Promise.reject(error);
+    }
+);
 
 export interface CreateTaskDto {
     title: string;

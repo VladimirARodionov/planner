@@ -3,6 +3,7 @@ import time
 import json
 import os
 import jwt
+import uuid
 from datetime import datetime, timedelta
 from aiogram import Router, F
 from aiogram.filters import Command
@@ -17,6 +18,8 @@ from backend.services.settings_service import SettingsService
 from backend.dialogs.task_dialogs import TaskDialog
 from backend.load_env import env_config
 
+logger = logging.getLogger(__name__)
+
 # Путь к файлу с состояниями авторизации
 AUTH_STATES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'auth_states.json')
 
@@ -26,23 +29,38 @@ AUTH_STATE_TTL = 600
 # Функция для создания access token
 def create_custom_access_token(identity):
     """Создает JWT access token"""
-    expires = datetime.utcnow() + timedelta(hours=1)  # Токен действителен 1 час
+    # Токен действителен 1 час (3600 секунд), как указано в настройках Flask JWT Extended
+    expires = datetime.utcnow() + timedelta(seconds=3600)
+    
+    # Создаем payload с полями, которые ожидает Flask JWT Extended
     payload = {
-        'sub': identity,  # Используем 'sub' вместо 'identity' для совместимости с Flask JWT Extended
-        'exp': expires,
-        'type': 'access'
+        'sub': identity,  # Идентификатор пользователя
+        'exp': int(expires.timestamp()),  # Время истечения токена в формате timestamp
+        'iat': int(datetime.utcnow().timestamp()),  # Время создания токена
+        'nbf': int(datetime.utcnow().timestamp()),  # Время, с которого токен действителен
+        'jti': str(uuid.uuid4()),  # Уникальный идентификатор токена
+        'type': 'access',  # Тип токена
+        'fresh': False  # Токен не является "свежим"
     }
+    
     return jwt.encode(payload, env_config.get('JWT_SECRET_KEY'), algorithm='HS256')
 
 # Функция для создания refresh token
 def create_custom_refresh_token(identity):
     """Создает JWT refresh token"""
-    expires = datetime.utcnow() + timedelta(days=30)  # Токен действителен 30 дней
+    # Токен действителен 30 дней (2592000 секунд), как указано в настройках Flask JWT Extended
+    expires = datetime.utcnow() + timedelta(seconds=2592000)
+    
+    # Создаем payload с полями, которые ожидает Flask JWT Extended
     payload = {
-        'sub': identity,  # Используем 'sub' вместо 'identity' для совместимости с Flask JWT Extended
-        'exp': expires,
-        'type': 'refresh'
+        'sub': identity,  # Идентификатор пользователя
+        'exp': int(expires.timestamp()),  # Время истечения токена в формате timestamp
+        'iat': int(datetime.utcnow().timestamp()),  # Время создания токена
+        'nbf': int(datetime.utcnow().timestamp()),  # Время, с которого токен действителен
+        'jti': str(uuid.uuid4()),  # Уникальный идентификатор токена
+        'type': 'refresh'  # Тип токена
     }
+    
     return jwt.encode(payload, env_config.get('JWT_SECRET_KEY'), algorithm='HS256')
 
 # Функция для загрузки состояний авторизации из файла
@@ -61,7 +79,6 @@ def load_auth_states():
         
         return auth_states
     except Exception as e:
-        logger = logging.getLogger(__name__)
         logger.error(f"Ошибка при загрузке состояний авторизации: {e}")
         return {}
 
@@ -72,7 +89,6 @@ def save_auth_states(auth_states):
         with open(AUTH_STATES_FILE, 'w') as f:
             json.dump(auth_states, f)
     except Exception as e:
-        logger = logging.getLogger(__name__)
         logger.error(f"Ошибка при сохранении состояний авторизации: {e}")
 
 # Функция для добавления состояния авторизации
@@ -113,7 +129,7 @@ def cleanup_auth_states():
         save_auth_states(auth_states)
 
 router = Router()
-logger = logging.getLogger(__name__)
+
 
 @router.message(Command("start"))
 async def start_command(message: Message):
@@ -255,7 +271,8 @@ async def list_tasks(message: Message):
     async with get_session() as session:
         task_service = TaskService(session)
         tasks = await task_service.get_tasks(str(message.from_user.id))
-        
+        logger.info(f"Задачи: {tasks}")
+
         if not tasks:
             await message.answer(i18n.format_value("tasks-empty"))
             return
@@ -277,13 +294,17 @@ async def list_tasks(message: Message):
                     "description": task['description']
                 }) + "\n"
                 
+            if task['duration']:
+                response += i18n.format_value("task-duration-line", {
+                    "duration": f"{task['duration']['name']} ({task['duration']['value']} {task['duration']['type']})"
+                }) + "\n"
+                
             if task['deadline']:
                 response += i18n.format_value("task-deadline-line", {
                     "deadline": task['deadline']
                 }) + "\n"
                 
             response += "\n"
-
         await message.answer(response)
 
 @router.message(Command("add_task"))

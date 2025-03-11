@@ -196,7 +196,7 @@ async def create_initial_default_settings(session: AsyncSession):
         {
             "id": 1,
             "name": "На день",
-            "duration_type": DurationType.DAYS.value,
+            "duration_type": DurationType.DAYS.name,
             "value": 1,
             "is_default": True,
             "is_active": True
@@ -204,7 +204,7 @@ async def create_initial_default_settings(session: AsyncSession):
         {
             "id": 2,
             "name": "На неделю",
-            "duration_type": DurationType.WEEKS.value,
+            "duration_type": DurationType.WEEKS.name,
             "value": 1,
             "is_default": False,
             "is_active": True
@@ -212,7 +212,7 @@ async def create_initial_default_settings(session: AsyncSession):
         {
             "id": 3,
             "name": "На месяц",
-            "duration_type": DurationType.MONTHS.value,
+            "duration_type": DurationType.MONTHS.name,
             "value": 1,
             "is_default": False,
             "is_active": True
@@ -220,7 +220,7 @@ async def create_initial_default_settings(session: AsyncSession):
         {
             "id": 4,
             "name": "На год",
-            "duration_type": DurationType.YEARS.value,
+            "duration_type": DurationType.YEARS.name,
             "value": 1,
             "is_default": False,
             "is_active": True
@@ -368,10 +368,26 @@ async def create_user_settings(user_id: int, session: AsyncSession):
     duration_count = 0
     for default_duration in default_durations.scalars():
         duration_data = json.loads(default_duration.value)
+        
+        # Преобразуем строковое значение duration_type в объект перечисления DurationType
+        duration_type_str = duration_data["duration_type"]
+        duration_type = None
+        
+        # Ищем соответствующее значение в перечислении
+        for dt in DurationType:
+            if dt.value == duration_type_str:
+                duration_type = dt
+                break
+        
+        # Если не нашли, используем значение по умолчанию
+        if duration_type is None:
+            logger.warning(f"Неизвестный тип длительности: {duration_type_str}, используем DAYS")
+            duration_type = DurationType.DAYS
+        
         db_duration = DurationSetting(
             user_id=user_id,
             name=duration_data["name"],
-            duration_type=duration_data["duration_type"],
+            duration_type=duration_type,
             value=duration_data["value"],
             is_default=duration_data["is_default"],
             is_active=duration_data["is_active"]

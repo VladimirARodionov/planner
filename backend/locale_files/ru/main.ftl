@@ -50,6 +50,7 @@ tasks-empty = У вас пока нет задач. Создайте новую 
 tasks-header = 📋 Ваши задачи:
 task-item = {$status_emoji} {$priority_emoji} #{$id} {$title}
 task-description-line = 📝 {$description}
+task-duration-line = ⏱️ Длительность: {$duration}
 task-deadline-line = ⏰ Дедлайн: {$deadline}
 tasks-menu = 📋 Список задач
 

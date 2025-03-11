@@ -58,13 +58,30 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         if (open) {
             loadSettings();
             if (task) {
+                console.log('Task for edit:', task);
+                
+                // Проверяем, что объекты существуют и имеют id
+                const typeId = task.type && task.type.id ? task.type.id.toString() : '';
+                const statusId = task.status && task.status.id ? task.status.id : '';
+                const priorityId = task.priority && task.priority.id ? task.priority.id : '';
+                const durationId = task.duration && task.duration.id ? task.duration.id : '';
+                
                 setFormData({
                     title: task.title,
                     description: task.description || '',
-                    type_id: task.type?.id?.toString() || '',
-                    status_id: task.status?.id || '',
-                    priority_id: task.priority?.id || '',
-                    duration_id: task.duration?.id || ''
+                    type_id: typeId,
+                    status_id: statusId,
+                    priority_id: priorityId,
+                    duration_id: durationId
+                });
+                
+                console.log('Form data after set:', {
+                    title: task.title,
+                    description: task.description || '',
+                    type_id: typeId,
+                    status_id: statusId,
+                    priority_id: priorityId,
+                    duration_id: durationId
                 });
             } else {
                 setFormData({
@@ -121,14 +138,18 @@ export const TaskForm: React.FC<TaskFormProps> = ({
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault();
+        
+        // Преобразуем строковые значения в числа, если они не пустые
         const submitData: CreateTaskDto | UpdateTaskDto = {
             title: formData.title,
             description: formData.description || null,
             type_id: formData.type_id ? parseInt(formData.type_id) : undefined,
-            status_id: formData.status_id !== '' ? formData.status_id : undefined,
-            priority_id: formData.priority_id !== '' ? formData.priority_id : undefined,
-            duration_id: formData.duration_id !== '' ? formData.duration_id : undefined
+            status_id: formData.status_id !== '' ? Number(formData.status_id) : undefined,
+            priority_id: formData.priority_id !== '' ? Number(formData.priority_id) : undefined,
+            duration_id: formData.duration_id !== '' ? Number(formData.duration_id) : undefined
         };
+        
+        console.log('Submitting task data:', submitData);
         onSubmit(submitData);
     };
 
@@ -172,7 +193,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                             >
                                 <MenuItem value="">Не выбран</MenuItem>
                                 {taskTypes.map((type) => (
-                                    <MenuItem key={type.id} value={type.id}>
+                                    <MenuItem key={type.id} value={type.id.toString()}>
                                         {type.name}
                                     </MenuItem>
                                 ))}

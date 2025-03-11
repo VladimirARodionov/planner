@@ -30,7 +30,10 @@ async def authenticate():
     username = data.get('username')
     password = data.get('password')
 
+    logger.info(f"Попытка аутентификации пользователя {username}")
+
     if not username or not password:
+        logger.warning(f"Отсутствуют обязательные поля username или password")
         return jsonify({'error': 'Username and password are required'}), 400
 
     async with get_session() as session:
@@ -38,8 +41,11 @@ async def authenticate():
         user = await auth_service.authenticate_user(username, password)
         
         if user:
-            access_token = create_access_token(identity=username)
-            refresh_token = create_refresh_token(identity=username)
+            logger.info(f"Пользователь {username} успешно аутентифицирован")
+            # Используем telegram_id пользователя в качестве идентификатора в токене
+            access_token = create_access_token(identity=str(user.telegram_id))
+            refresh_token = create_refresh_token(identity=str(user.telegram_id))
+            logger.info(f"Созданы токены для пользователя {username} с идентификатором {user.telegram_id}")
             cache.set("current_user_" + username, data)
             return jsonify({
                 'user': username,
@@ -47,17 +53,35 @@ async def authenticate():
                 'refresh': refresh_token
             }), 200
         else:
+            logger.warning(f"Неверные учетные данные для пользователя {username}")
             cache.delete("current_user_" + username)
             return jsonify({'error': 'Invalid credentials'}), 401
 
 
 @bp.route('/api/auth/refresh/', methods=['OPTIONS', 'POST'])
 @cross_origin()
-@jwt_required()
+@jwt_required(refresh=True)
 def refresh():
-    current_user = get_jwt_identity()
-    access_token = create_access_token(identity=current_user)
-    return jsonify({'user': current_user, 'access': access_token}), 200
+    """Обновить access токен с помощью refresh токена"""
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    try:
+        # Получаем идентификатор пользователя из refresh токена
+        current_user = get_jwt_identity()
+        logger.info(f"Обновление токена для пользователя с идентификатором {current_user}")
+        
+        # Создаем новый access токен
+        access_token = create_access_token(identity=current_user)
+        logger.info(f"Создан новый access токен для пользователя с идентификатором {current_user}")
+        
+        return jsonify({
+            'user': current_user,
+            'access': access_token
+        }), 200
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении токена: {e}")
+        return jsonify({'error': 'Invalid refresh token'}), 401
 
 
 @bp.route('/api/auth/logout/', methods=['OPTIONS', 'POST'])
