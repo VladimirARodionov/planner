@@ -77,43 +77,48 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask }) 
                             </Box>
                         }
                     >
-                        <ListItemText
-                            primary={
-                                <Box display="flex" alignItems="center" gap={1}>
-                                    <Typography>{task.title}</Typography>
-                                    {task.status && (
-                                        <Chip
-                                            label={task.status.name}
-                                            size="small"
-                                            sx={{
-                                                backgroundColor: task.status.color || '#ccc',
-                                                color: '#fff'
-                                            }}
-                                        />
-                                    )}
-                                    {task.priority && (
-                                        <Chip
-                                            label={task.priority.name}
-                                            size="small"
-                                            sx={{
-                                                backgroundColor: task.priority.color || '#ccc',
-                                                color: '#fff'
-                                            }}
-                                        />
-                                    )}
-                                </Box>
-                            }
-                            secondary={
-                                <Box>
-                                    <Typography variant="body2" color="text.secondary">
-                                        {task.description}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                        {task.deadline && `Срок: ${new Date(task.deadline).toLocaleDateString()}`}
-                                    </Typography>
-                                </Box>
-                            }
-                        />
+                        <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                            {/* Заголовок задачи и метки */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                <Typography variant="body1" component="span">
+                                    {task.title}
+                                </Typography>
+                                {task.status && (
+                                    <Chip
+                                        label={task.status.name}
+                                        size="small"
+                                        sx={{
+                                            backgroundColor: task.status.color || '#ccc',
+                                            color: '#fff'
+                                        }}
+                                    />
+                                )}
+                                {task.priority && (
+                                    <Chip
+                                        label={task.priority.name}
+                                        size="small"
+                                        sx={{
+                                            backgroundColor: task.priority.color || '#ccc',
+                                            color: '#fff'
+                                        }}
+                                    />
+                                )}
+                            </Box>
+                            
+                            {/* Описание задачи */}
+                            {task.description && (
+                                <Typography variant="body2" color="text.secondary" component="span" sx={{ display: 'block' }}>
+                                    {task.description}
+                                </Typography>
+                            )}
+                            
+                            {/* Дедлайн */}
+                            {task.deadline && (
+                                <Typography variant="caption" color="text.secondary" component="span" sx={{ display: 'block' }}>
+                                    Срок: {new Date(task.deadline).toLocaleDateString()}
+                                </Typography>
+                            )}
+                        </Box>
                     </ListItem>
                 ))}
             </List>

@@ -14,6 +14,22 @@ class DurationType(enum.Enum):
     WEEKS = "weeks"
     MONTHS = "months"
     YEARS = "years"
+    
+    @classmethod
+    def _missing_(cls, value):
+        """Обработка отсутствующих значений перечисления"""
+        # Проверяем, есть ли значение в нижнем регистре
+        for member in cls:
+            if member.value == value:
+                return member
+        
+        # Проверяем, есть ли значение в верхнем регистре
+        for member in cls:
+            if member.name == value or member.name == value.upper():
+                return member
+        
+        # Если ничего не найдено, возвращаем None
+        return None
 
 class GlobalSettings(Base):
     """Глобальные настройки приложения"""

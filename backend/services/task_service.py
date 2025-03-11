@@ -1,8 +1,11 @@
 from typing import List, Optional, Dict, Any
+
+from dateutil.relativedelta import relativedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 import logging
+from datetime import datetime, timedelta
 
 from backend.db.models import Task, DurationSetting, TaskTypeSetting, StatusSetting, PrioritySetting
 from backend.services.auth_service import AuthService
@@ -55,7 +58,7 @@ class TaskService:
     ) -> Optional[Dict[str, Any]]:
         """Создать новую задачу"""
         logger.debug(f"Creating task for user {user_id} with data: {task_data}")
-        
+
         user = await self.auth_service.get_user_by_id(user_id)
         if not user:
             logger.error(f"User {user_id} not found")
@@ -92,6 +95,9 @@ class TaskService:
             status = status_result.scalar_one_or_none()
             if status:
                 task_data['status_id'] = status.id
+                logger.debug(f"Using default status with ID: {status.id}")
+            else:
+                logger.debug("No default status found")
                 
         if not task_data.get('priority_id'):
             priority_query = select(PrioritySetting).where(
@@ -102,6 +108,9 @@ class TaskService:
             priority = priority_result.scalar_one_or_none()
             if priority:
                 task_data['priority_id'] = priority.id
+                logger.debug(f"Using default priority with ID: {priority.id}")
+            else:
+                logger.debug("No default priority found")
                 
         if not task_data.get('type_id'):
             type_query = select(TaskTypeSetting).where(
@@ -207,8 +216,25 @@ class TaskService:
     def _task_to_dict(self, task: Task) -> Dict[str, Any]:
         """Преобразовать задачу в словарь"""
         logger.debug(f"Converting task {task.id} to dict")
+        logger.debug(f"Task duration: {task.duration}, duration_id: {task.duration_id}")
+        logger.debug(f"Task deadline: {task.deadline}")
         
         try:
+            # Подготовим данные о длительности, если она есть
+            duration_data = None
+            if task.duration:
+                try:
+                    duration_data = {
+                        'id': task.duration.id,
+                        'name': task.duration.name,
+                        'type': task.duration.duration_type.value if task.duration.duration_type else None,
+                        'value': task.duration.value
+                    }
+                    logger.debug(f"Duration data: {duration_data}")
+                except Exception as e:
+                    logger.exception(f"Error preparing duration data: {e}")
+                    duration_data = None
+            
             result = {
                 'id': task.id,
                 'title': task.title,
@@ -228,12 +254,7 @@ class TaskService:
                     'name': task.priority.name,
                     'color': task.priority.color
                 } if task.priority else None,
-                'duration': {
-                    'id': task.duration.id,
-                    'name': task.duration.name,
-                    'type': task.duration.duration_type.value,
-                    'value': task.duration.value
-                } if task.duration else None,
+                'duration': duration_data,
                 'deadline': task.deadline.isoformat() if task.deadline else None,
                 'created_at': task.created_at.isoformat(),
                 'completed_at': task.completed_at.isoformat() if task.completed_at else None,
