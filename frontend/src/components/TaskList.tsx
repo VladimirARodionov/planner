@@ -18,8 +18,6 @@ import {
     AccordionSummary, 
     AccordionDetails,
     Chip,
-    IconButton,
-    Tooltip,
     FormControlLabel,
     Checkbox,
     Stack
@@ -27,9 +25,7 @@ import {
 import { 
     FilterList as FilterListIcon, 
     ExpandMore as ExpandMoreIcon, 
-    Sort as SortIcon,
     Clear as ClearIcon,
-    CalendarMonth as CalendarIcon
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -42,7 +38,7 @@ interface TaskListProps {
     refreshTrigger?: number;
 }
 
-export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, refreshTrigger }) => {
+export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }) => {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [taskData, setTaskData] = useState<PaginatedResponse | null>(null);
@@ -116,14 +112,6 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, re
     }, [pagination, searchQuery, filters, sortField, sortDirection]);
 
     useEffect(() => {
-        console.log('TaskList useEffect triggered', { 
-            page: pagination.page, 
-            sort_by: pagination.sort_by, 
-            sort_order: pagination.sort_order, 
-            filters,
-            refreshTrigger,
-            searchQuery 
-        });
         fetchTasks();
     }, [pagination.page, filters, refreshTrigger, fetchTasks]);
 
