@@ -30,6 +30,7 @@ const ProtectedRoute: React.FC<{ element: React.ReactNode }> = ({ element }) => 
 const MainApp: React.FC = () => {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState<Task | undefined>();
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
     const [notification, setNotification] = useState<{
         message: string;
         type: AlertProps['severity'];
@@ -73,6 +74,7 @@ const MainApp: React.FC = () => {
                 });
             }
             handleCloseForm();
+            setRefreshTrigger(prev => prev + 1);
         } catch (err) {
             setNotification({
                 message: 'Произошла ошибка при сохранении задачи',
@@ -89,6 +91,7 @@ const MainApp: React.FC = () => {
                 message: 'Задача успешно удалена',
                 type: 'success'
             });
+            setRefreshTrigger(prev => prev + 1);
         } catch (err) {
             setNotification({
                 message: 'Произошла ошибка при удалении задачи',
@@ -127,6 +130,7 @@ const MainApp: React.FC = () => {
                 <TaskList
                     onEditTask={handleEditTask}
                     onDeleteTask={handleDeleteTask}
+                    refreshTrigger={refreshTrigger}
                 />
             </Container>
 

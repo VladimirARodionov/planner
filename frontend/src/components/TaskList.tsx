@@ -7,16 +7,17 @@ import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 interface TaskListProps {
     onEditTask?: (task: Task) => void;
     onDeleteTask?: (taskId: number) => void;
+    refreshTrigger?: number;
 }
 
-export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask }) => {
+export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, refreshTrigger = 0 }) => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         loadTasks();
-    }, []);
+    }, [refreshTrigger]);
 
     const loadTasks = async () => {
         try {
@@ -35,7 +36,6 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask }) 
     const handleDelete = async (taskId: number) => {
         try {
             await TasksAPI.deleteTask(taskId);
-            setTasks(tasks.filter(task => task.id !== taskId));
             onDeleteTask?.(taskId);
         } catch (err) {
             setError('Ошибка при удалении задачи');
