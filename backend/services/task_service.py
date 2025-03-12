@@ -274,12 +274,14 @@ class TaskService:
                 'status': {
                     'id': status.id,
                     'name': status.name,
-                    'color': status.color
+                    'color': status.color,
+                    'order': status.order
                 } if status else None,
                 'priority': {
                     'id': priority.id,
                     'name': priority.name,
-                    'color': priority.color
+                    'color': priority.color,
+                    'order': priority.order
                 } if priority else None,
                 'duration': duration_data,
                 'deadline': task.deadline.isoformat() if task.deadline else None,

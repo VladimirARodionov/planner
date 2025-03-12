@@ -5,6 +5,7 @@ import decouple
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.fsm.storage.memory import MemoryStorage
 from sqlalchemy import create_engine
 
 # настраиваем логирование и выводим в переменную для отдельного использования в нужных местах
@@ -57,5 +58,8 @@ db = create_engine(
 # инициируем объект бота, передавая ему parse_mode=ParseMode.HTML по умолчанию
 main_bot = Bot(token=env_config.get('TELEGRAM_TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
+# Создаем хранилище состояний
+storage = MemoryStorage()
+
 # инициируем объект бота
-dp = Dispatcher()
+dp = Dispatcher(storage=storage)
