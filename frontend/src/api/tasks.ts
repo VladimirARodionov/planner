@@ -81,6 +81,8 @@ export interface TaskFilters {
     duration_id?: number;
     type_id?: number;
     is_completed?: boolean;
+    deadline_from?: string;
+    deadline_to?: string;
 }
 
 export interface PaginationParams {
@@ -179,6 +181,12 @@ export const TasksAPI = {
         return response.data;
     },
 
+    // Типы задач
+    getTaskTypes: async () => {
+        const response = await api.get<TaskType[]>('/settings/task-types/');
+        return response.data;
+    },
+
     createStatus: async (status: {
         name: string;
         code: string;
@@ -219,9 +227,17 @@ export const TasksAPI = {
         return response.data;
     },
 
+    deleteStatus: async (statusId: number) => {
+        await api.delete(`/settings/status/${statusId}`);
+    },
+
     updatePriority: async (priorityId: number, priority: Partial<Priority>) => {
         const response = await api.put<Priority>(`/settings/priority/${priorityId}`, priority);
         return response.data;
+    },
+
+    deletePriority: async (priorityId: number) => {
+        await api.delete(`/settings/priority/${priorityId}`);
     },
 
     updateDuration: async (durationId: number, duration: Partial<Duration>) => {
@@ -229,29 +245,13 @@ export const TasksAPI = {
         return response.data;
     },
 
-    deleteStatus: async (statusId: number) => {
-        await api.delete(`/settings/status/${statusId}`);
-    },
-
-    deletePriority: async (priorityId: number) => {
-        await api.delete(`/settings/priority/${priorityId}`);
-    },
-
     deleteDuration: async (durationId: number) => {
         await api.delete(`/settings/duration/${durationId}`);
     },
 
-    // Типы задач
-    getTaskTypes: async () => {
-        const response = await api.get<TaskType[]>('/settings/task-types/');
-        return response.data;
-    },
-
     createTaskType: async (taskType: {
         name: string;
-        description?: string;
         color?: string;
-        order?: number;
         is_active?: boolean;
         is_default?: boolean;
     }) => {
@@ -267,4 +267,4 @@ export const TasksAPI = {
     deleteTaskType: async (taskTypeId: number) => {
         await api.delete(`/settings/task-types/${taskTypeId}`);
     }
-}; 
+}
