@@ -10,8 +10,8 @@ from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram_dialog import DialogManager, StartMode
-from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+import re
 
 from backend.database import get_session, create_user_settings
 from backend.locale_config import i18n
@@ -272,279 +272,238 @@ async def start_command(message: Message):
 async def stop_command(message: Message):
     await message.answer(i18n.format_value("stopped"))
 
+# Функция для отображения справки
+async def show_help(message: Message):
+    """Показать справку по командам"""
+    help_text = (
+            i18n.format_value("help-header") + "\n\n" +
+            i18n.format_value("help-tasks") + "\n" +
+            i18n.format_value("help-add-task") + "\n" +
+            i18n.format_value("help-delete-task") + "\n" +
+            "\n" +
+            i18n.format_value("settings_command_help") + "\n" +
+            i18n.format_value("settings_statuses_command_help") + "\n" +
+            i18n.format_value("settings_priorities_command_help") + "\n" +
+            i18n.format_value("settings_durations_command_help") + "\n" +
+            i18n.format_value("settings_task_types_command_help") + "\n" +
+            i18n.format_value("create_settings_command_help") + "\n" +
+            "\n" +
+            i18n.format_value("help-help")
+    )
+    await message.answer(help_text)
+
+@router.message(Command("help"))
+async def help_command(message: Message):
+    """Показать справку по командам"""
+    await show_help(message)
+
 @router.message(Command("tasks"))
 async def list_tasks(message: Message):
     """Показать список задач с пагинацией"""
-    await show_tasks_page(message, page=1)
+    await show_tasks_page(message.from_user.id, message, page=1)
 
-async def show_tasks_page(message: Message, page: int = 1, callback_query: CallbackQuery = None, filters: dict = None, sort_by: str = None, sort_order: str = "asc"):
-    """Показать страницу списка задач с пагинацией"""
-    # Количество задач на одной странице
-    page_size = 3
-    
-    # Вычисляем смещение для запроса
-    offset = (page - 1) * page_size
-    
-    user_id = message.from_user.id if message else callback_query.from_user.id
-    logger.debug(f"Показываем страницу {page} списка задач для пользователя {user_id}")
-    
-    # Инициализируем фильтры, если они не переданы
+async def show_tasks_page(user_id, message: Message, page: int = 1, filters: dict = None, sort_by: str = None, sort_order: str = "asc"):
+    """Показывает страницу с задачами пользователя"""
     if filters is None:
         filters = {}
     
+    if not user_id:
+        logger.error("Не удалось получить ID пользователя из сообщения")
+        return
+        
+    page_size = 3  # Количество задач на странице
+    
+    # Извлекаем поисковый запрос из фильтров, если он есть
+    search_query = filters.get('search', '')
+    
     async with get_session() as session:
         task_service = TaskService(session)
-        # Получаем общее количество задач для пользователя с учетом фильтров
-        all_tasks = await task_service.get_tasks(str(user_id), filters)
         
-        # Применяем сортировку, если указана
-        if sort_by:
-            logger.debug(f"Сортировка задач по {sort_by} в порядке {sort_order}")
-            reverse = sort_order == "desc"
-            
-            if sort_by == "title":
-                all_tasks.sort(key=lambda x: x['title'].lower(), reverse=reverse)
-            elif sort_by == "deadline":
-                # Сортируем по дедлайну, задачи без дедлайна в конце
-                all_tasks.sort(
-                    key=lambda x: (x['deadline'] is None, x['deadline']), 
-                    reverse=reverse
-                )
-            elif sort_by == "priority":
-                # Сортируем по приоритету, задачи без приоритета в конце
-                all_tasks.sort(
-                    key=lambda x: (
-                        x['priority'] is None, 
-                        -x['priority']['order'] if x['priority'] else 0
-                    ), 
-                    reverse=reverse
-                )
-            elif sort_by == "status":
-                # Сортируем по статусу, задачи без статуса в конце
-                all_tasks.sort(
-                    key=lambda x: (
-                        x['status'] is None, 
-                        x['status']['order'] if x['status'] else 0
-                    ), 
-                    reverse=reverse
-                )
+        # Получаем задачи с пагинацией и общее количество
+        # Метод возвращает кортеж (tasks, total_tasks), а не словарь
+        tasks, total_tasks = await task_service.get_tasks_paginated(
+            user_id,
+            page=page,
+            page_size=page_size,
+            filters=filters,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            search_query=search_query
+        )
         
-        total_tasks = len(all_tasks)
+        # Вычисляем общее количество страниц
+        total_pages = (total_tasks + page_size - 1) // page_size if total_tasks > 0 else 1
         
-        # Получаем задачи для текущей страницы
-        tasks = all_tasks[offset:offset + page_size] if offset < total_tasks else []
+        # Если запрошенная страница больше общего количества страниц, показываем последнюю страницу
+        if page > total_pages and total_pages > 0:
+            page = total_pages
+            # Получаем задачи для последней страницы
+            tasks, _ = await task_service.get_tasks_paginated(
+                user_id,
+                page=page,
+                page_size=page_size,
+                filters=filters,
+                sort_by=sort_by,
+                sort_order=sort_order,
+                search_query=search_query
+            )
         
-        logger.debug(f"Получено {len(tasks)} задач для страницы {page} (всего {total_tasks} задач)")
-
-        # Если задач нет, показываем сообщение
-        if not tasks and page == 1:
-            if callback_query:
-                await callback_query.message.edit_text(i18n.format_value("tasks-empty"))
-            else:
-                await message.answer(i18n.format_value("tasks-empty"))
-            return
-
-        # Если запрошена страница, которой нет, показываем первую страницу
-        if not tasks and page > 1:
-            logger.debug(f"Запрошена несуществующая страница {page}, показываем первую страницу")
-            await show_tasks_page(message, page=1, callback_query=callback_query, filters=filters, sort_by=sort_by, sort_order=sort_order)
-            return
-
         # Формируем текст сообщения
-        total_pages = (total_tasks + page_size - 1) // page_size
-        
-        # Добавляем информацию о примененных фильтрах и сортировке
-        filter_info = ""
-        if filters:
-            filter_parts = []
+        if total_tasks == 0:
+            response = "У вас нет задач"
+            if filters:
+                filter_description = get_filter_description(filters)
+                if filter_description:
+                    response += f" с фильтрами: {filter_description}"
+            if search_query:
+                response += f"\nПоиск: '{search_query}'"
+            response += "\n\nСоздайте новую задачу с помощью команды /add_task"
+        else:
+            # Формируем заголовок с информацией о странице и фильтрах
+            response = f"Ваши задачи (страница {page}/{total_pages}, всего {total_tasks}):\n"
             
-            # Получаем информацию о настройках пользователя для отображения названий фильтров
-            settings_service = SettingsService(session)
-            settings = await settings_service.get_settings(str(user_id))
+            # Добавляем информацию о фильтрах, если они есть
+            if filters:
+                filter_description = get_filter_description(filters)
+                if filter_description:
+                    response += f"Фильтры: {filter_description}\n"
             
-            if filters.get('status_id'):
-                status_name = next((s['name'] for s in settings['statuses'] if s['id'] == filters['status_id']), "Неизвестный")
-                filter_parts.append(f"Статус: {status_name}")
+            # Добавляем информацию о поисковом запросе, если он есть
+            if search_query:
+                response += f"Поиск: '{search_query}'\n"
             
-            if filters.get('priority_id'):
-                priority_name = next((p['name'] for p in settings['priorities'] if p['id'] == filters['priority_id']), "Неизвестный")
-                filter_parts.append(f"Приоритет: {priority_name}")
+            # Добавляем информацию о сортировке, если она есть
+            if sort_by:
+                sort_name = get_sort_name_display(sort_by)
+                sort_direction = "по возрастанию" if sort_order == "asc" else "по убыванию"
+                response += f"Сортировка: {sort_name} {sort_direction}\n"
             
-            if filters.get('type_id'):
-                type_name = next((t['name'] for t in settings['task_types'] if t['id'] == filters['type_id']), "Неизвестный")
-                filter_parts.append(f"Тип: {type_name}")
-            
-            if filter_parts:
-                filter_info = " [" + ", ".join(filter_parts) + "]"
-        
-        # Добавляем информацию о сортировке
-        sort_info = ""
-        if sort_by:
-            sort_name = {
-                "title": "названию",
-                "deadline": "дедлайну",
-                "priority": "приоритету",
-                "status": "статусу"
-            }.get(sort_by, sort_by)
-            
-            sort_direction = "↓" if sort_order == "desc" else "↑"
-            sort_info = f" (Сортировка: {sort_name} {sort_direction})"
-        
-        response = i18n.format_value("tasks-header") + filter_info + sort_info + f" (Страница {page}/{total_pages})\n\n"
-        
-        for task in tasks:
-            response += i18n.format_value("task-item", {
-                "id": task['id'],
-                "title": task['title']
-            }) + "\n"
-
-            if task['description']:
-                response += i18n.format_value("task-description-line", {
-                    "description": task['description']
-                }) + "\n"
-
-            if task['status']:
-                response += i18n.format_value("task-status-line", {
-                    "status": task['status']['name']
-                }) + "\n"
-
-            if task['priority']:
-                response += i18n.format_value("task-priority-line", {
-                    "priority": task['priority']['name']
-                }) + "\n"
-
-            if task['duration']:
-                response += i18n.format_value("task-duration-line", {
-                    "duration": f"{task['duration']['name']} ({task['duration']['value']} {task['duration']['type']})"
-                }) + "\n"
-                
-            if task['deadline']:
-                response += i18n.format_value("task-deadline-line", {
-                    "deadline": task['deadline']
-                }) + "\n"
-                
             response += "\n"
+            
+            # Добавляем информацию о задачах
+            for task in tasks:
+                response += i18n.format_value("task-item", {
+                    "id": task['id'],
+                    "title": task['title']
+                }) + "\n"
+
+                if task['description']:
+                    response += i18n.format_value("task-description-line", {
+                        "description": task['description']
+                    }) + "\n"
+
+                if task['status']:
+                    response += i18n.format_value("task-status-line", {
+                        "status": task['status']['name']
+                    }) + "\n"
+
+                if task['priority']:
+                    response += i18n.format_value("task-priority-line", {
+                        "priority": task['priority']['name']
+                    }) + "\n"
+                    
+                if task['deadline']:
+                    response += i18n.format_value("task-deadline-line", {
+                        "deadline": task['deadline']
+                    }) + "\n"
+                    
+                response += "\n"
         
         # Создаем клавиатуру для навигации
         keyboard = []
+        
+        # Кнопки для навигации по страницам
         navigation_row = []
         
         # Кнопка "Предыдущая страница"
         if page > 1:
+            # Кодируем фильтры и параметры сортировки в callback_data
+            encoded_filters = encode_filters(filters)
+            callback_data = f"tasks_page_{page-1}_{encoded_filters}"
+            
+            if sort_by:
+                callback_data += f"_{sort_by}_{sort_order}"
+            else:
+                callback_data += "__"
+                
             navigation_row.append(InlineKeyboardButton(
                 text="◀️ Назад",
-                callback_data=f"tasks_page_{page-1}_{encode_filters(filters)}_{sort_by or ''}_{sort_order}"
+                callback_data=callback_data
             ))
         
         # Кнопка "Следующая страница"
         if page < total_pages:
+            # Кодируем фильтры и параметры сортировки в callback_data
+            encoded_filters = encode_filters(filters)
+            callback_data = f"tasks_page_{page+1}_{encoded_filters}"
+            
+            if sort_by:
+                callback_data += f"_{sort_by}_{sort_order}"
+            else:
+                callback_data += "__"
+                
             navigation_row.append(InlineKeyboardButton(
                 text="Вперед ▶️",
-                callback_data=f"tasks_page_{page+1}_{encode_filters(filters)}_{sort_by or ''}_{sort_order}"
+                callback_data=callback_data
             ))
         
-        # Добавляем кнопки навигации, если они есть
         if navigation_row:
             keyboard.append(navigation_row)
         
-        # Добавляем кнопки фильтрации
-        filter_row = []
+        # Кнопки для фильтрации и сортировки
+        action_row = []
         
-        # Кнопка фильтрации по статусу
-        filter_row.append(InlineKeyboardButton(
-            text="🔍 Статус",
-            callback_data=f"tasks_filter_status_{encode_filters(filters)}_{sort_by or ''}_{sort_order}"
+        # Кнопка фильтрации
+        action_row.append(InlineKeyboardButton(
+            text="🔍 Фильтр",
+            callback_data="tasks_filter"
         ))
         
-        # Кнопка фильтрации по приоритету
-        filter_row.append(InlineKeyboardButton(
-            text="🔍 Приоритет",
-            callback_data=f"tasks_filter_priority_{encode_filters(filters)}_{sort_by or ''}_{sort_order}"
-        ))
+        # Кнопка поиска
+        # Кодируем текущие фильтры и параметры сортировки в callback_data
+        encoded_filters = encode_filters(filters)
+        search_callback_data = f"tasks_search_{encoded_filters}"
         
-        # Кнопка фильтрации по типу
-        filter_row.append(InlineKeyboardButton(
-            text="🔍 Тип",
-            callback_data=f"tasks_filter_type_{encode_filters(filters)}_{sort_by or ''}_{sort_order}"
-        ))
-        
-        keyboard.append(filter_row)
-        
-        # Добавляем кнопки сортировки
-        sort_row = []
-        
-        # Кнопка сортировки по названию
-        sort_icon = ""
-        if sort_by == "title":
-            sort_icon = "↓" if sort_order == "desc" else "↑"
-        sort_row.append(InlineKeyboardButton(
-            text=f"📝 Название {sort_icon}",
-            callback_data=f"tasks_sort_title_{encode_filters(filters)}"
-        ))
-        
-        # Кнопка сортировки по дедлайну
-        sort_icon = ""
-        if sort_by == "deadline":
-            sort_icon = "↓" if sort_order == "desc" else "↑"
-        sort_row.append(InlineKeyboardButton(
-            text=f"⏰ Дедлайн {sort_icon}",
-            callback_data=f"tasks_sort_deadline_{encode_filters(filters)}"
-        ))
-        
-        keyboard.append(sort_row)
-        
-        # Вторая строка сортировки
-        sort_row2 = []
-        
-        # Кнопка сортировки по приоритету
-        sort_icon = ""
-        if sort_by == "priority":
-            sort_icon = "↓" if sort_order == "desc" else "↑"
-        sort_row2.append(InlineKeyboardButton(
-            text=f"🔥 Приоритет {sort_icon}",
-            callback_data=f"tasks_sort_priority_{encode_filters(filters)}"
-        ))
-        
-        # Кнопка сортировки по статусу
-        sort_icon = ""
-        if sort_by == "status":
-            sort_icon = "↓" if sort_order == "desc" else "↑"
-        sort_row2.append(InlineKeyboardButton(
-            text=f"🔄 Статус {sort_icon}",
-            callback_data=f"tasks_sort_status_{encode_filters(filters)}"
-        ))
-        
-        keyboard.append(sort_row2)
-        
-        # Добавляем кнопку сброса фильтров, если они применены
-        if filters:
-            keyboard.append([InlineKeyboardButton(
-                text="❌ Сбросить фильтры",
-                callback_data=f"tasks_filter_reset_{sort_by or ''}_{sort_order}"
-            )])
-        
-        # Добавляем кнопку сброса сортировки, если она применена
         if sort_by:
-            keyboard.append([InlineKeyboardButton(
-                text="❌ Сбросить сортировку",
-                callback_data=f"tasks_sort_reset_{encode_filters(filters)}"
-            )])
+            search_callback_data += f"_{sort_by}_{sort_order}"
+        else:
+            search_callback_data += "__"
+            
+        action_row.append(InlineKeyboardButton(
+            text="🔎 Поиск",
+            callback_data=search_callback_data
+        ))
         
-        # Добавляем кнопку обновления
-        keyboard.append([InlineKeyboardButton(
-            text="🔄 Обновить",
-            callback_data=f"tasks_page_{page}_{encode_filters(filters)}_{sort_by or ''}_{sort_order}"
-        )])
+        # Кнопка сортировки
+        action_row.append(InlineKeyboardButton(
+            text="📊 Сортировка",
+            callback_data="tasks_sort"
+        ))
         
-        # Создаем разметку клавиатуры
+        keyboard.append(action_row)
+        
+        # Добавляем кнопку сброса фильтров и сортировки, если они применены
+        if filters or sort_by:
+            reset_row = []
+            
+            if filters:
+                reset_row.append(InlineKeyboardButton(
+                    text="❌ Сбросить фильтры",
+                    callback_data="tasks_reset_filters"
+                ))
+            
+            if sort_by:
+                reset_row.append(InlineKeyboardButton(
+                    text="❌ Сбросить сортировку",
+                    callback_data="tasks_reset_sort"
+                ))
+            
+            keyboard.append(reset_row)
+        
         markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
         
-        # Отправляем или редактируем сообщение
-        if callback_query:
-            await callback_query.message.edit_text(response, reply_markup=markup)
-            await callback_query.answer()
-        else:
-            await message.answer(response, reply_markup=markup)
+        # Отправляем сообщение с задачами и клавиатурой
+        await message.answer(response, reply_markup=markup)
 
 # Функции для кодирования и декодирования фильтров
 def encode_filters(filters: dict) -> str:
@@ -605,8 +564,200 @@ async def on_tasks_page_callback(callback_query: CallbackQuery):
     
     logger.debug(f"Получен колбэк для перехода на страницу {page}, фильтры: {filters}, сортировка: {sort_by} {sort_order}")
     
-    # Показываем запрошенную страницу с фильтрами и сортировкой
-    await show_tasks_page(None, page=page, callback_query=callback_query, filters=filters, sort_by=sort_by, sort_order=sort_order)
+    # Извлекаем поисковый запрос из фильтров, если он есть
+    search_query = filters.get('search', '')
+    
+    user_id = callback_query.message.from_user.id
+    page_size = 3  # Количество задач на странице
+    
+    async with get_session() as session:
+        task_service = TaskService(session)
+        
+        # Получаем задачи с пагинацией и общее количество
+        tasks, total_tasks = await task_service.get_tasks_paginated(
+            str(user_id),
+            page=page,
+            page_size=page_size,
+            filters=filters,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            search_query=search_query
+        )
+        
+        # Вычисляем общее количество страниц
+        total_pages = (total_tasks + page_size - 1) // page_size if total_tasks > 0 else 1
+        
+        # Если запрошенная страница больше общего количества страниц, показываем последнюю страницу
+        if page > total_pages and total_pages > 0:
+            page = total_pages
+            # Получаем задачи для последней страницы
+            tasks, _ = await task_service.get_tasks_paginated(
+                str(user_id),
+                page=page,
+                page_size=page_size,
+                filters=filters,
+                sort_by=sort_by,
+                sort_order=sort_order,
+                search_query=search_query
+            )
+        
+        # Формируем текст сообщения
+        if total_tasks == 0:
+            response = "У вас нет задач"
+            if filters:
+                filter_description = get_filter_description(filters)
+                if filter_description:
+                    response += f" с фильтрами: {filter_description}"
+            if search_query:
+                response += f"\nПоиск: '{search_query}'"
+            response += "\n\nСоздайте новую задачу с помощью команды /add_task"
+        else:
+            # Формируем заголовок с информацией о странице и фильтрах
+            response = f"Ваши задачи (страница {page}/{total_pages}, всего {total_tasks}):\n"
+            
+            # Добавляем информацию о фильтрах, если они есть
+            if filters:
+                filter_description = get_filter_description(filters)
+                if filter_description:
+                    response += f"Фильтры: {filter_description}\n"
+            
+            # Добавляем информацию о поисковом запросе, если он есть
+            if search_query:
+                response += f"Поиск: '{search_query}'\n"
+            
+            # Добавляем информацию о сортировке, если она есть
+            if sort_by:
+                sort_name = get_sort_name_display(sort_by)
+                sort_direction = "по возрастанию" if sort_order == "asc" else "по убыванию"
+                response += f"Сортировка: {sort_name} {sort_direction}\n"
+            
+            response += "\n"
+            
+            # Добавляем информацию о задачах
+            for task in tasks:
+                response += i18n.format_value("task-item", {
+                    "id": task['id'],
+                    "title": task['title']
+                }) + "\n"
+
+                if task['description']:
+                    response += i18n.format_value("task-description-line", {
+                        "description": task['description']
+                    }) + "\n"
+
+                if task['status']:
+                    response += i18n.format_value("task-status-line", {
+                        "status": task['status']['name']
+                    }) + "\n"
+
+                if task['priority']:
+                    response += i18n.format_value("task-priority-line", {
+                        "priority": task['priority']['name']
+                    }) + "\n"
+                    
+                if task['deadline']:
+                    response += i18n.format_value("task-deadline-line", {
+                        "deadline": task['deadline']
+                    }) + "\n"
+                    
+                response += "\n"
+        
+        # Создаем клавиатуру для навигации
+        keyboard = []
+        
+        # Кнопки для навигации по страницам
+        navigation_row = []
+        
+        # Кнопка "Предыдущая страница"
+        if page > 1:
+            # Кодируем фильтры и параметры сортировки в callback_data
+            encoded_filters = encode_filters(filters)
+            callback_data = f"tasks_page_{page-1}_{encoded_filters}"
+            
+            if sort_by:
+                callback_data += f"_{sort_by}_{sort_order}"
+            else:
+                callback_data += "__"
+                
+            navigation_row.append(InlineKeyboardButton(
+                text="◀️ Назад",
+                callback_data=callback_data
+            ))
+        
+        # Кнопка "Следующая страница"
+        if page < total_pages:
+            # Кодируем фильтры и параметры сортировки в callback_data
+            encoded_filters = encode_filters(filters)
+            callback_data = f"tasks_page_{page+1}_{encoded_filters}"
+            
+            if sort_by:
+                callback_data += f"_{sort_by}_{sort_order}"
+            else:
+                callback_data += "__"
+                
+            navigation_row.append(InlineKeyboardButton(
+                text="Вперед ▶️",
+                callback_data=callback_data
+            ))
+        
+        if navigation_row:
+            keyboard.append(navigation_row)
+        
+        # Кнопки для фильтрации и сортировки
+        action_row = []
+        
+        # Кнопка фильтрации
+        action_row.append(InlineKeyboardButton(
+            text="🔍 Фильтр",
+            callback_data="tasks_filter"
+        ))
+        
+        # Кнопка поиска
+        # Кодируем текущие фильтры и параметры сортировки в callback_data
+        encoded_filters = encode_filters(filters)
+        search_callback_data = f"tasks_search_{encoded_filters}"
+        
+        if sort_by:
+            search_callback_data += f"_{sort_by}_{sort_order}"
+        else:
+            search_callback_data += "__"
+            
+        action_row.append(InlineKeyboardButton(
+            text="🔎 Поиск",
+            callback_data=search_callback_data
+        ))
+        
+        # Кнопка сортировки
+        action_row.append(InlineKeyboardButton(
+            text="📊 Сортировка",
+            callback_data="tasks_sort"
+        ))
+        
+        keyboard.append(action_row)
+        
+        # Добавляем кнопку сброса фильтров и сортировки, если они применены
+        if filters or sort_by:
+            reset_row = []
+            
+            if filters:
+                reset_row.append(InlineKeyboardButton(
+                    text="❌ Сбросить фильтры",
+                    callback_data="tasks_reset_filters"
+                ))
+            
+            if sort_by:
+                reset_row.append(InlineKeyboardButton(
+                    text="❌ Сбросить сортировку",
+                    callback_data="tasks_reset_sort"
+                ))
+            
+            keyboard.append(reset_row)
+        
+        markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+        
+        # Отправляем или редактируем сообщение
+        await callback_query.message.edit_text(response, reply_markup=markup)
+        await callback_query.answer()
 
 # Обработчик нажатия на кнопку сброса всех фильтров
 @router.callback_query(F.data.startswith("tasks_filter_reset"))
@@ -630,7 +781,129 @@ async def on_tasks_filter_reset_callback(callback_query: CallbackQuery):
             sort_order = remaining_parts[1]
     
     # Показываем первую страницу без фильтров, но с сохранением сортировки
-    await show_tasks_page(None, page=1, callback_query=callback_query, filters={}, sort_by=sort_by, sort_order=sort_order)
+    user_id = callback_query.message.from_user.id
+    page_size = 3  # Количество задач на странице
+    
+    async with get_session() as session:
+        task_service = TaskService(session)
+        
+        # Получаем задачи с пагинацией и общее количество
+        tasks, total_tasks = await task_service.get_tasks_paginated(
+            str(user_id),
+            page=1,
+            page_size=page_size,
+            filters={},
+            sort_by=sort_by,
+            sort_order=sort_order
+        )
+        
+        # Вычисляем общее количество страниц
+        total_pages = (total_tasks + page_size - 1) // page_size if total_tasks > 0 else 1
+        
+        # Формируем текст сообщения
+        if total_tasks == 0:
+            response = "У вас нет задач"
+            response += "\n\nСоздайте новую задачу с помощью команды /add_task"
+        else:
+            # Формируем заголовок с информацией о странице и фильтрах
+            response = f"Ваши задачи (страница 1/{total_pages}, всего {total_tasks}):\n"
+            
+            # Добавляем информацию о сортировке, если она есть
+            if sort_by:
+                sort_name = get_sort_name_display(sort_by)
+                sort_direction = "по возрастанию" if sort_order == "asc" else "по убыванию"
+                response += f"Сортировка: {sort_name} {sort_direction}\n"
+            
+            response += "\n"
+            
+            # Добавляем информацию о задачах
+            for task in tasks:
+                response += i18n.format_value("task-item", {
+                    "id": task['id'],
+                    "title": task['title']
+                }) + "\n"
+
+                if task['description']:
+                    response += i18n.format_value("task-description-line", {
+                        "description": task['description']
+                    }) + "\n"
+
+                if task['status']:
+                    response += i18n.format_value("task-status-line", {
+                        "status": task['status']['name']
+                    }) + "\n"
+
+                if task['priority']:
+                    response += i18n.format_value("task-priority-line", {
+                        "priority": task['priority']['name']
+                    }) + "\n"
+                    
+                if task['deadline']:
+                    response += i18n.format_value("task-deadline-line", {
+                        "deadline": task['deadline']
+                    }) + "\n"
+                    
+                response += "\n"
+        
+        # Создаем клавиатуру для навигации
+        keyboard = []
+        
+        # Кнопки для навигации по страницам
+        navigation_row = []
+        
+        # Кнопка "Следующая страница"
+        if total_pages > 1:
+            # Кодируем параметры сортировки в callback_data
+            callback_data = f"tasks_page_2_"
+            
+            if sort_by:
+                callback_data += f"_{sort_by}_{sort_order}"
+            else:
+                callback_data += "__"
+                
+            navigation_row.append(InlineKeyboardButton(
+                text="Вперед ▶️",
+                callback_data=callback_data
+            ))
+        
+        if navigation_row:
+            keyboard.append(navigation_row)
+        
+        # Кнопки для фильтрации и сортировки
+        action_row = []
+        
+        # Кнопка фильтрации
+        action_row.append(InlineKeyboardButton(
+            text="🔍 Фильтр",
+            callback_data="tasks_filter"
+        ))
+        
+        # Кнопка поиска
+        action_row.append(InlineKeyboardButton(
+            text="🔎 Поиск",
+            callback_data="tasks_search___"
+        ))
+        
+        # Кнопка сортировки
+        action_row.append(InlineKeyboardButton(
+            text="📊 Сортировка",
+            callback_data="tasks_sort"
+        ))
+        
+        keyboard.append(action_row)
+        
+        # Добавляем кнопку сброса сортировки, если она применена
+        if sort_by:
+            keyboard.append([InlineKeyboardButton(
+                text="❌ Сбросить сортировку",
+                callback_data="tasks_reset_sort"
+            )])
+        
+        markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+        
+        # Отправляем или редактируем сообщение
+        await callback_query.message.edit_text(response, reply_markup=markup)
+        await callback_query.answer("Фильтры сброшены")
 
 # Обработчик нажатия на кнопку сброса сортировки
 @router.callback_query(F.data.startswith("tasks_sort_reset"))
@@ -647,55 +920,537 @@ async def on_tasks_sort_reset_callback(callback_query: CallbackQuery):
         filters = decode_filters(parts[3])
     
     # Показываем первую страницу с фильтрами, но без сортировки
-    await show_tasks_page(None, page=1, callback_query=callback_query, filters=filters)
+    user_id = callback_query.message.from_user.id
+    page_size = 3  # Количество задач на странице
+    
+    # Извлекаем поисковый запрос из фильтров, если он есть
+    search_query = filters.get('search', '')
+    
+    async with get_session() as session:
+        task_service = TaskService(session)
+        
+        # Получаем задачи с пагинацией и общее количество
+        tasks, total_tasks = await task_service.get_tasks_paginated(
+            str(user_id),
+            page=1,
+            page_size=page_size,
+            filters=filters,
+            search_query=search_query
+        )
+        
+        # Вычисляем общее количество страниц
+        total_pages = (total_tasks + page_size - 1) // page_size if total_tasks > 0 else 1
+        
+        # Формируем текст сообщения
+        if total_tasks == 0:
+            response = "У вас нет задач"
+            if filters:
+                filter_description = get_filter_description(filters)
+                if filter_description:
+                    response += f" с фильтрами: {filter_description}"
+            if search_query:
+                response += f"\nПоиск: '{search_query}'"
+            response += "\n\nСоздайте новую задачу с помощью команды /add_task"
+        else:
+            # Формируем заголовок с информацией о странице и фильтрах
+            response = f"Ваши задачи (страница 1/{total_pages}, всего {total_tasks}):\n"
+            
+            # Добавляем информацию о фильтрах, если они есть
+            if filters:
+                filter_description = get_filter_description(filters)
+                if filter_description:
+                    response += f"Фильтры: {filter_description}\n"
+            
+            # Добавляем информацию о поисковом запросе, если он есть
+            if search_query:
+                response += f"Поиск: '{search_query}'\n"
+            
+            response += "\n"
+            
+            # Добавляем информацию о задачах
+            for task in tasks:
+                response += i18n.format_value("task-item", {
+                    "id": task['id'],
+                    "title": task['title']
+                }) + "\n"
 
-# Обработчик нажатия на кнопки сортировки
-@router.callback_query(F.data.startswith("tasks_sort_"))
-async def on_tasks_sort_callback(callback_query: CallbackQuery):
-    """Обработчик нажатия на кнопки сортировки"""
-    # Извлекаем параметр сортировки и фильтры из callback_data
-    parts = callback_query.data.split("_", 3)
+                if task['description']:
+                    response += i18n.format_value("task-description-line", {
+                        "description": task['description']
+                    }) + "\n"
+
+                if task['status']:
+                    response += i18n.format_value("task-status-line", {
+                        "status": task['status']['name']
+                    }) + "\n"
+
+                if task['priority']:
+                    response += i18n.format_value("task-priority-line", {
+                        "priority": task['priority']['name']
+                    }) + "\n"
+                    
+                if task['deadline']:
+                    response += i18n.format_value("task-deadline-line", {
+                        "deadline": task['deadline']
+                    }) + "\n"
+                    
+                response += "\n"
+        
+        # Создаем клавиатуру для навигации
+        keyboard = []
+        
+        # Кнопки для навигации по страницам
+        navigation_row = []
+        
+        # Кнопка "Следующая страница"
+        if total_pages > 1:
+            # Кодируем фильтры в callback_data
+            encoded_filters = encode_filters(filters)
+            callback_data = f"tasks_page_2_{encoded_filters}__"
+                
+            navigation_row.append(InlineKeyboardButton(
+                text="Вперед ▶️",
+                callback_data=callback_data
+            ))
+        
+        if navigation_row:
+            keyboard.append(navigation_row)
+        
+        # Кнопки для фильтрации и сортировки
+        action_row = []
+        
+        # Кнопка фильтрации
+        action_row.append(InlineKeyboardButton(
+            text="🔍 Фильтр",
+            callback_data="tasks_filter"
+        ))
+        
+        # Кнопка поиска
+        # Кодируем текущие фильтры в callback_data
+        encoded_filters = encode_filters(filters)
+        search_callback_data = f"tasks_search_{encoded_filters}__"
+            
+        action_row.append(InlineKeyboardButton(
+            text="🔎 Поиск",
+            callback_data=search_callback_data
+        ))
+        
+        # Кнопка сортировки
+        action_row.append(InlineKeyboardButton(
+            text="📊 Сортировка",
+            callback_data="tasks_sort"
+        ))
+        
+        keyboard.append(action_row)
+        
+        # Добавляем кнопку сброса фильтров, если они применены
+        if filters:
+            keyboard.append([InlineKeyboardButton(
+                text="❌ Сбросить фильтры",
+                callback_data="tasks_reset_filters"
+            )])
+        
+        markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+        
+        # Отправляем или редактируем сообщение
+        await callback_query.message.edit_text(response, reply_markup=markup)
+        await callback_query.answer("Сортировка сброшена")
+
+# Обработчик нажатия на кнопку фильтрации
+@router.callback_query(F.data == "tasks_filter")
+async def on_filter_button_callback(callback_query: CallbackQuery):
+    """Обработчик нажатия на кнопку фильтрации"""
+    logger.debug("Получен колбэк для выбора фильтра")
     
-    # Пропускаем обработку для кнопки сброса сортировки
-    if parts[2] == "reset":
-        return
+    # Создаем клавиатуру с кнопками для выбора типа фильтра
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                text="🔄 Статус",
+                callback_data="tasks_filter_status"
+            ),
+            InlineKeyboardButton(
+                text="🔥 Приоритет",
+                callback_data="tasks_filter_priority"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="📋 Тип задачи",
+                callback_data="tasks_filter_type"
+            ),
+            InlineKeyboardButton(
+                text="📅 Дедлайн",
+                callback_data="tasks_filter_deadline"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="↩️ Назад",
+                callback_data="tasks_filter_back"
+            )
+        ]
+    ]
     
-    sort_by = parts[2]
+    markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
     
-    # Проверяем, есть ли фильтры
+    # Отправляем сообщение с клавиатурой для выбора типа фильтра
+    await callback_query.message.edit_text(
+        "Выберите тип фильтра:",
+        reply_markup=markup
+    )
+    await callback_query.answer()
+
+# Обработчик нажатия на кнопку сортировки
+@router.callback_query(F.data == "tasks_sort")
+async def on_sort_button_callback(callback_query: CallbackQuery):
+    """Обработчик нажатия на кнопку сортировки"""
+    logger.debug("Получен колбэк для выбора сортировки")
+    
+    # Создаем клавиатуру с кнопками для выбора поля сортировки
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                text="📝 По названию",
+                callback_data="tasks_sort_field_title"
+            ),
+            InlineKeyboardButton(
+                text="⏰ По дедлайну",
+                callback_data="tasks_sort_field_deadline"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="🔥 По приоритету",
+                callback_data="tasks_sort_field_priority"
+            ),
+            InlineKeyboardButton(
+                text="🔄 По статусу",
+                callback_data="tasks_sort_field_status"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="📅 По дате создания",
+                callback_data="tasks_sort_field_created_at"
+            ),
+            InlineKeyboardButton(
+                text="✅ По дате завершения",
+                callback_data="tasks_sort_field_completed_at"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="↩️ Назад",
+                callback_data="tasks_sort_back"
+            )
+        ]
+    ]
+    
+    markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+    
+    # Отправляем сообщение с клавиатурой для выбора поля сортировки
+    await callback_query.message.edit_text(
+        "Выберите поле для сортировки:",
+        reply_markup=markup
+    )
+    await callback_query.answer()
+
+# Обработчик нажатия на кнопку выбора поля сортировки
+@router.callback_query(F.data.startswith("tasks_sort_field_"))
+async def on_sort_field_callback(callback_query: CallbackQuery):
+    """Обработчик нажатия на кнопку выбора поля сортировки"""
+    logger.debug("Получен колбэк для выбора направления сортировки")
+    
+    # Извлекаем поле сортировки из callback_data
+    sort_field = callback_query.data.split("_")[-1]
+    
+    # Создаем клавиатуру с кнопками для выбора направления сортировки
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                text="🔼 По возрастанию",
+                callback_data=f"tasks_sort_direction_{sort_field}_asc"
+            ),
+            InlineKeyboardButton(
+                text="🔽 По убыванию",
+                callback_data=f"tasks_sort_direction_{sort_field}_desc"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="↩️ Назад",
+                callback_data="tasks_sort"
+            )
+        ]
+    ]
+    
+    markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+    
+    # Отправляем сообщение с клавиатурой для выбора направления сортировки
+    await callback_query.message.edit_text(
+        f"Выберите направление сортировки для поля '{get_sort_name_display(sort_field)}':",
+        reply_markup=markup
+    )
+    await callback_query.answer()
+
+# Функция для получения отображаемого имени поля сортировки
+def get_sort_name_display(sort_by: str) -> str:
+    """Возвращает название поля сортировки для отображения пользователю"""
+    sort_names = {
+        "title": "по названию",
+        "deadline": "по дедлайну",
+        "priority": "по приоритету",
+        "status": "по статусу",
+        "created_at": "по дате создания",
+        "completed_at": "по дате завершения"
+    }
+    
+    return sort_names.get(sort_by, sort_by)
+
+# Обработчик нажатия на кнопку выбора направления сортировки
+@router.callback_query(F.data.startswith("tasks_sort_direction_"))
+async def on_sort_direction_callback(callback_query: CallbackQuery):
+    """Обработчик нажатия на кнопку выбора направления сортировки"""
+    logger.debug("Получен колбэк для применения сортировки")
+    
+    # Извлекаем поле и направление сортировки из callback_data
+    parts = callback_query.data.split("_")
+    sort_field = parts[-2]
+    sort_order = parts[-1]
+    
+    # Извлекаем текущие фильтры из сообщения
+    message_text = callback_query.message.text
     filters = {}
     
-    if len(parts) > 3:
-        # Формат: tasks_sort_sort_by_encoded_filters
-        filters = decode_filters(parts[3])
+    # Проверяем, есть ли информация о фильтрах в сообщении
+    if "Фильтры:" in message_text:
+        filter_line = next((line for line in message_text.split('\n') if "Фильтры:" in line), None)
+        if filter_line:
+            filter_text = filter_line.replace("Фильтры:", "").strip()
+            filter_parts = filter_text.split(", ")
+            
+            for part in filter_parts:
+                if ":" in part:
+                    key, value = part.split(":", 1)
+                    key = key.strip().lower()
+                    value = value.strip()
+                    
+                    if key == "статус":
+                        filters["status_id"] = value
+                    elif key == "приоритет":
+                        filters["priority_id"] = value
+                    elif key == "тип":
+                        filters["type_id"] = value
+                    elif key == "дедлайн от":
+                        filters["deadline_from"] = value
+                    elif key == "дедлайн до":
+                        filters["deadline_to"] = value
     
-    # Определяем порядок сортировки
-    # Если уже сортируем по этому полю, меняем порядок сортировки
-    current_sort_by = None
-    current_sort_order = "asc"
+    # Проверяем, есть ли информация о поиске в сообщении
+    if "Поиск:" in message_text:
+        search_line = next((line for line in message_text.split('\n') if "Поиск:" in line), None)
+        if search_line:
+            search_query = search_line.replace("Поиск:", "").strip()
+            # Удаляем кавычки вокруг запроса
+            search_query = search_query.strip("'")
+            if search_query:
+                filters["search"] = search_query
     
-    # Проверяем текущую сортировку из callback_query.message
-    if callback_query.message and callback_query.message.reply_markup:
-        for row in callback_query.message.reply_markup.inline_keyboard:
-            for button in row:
-                if button.callback_data and button.callback_data.startswith("tasks_page_"):
-                    # Формат: tasks_page_1_encoded_filters_sort_by_sort_order
-                    button_parts = button.callback_data.split("_", 3)
-                    if len(button_parts) > 3:
-                        remaining_parts = button_parts[3].split("_")
-                        if len(remaining_parts) >= 2 and remaining_parts[1]:
-                            current_sort_by = remaining_parts[1]
-                        if len(remaining_parts) >= 3 and remaining_parts[2]:
-                            current_sort_order = remaining_parts[2]
+    # Создаем новое сообщение с правильным user_id
+    message = callback_query.message
+
+    # Логируем ID пользователя для отладки
+    logger.debug(f"ID пользователя в колбэке: {callback_query.from_user.id}")
+    
+    # Показываем первую страницу с примененной сортировкой
+    await show_tasks_page(callback_query.from_user.id, message, page=1, filters=filters, sort_by=sort_field, sort_order=sort_order)
+    await callback_query.answer(f"Сортировка по полю '{get_sort_name_display(sort_field)}' применена")
+
+# Обработчик нажатия на кнопку "Назад" в меню сортировки
+@router.callback_query(F.data == "tasks_sort_back")
+async def on_sort_back_callback(callback_query: CallbackQuery):
+    """Обработчик нажатия на кнопку "Назад" в меню сортировки"""
+    logger.debug("Получен колбэк для возврата из меню сортировки")
+    
+    # Извлекаем текущие фильтры, сортировку и страницу из сообщения
+    message_text = callback_query.message.text
+    page = 1
+    filters = {}
+    sort_by = None
+    sort_order = "asc"
+    
+    # Извлекаем номер страницы из сообщения
+    if "страница" in message_text.lower():
+        page_match = re.search(r'страница (\d+)/(\d+)', message_text.lower())
+        if page_match:
+            page = int(page_match.group(1))
+    
+    # Проверяем, есть ли информация о фильтрах в сообщении
+    if "Фильтры:" in message_text:
+        filter_line = next((line for line in message_text.split('\n') if "Фильтры:" in line), None)
+        if filter_line:
+            filter_text = filter_line.replace("Фильтры:", "").strip()
+            filter_parts = filter_text.split(", ")
+            
+            for part in filter_parts:
+                if ":" in part:
+                    key, value = part.split(":", 1)
+                    key = key.strip().lower()
+                    value = value.strip()
+                    
+                    if key == "статус":
+                        filters["status_id"] = value
+                    elif key == "приоритет":
+                        filters["priority_id"] = value
+                    elif key == "тип":
+                        filters["type_id"] = value
+                    elif key == "дедлайн от":
+                        filters["deadline_from"] = value
+                    elif key == "дедлайн до":
+                        filters["deadline_to"] = value
+    
+    # Проверяем, есть ли информация о поиске в сообщении
+    if "Поиск:" in message_text:
+        search_line = next((line for line in message_text.split('\n') if "Поиск:" in line), None)
+        if search_line:
+            search_query = search_line.replace("Поиск:", "").strip()
+            # Удаляем кавычки вокруг запроса
+            search_query = search_query.strip("'")
+            if search_query:
+                filters["search"] = search_query
+    
+    # Проверяем, есть ли информация о сортировке в сообщении
+    if "Сортировка:" in message_text:
+        sort_line = next((line for line in message_text.split('\n') if "Сортировка:" in line), None)
+        if sort_line:
+            # Извлекаем поле сортировки
+            for field, name in {
+                "title": "по названию",
+                "deadline": "по дедлайну",
+                "priority": "по приоритету",
+                "status": "по статусу",
+                "created_at": "по дате создания",
+                "completed_at": "по дате завершения"
+            }.items():
+                if name in sort_line:
+                    sort_by = field
                     break
+            
+            # Определяем порядок сортировки
+            sort_order = "desc" if "по убыванию" in sort_line else "asc"
     
-    # Если уже сортируем по этому полю, меняем порядок сортировки
-    sort_order = "desc" if (current_sort_by == sort_by and current_sort_order == "asc") else "asc"
+    # Показываем страницу с текущими фильтрами и сортировкой
+    await show_tasks_page(callback_query.from_user.id, callback_query.message, page=page, filters=filters, sort_by=sort_by, sort_order=sort_order)
+    await callback_query.answer()
+
+# Обработчик нажатия на кнопку "Назад" в меню фильтрации
+@router.callback_query(F.data == "tasks_filter_back")
+async def on_filter_back_callback(callback_query: CallbackQuery):
+    """Обработчик нажатия на кнопку "Назад" в меню фильтрации"""
+    logger.debug("Получен колбэк для возврата из меню фильтрации")
     
-    logger.debug(f"Получен колбэк для сортировки по {sort_by} в порядке {sort_order}, фильтры: {filters}")
+    # Извлекаем текущие фильтры, сортировку и страницу из сообщения
+    message_text = callback_query.message.text
+    page = 1
+    filters = {}
+    sort_by = None
+    sort_order = "asc"
     
-    # Показываем первую страницу с фильтрами и сортировкой
-    await show_tasks_page(None, page=1, callback_query=callback_query, filters=filters, sort_by=sort_by, sort_order=sort_order)
+    # Извлекаем номер страницы из сообщения
+    if "страница" in message_text.lower():
+        page_match = re.search(r'страница (\d+)/(\d+)', message_text.lower())
+        if page_match:
+            page = int(page_match.group(1))
+    
+    # Проверяем, есть ли информация о фильтрах в сообщении
+    if "Фильтры:" in message_text:
+        filter_line = next((line for line in message_text.split('\n') if "Фильтры:" in line), None)
+        if filter_line:
+            filter_text = filter_line.replace("Фильтры:", "").strip()
+            filter_parts = filter_text.split(", ")
+            
+            for part in filter_parts:
+                if ":" in part:
+                    key, value = part.split(":", 1)
+                    key = key.strip().lower()
+                    value = value.strip()
+                    
+                    if key == "статус":
+                        filters["status_id"] = value
+                    elif key == "приоритет":
+                        filters["priority_id"] = value
+                    elif key == "тип":
+                        filters["type_id"] = value
+                    elif key == "дедлайн от":
+                        filters["deadline_from"] = value
+                    elif key == "дедлайн до":
+                        filters["deadline_to"] = value
+    
+    # Проверяем, есть ли информация о поиске в сообщении
+    if "Поиск:" in message_text:
+        search_line = next((line for line in message_text.split('\n') if "Поиск:" in line), None)
+        if search_line:
+            search_query = search_line.replace("Поиск:", "").strip()
+            # Удаляем кавычки вокруг запроса
+            search_query = search_query.strip("'")
+            if search_query:
+                filters["search"] = search_query
+    
+    # Проверяем, есть ли информация о сортировке в сообщении
+    if "Сортировка:" in message_text:
+        sort_line = next((line for line in message_text.split('\n') if "Сортировка:" in line), None)
+        if sort_line:
+            # Извлекаем поле сортировки
+            for field, name in {
+                "title": "по названию",
+                "deadline": "по дедлайну",
+                "priority": "по приоритету",
+                "status": "по статусу",
+                "created_at": "по дате создания",
+                "completed_at": "по дате завершения"
+            }.items():
+                if name in sort_line:
+                    sort_by = field
+                    break
+            
+            # Определяем порядок сортировки
+            sort_order = "desc" if "по убыванию" in sort_line else "asc"
+    
+    # Показываем страницу с текущими фильтрами и сортировкой
+    await show_tasks_page(callback_query.from_user.id, callback_query.message, page=page, filters=filters, sort_by=sort_by, sort_order=sort_order)
+    await callback_query.answer()
+
+def get_filter_description(filters: dict) -> str:
+    """Формирует описание примененных фильтров для отображения пользователю"""
+    if not filters:
+        return ""
+    
+    # Удаляем поисковый запрос из фильтров для описания
+    filters_copy = filters.copy()
+    filters_copy.pop('search', None)
+    
+    if not filters_copy:
+        return ""
+    
+    filter_parts = []
+    
+    if 'status_id' in filters_copy:
+        filter_parts.append(f"Статус: {filters_copy['status_id']}")
+    
+    if 'priority_id' in filters_copy:
+        filter_parts.append(f"Приоритет: {filters_copy['priority_id']}")
+    
+    if 'type_id' in filters_copy:
+        filter_parts.append(f"Тип: {filters_copy['type_id']}")
+    
+    if 'deadline_from' in filters_copy:
+        filter_parts.append(f"Дедлайн от: {filters_copy['deadline_from']}")
+    
+    if 'deadline_to' in filters_copy:
+        filter_parts.append(f"Дедлайн до: {filters_copy['deadline_to']}")
+    
+    return ", ".join(filter_parts)
 
 @router.message(Command("add_task"))
 async def start_add_task(message: Message, dialog_manager: DialogManager):
@@ -717,33 +1472,13 @@ async def delete_task(message: Message):
         async with get_session() as session:
             task_service = TaskService(session)
             success = await task_service.delete_task(str(message.from_user.id), task_id)
-            
+
             if success:
                 await message.answer(i18n.format_value("task-deleted", {"id": task_id}))
             else:
                 await message.answer(i18n.format_value("task-delete-error", {"id": task_id}))
     except (IndexError, ValueError):
         await message.answer(i18n.format_value("task-delete-usage"))
-
-@router.message(Command("help"))
-async def show_help(message: Message):
-    """Показать справку по командам"""
-    help_text = (
-        i18n.format_value("help-header") + "\n\n" +
-        i18n.format_value("help-tasks") + "\n" +
-        i18n.format_value("help-add-task") + "\n" +
-        i18n.format_value("help-delete-task") + "\n" +
-        "\n" +
-        i18n.format_value("settings_command_help") + "\n" +
-        i18n.format_value("settings_statuses_command_help") + "\n" +
-        i18n.format_value("settings_priorities_command_help") + "\n" +
-        i18n.format_value("settings_durations_command_help") + "\n" +
-        i18n.format_value("settings_task_types_command_help") + "\n" +
-        i18n.format_value("create_settings_command_help") + "\n" +
-        "\n" +
-        i18n.format_value("help-help")
-    )
-    await message.answer(help_text)
 
 @router.message(Command("settings"))
 async def show_settings(message: Message):
@@ -766,7 +1501,7 @@ async def show_settings(message: Message):
             callback_data="settings_task_types"
         )]
     ])
-    
+
     await message.answer(
         i18n.format_value("settings_header"),
         reply_markup=keyboard
@@ -776,21 +1511,21 @@ async def show_settings(message: Message):
 async def on_settings_statuses_callback(callback_query: CallbackQuery):
     """Обработчик нажатия на кнопку настроек статусов"""
     await callback_query.answer()
-    
+
     user_id = callback_query.from_user.id
     logger.debug(f"Обработка колбэка settings_statuses от пользователя {user_id}")
-    
+
     async with get_session() as session:
         settings_service = SettingsService(session)
         statuses = await settings_service.get_statuses(str(user_id))
-        
+
         logger.debug(f"Получено {len(statuses) if statuses else 0} статусов для пользователя {user_id}")
-        
+
         if not statuses:
             logger.warning(f"Статусы для пользователя {user_id} не найдены")
             await callback_query.message.answer(i18n.format_value("settings_not_found"))
             return
-            
+
         response = i18n.format_value("settings_statuses") + "\n\n"
         for status in statuses:
             logger.debug(f"Статус: {status}")
@@ -798,49 +1533,49 @@ async def on_settings_statuses_callback(callback_query: CallbackQuery):
             response += f"  Цвет: {status['color']}\n"
             response += f"  По умолчанию: {'✅' if status['is_default'] else '❌'}\n"
             response += f"  Финальный: {'✅' if status['is_final'] else '❌'}\n\n"
-            
+
         await callback_query.message.answer(response)
 
 @router.callback_query(F.data == "settings_priorities")
 async def on_settings_priorities_callback(callback_query: CallbackQuery):
     """Обработчик нажатия на кнопку настроек приоритетов"""
     await callback_query.answer()
-    
+
     user_id = callback_query.from_user.id
     logger.debug(f"Обработка колбэка settings_priorities от пользователя {user_id}")
-    
+
     async with get_session() as session:
         settings_service = SettingsService(session)
         priorities = await settings_service.get_priorities(str(user_id))
-        
+
         if not priorities:
             await callback_query.message.answer(i18n.format_value("settings_not_found"))
             return
-            
+
         response = i18n.format_value("settings_priorities") + "\n\n"
         for priority in priorities:
             response += f"• {priority['name']}\n"
             response += f"  Цвет: {priority['color']}\n"
             response += f"  По умолчанию: {'✅' if priority['is_default'] else '❌'}\n\n"
-            
+
         await callback_query.message.answer(response)
 
 @router.callback_query(F.data == "settings_durations")
 async def on_settings_durations_callback(callback_query: CallbackQuery):
     """Обработчик нажатия на кнопку настроек длительностей"""
     await callback_query.answer()
-    
+
     user_id = callback_query.from_user.id
     logger.debug(f"Обработка колбэка settings_durations от пользователя {user_id}")
-    
+
     async with get_session() as session:
         settings_service = SettingsService(session)
         durations = await settings_service.get_durations(str(user_id))
-        
+
         if not durations:
             await callback_query.message.answer(i18n.format_value("settings_not_found"))
             return
-            
+
         response = i18n.format_value("settings_durations") + "\n\n"
         for duration in durations:
             try:
@@ -854,25 +1589,25 @@ async def on_settings_durations_callback(callback_query: CallbackQuery):
             except Exception as e:
                 logger.error(f"Ошибка при обработке длительности: {e}")
                 logger.error(f"Данные длительности: {duration}")
-            
+
         await callback_query.message.answer(response)
 
 @router.callback_query(F.data == "settings_task_types")
 async def on_settings_task_types_callback(callback_query: CallbackQuery):
     """Обработчик нажатия на кнопку настроек типов задач"""
     await callback_query.answer()
-    
+
     user_id = callback_query.from_user.id
     logger.debug(f"Обработка колбэка settings_task_types от пользователя {user_id}")
-    
+
     async with get_session() as session:
         settings_service = SettingsService(session)
         task_types = await settings_service.get_task_types(str(user_id))
-        
+
         if not task_types:
             await callback_query.message.answer(i18n.format_value("settings_not_found"))
             return
-            
+
         response = i18n.format_value("settings_task_types") + "\n\n"
         for task_type in task_types:
             response += f"• {task_type['name']}\n"
@@ -880,296 +1615,5 @@ async def on_settings_task_types_callback(callback_query: CallbackQuery):
                 response += f"  Описание: {task_type['description']}\n"
             response += f"  Цвет: {task_type['color']}\n"
             response += f"  По умолчанию: {'✅' if task_type['is_default'] else '❌'}\n\n"
-            
+
         await callback_query.message.answer(response)
-
-@router.message(Command("create_settings"))
-async def create_settings_command(message: Message):
-    """Принудительно создает настройки для пользователя"""
-    user_id = message.from_user.id
-    logger.debug(f"Команда /create_settings от пользователя {user_id}")
-    
-    async with get_session() as session:
-        auth_service = AuthService(session)
-        user = await auth_service.get_user_by_id(str(user_id))
-        
-        if not user:
-            await message.answer("Пользователь не найден. Сначала выполните команду /start")
-            return
-        
-        try:
-            # Принудительно создаем настройки для пользователя
-            await create_user_settings(user.telegram_id, session)
-            logger.debug(f"Настройки для пользователя {user_id} созданы успешно")
-            await message.answer("Настройки успешно созданы!")
-        except Exception as e:
-            logger.error(f"Ошибка при создании настроек для пользователя {user_id}: {e}")
-            await message.answer(f"Ошибка при создании настроек: {e}")
-
-@router.message(Command("settings_statuses"))
-async def show_statuses_settings(message: Message):
-    """Показать настройки статусов задач"""
-    user_id = message.from_user.id
-    logger.debug(f"Запрос настроек статусов для пользователя {user_id}")
-    
-    async with get_session() as session:
-        settings_service = SettingsService(session)
-        statuses = await settings_service.get_statuses(str(user_id))
-        
-        logger.debug(f"Получено {len(statuses) if statuses else 0} статусов для пользователя {user_id}")
-        
-        if not statuses:
-            logger.warning(f"Статусы для пользователя {user_id} не найдены")
-            await message.answer(i18n.format_value("settings_not_found"))
-            return
-            
-        response = i18n.format_value("settings_statuses") + "\n\n"
-        for status in statuses:
-            logger.debug(f"Статус: {status}")
-            response += f"• {status['name']} ({status['code']})\n"
-            response += f"  Цвет: {status['color']}\n"
-            response += f"  По умолчанию: {'✅' if status['is_default'] else '❌'}\n"
-            response += f"  Финальный: {'✅' if status['is_final'] else '❌'}\n\n"
-            
-        await message.answer(response)
-
-@router.message(Command("settings_priorities"))
-async def show_priorities_settings(message: Message):
-    """Показать настройки приоритетов задач"""
-    user_id = message.from_user.id
-    
-    async with get_session() as session:
-        settings_service = SettingsService(session)
-        priorities = await settings_service.get_priorities(str(user_id))
-        
-        if not priorities:
-            await message.answer(i18n.format_value("settings_not_found"))
-            return
-            
-        response = i18n.format_value("settings_priorities") + "\n\n"
-        for priority in priorities:
-            response += f"• {priority['name']}\n"
-            response += f"  Цвет: {priority['color']}\n"
-            response += f"  По умолчанию: {'✅' if priority['is_default'] else '❌'}\n\n"
-            
-        await message.answer(response)
-
-@router.message(Command("settings_durations"))
-async def show_durations_settings(message: Message):
-    """Показать настройки длительностей задач"""
-    user_id = message.from_user.id
-    logger.debug(f"Запрос настроек длительностей для пользователя {user_id}")
-    
-    async with get_session() as session:
-        settings_service = SettingsService(session)
-        durations = await settings_service.get_durations(str(user_id))
-        
-        logger.debug(f"Получено {len(durations) if durations else 0} длительностей для пользователя {user_id}")
-        
-        if not durations:
-            logger.warning(f"Длительности для пользователя {user_id} не найдены")
-            await message.answer(i18n.format_value("settings_not_found"))
-            return
-            
-        response = i18n.format_value("settings_durations") + "\n\n"
-        for duration in durations:
-            try:
-                response += f"• {duration['name']}\n"
-                if 'duration_type' in duration:
-                    response += f"  Тип: {duration['duration_type']}\n"
-                elif 'type' in duration:
-                    response += f"  Тип: {duration['type']}\n"
-                response += f"  Значение: {duration['value']}\n"
-                response += f"  По умолчанию: {'✅' if duration['is_default'] else '❌'}\n\n"
-            except Exception as e:
-                logger.error(f"Ошибка при обработке длительности: {e}")
-                logger.error(f"Данные длительности: {duration}")
-            
-        await message.answer(response)
-
-@router.message(Command("settings_types"))
-async def show_task_types_settings(message: Message):
-    """Показать настройки типов задач"""
-    user_id = message.from_user.id
-    
-    async with get_session() as session:
-        settings_service = SettingsService(session)
-        task_types = await settings_service.get_task_types(str(user_id))
-        
-        if not task_types:
-            await message.answer(i18n.format_value("settings_not_found"))
-            return
-            
-        response = i18n.format_value("settings_task_types") + "\n\n"
-        for task_type in task_types:
-            response += f"• {task_type['name']}\n"
-            if task_type.get('description'):
-                response += f"  Описание: {task_type['description']}\n"
-            response += f"  Цвет: {task_type['color']}\n"
-            response += f"  По умолчанию: {'✅' if task_type['is_default'] else '❌'}\n\n"
-            
-        await message.answer(response)
-
-# Обработчик команды поиска задач
-@router.message(Command("search"))
-async def search_tasks(message: Message):
-    """Обработчик команды поиска задач"""
-    # Получаем текст запроса из сообщения
-    query_text = message.text.replace("/search", "").strip()
-    
-    if not query_text:
-        # Если запрос пустой, просим пользователя ввести поисковый запрос
-        await message.answer("Пожалуйста, введите поисковый запрос после команды /search")
-        return
-    
-    logger.debug(f"Поиск задач по запросу: {query_text}")
-    
-    user_id = message.from_user.id
-    
-    async with get_session() as session:
-        task_service = TaskService(session)
-        # Получаем все задачи пользователя
-        all_tasks = await task_service.get_tasks(str(user_id), {})
-        
-        # Фильтруем задачи по поисковому запросу
-        found_tasks = []
-        for task in all_tasks:
-            # Проверяем, содержится ли запрос в названии или описании задачи
-            title = task['title'].lower()
-            description = task['description'].lower() if task['description'] else ""
-            
-            if query_text.lower() in title or query_text.lower() in description:
-                found_tasks.append(task)
-        
-        # Если задачи не найдены, сообщаем об этом
-        if not found_tasks:
-            await message.answer(f"По запросу '{query_text}' ничего не найдено")
-            return
-        
-        # Формируем текст сообщения с результатами поиска
-        response = f"Результаты поиска по запросу '{query_text}' ({len(found_tasks)} найдено):\n\n"
-        
-        for task in found_tasks:
-            response += i18n.format_value("task-item", {
-                "id": task['id'],
-                "title": task['title']
-            }) + "\n"
-
-            if task['description']:
-                response += i18n.format_value("task-description-line", {
-                    "description": task['description']
-                }) + "\n"
-
-            if task['status']:
-                response += i18n.format_value("task-status-line", {
-                    "status": task['status']['name']
-                }) + "\n"
-
-            if task['priority']:
-                response += i18n.format_value("task-priority-line", {
-                    "priority": task['priority']['name']
-                }) + "\n"
-                
-            if task['deadline']:
-                response += i18n.format_value("task-deadline-line", {
-                    "deadline": task['deadline']
-                }) + "\n"
-                
-            response += "\n"
-        
-        # Создаем клавиатуру с кнопкой для просмотра всех задач
-        keyboard = [[InlineKeyboardButton(
-            text="Показать все задачи",
-            callback_data="tasks_page_1__"
-        )]]
-        
-        markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
-        
-        # Отправляем сообщение с результатами поиска
-        await message.answer(response, reply_markup=markup)
-
-# Обработчик команды поиска задач с диалогом
-@router.message(Command("find"))
-async def start_search_dialog(message: Message, state: FSMContext):
-    """Обработчик команды поиска задач с диалогом"""
-    # Отправляем сообщение с просьбой ввести поисковый запрос
-    await message.answer("Введите текст для поиска задач:")
-    
-    # Устанавливаем состояние ожидания ввода поискового запроса
-    await state.set_state(SearchStates.waiting_for_query)
-
-# Обработчик ввода поискового запроса
-@router.message(SearchStates.waiting_for_query)
-async def process_search_query(message: Message, state: FSMContext):
-    """Обработчик ввода поискового запроса"""
-    # Получаем текст запроса из сообщения
-    query_text = message.text.strip()
-    
-    # Сбрасываем состояние
-    await state.clear()
-    
-    logger.debug(f"Поиск задач по запросу: {query_text}")
-    
-    user_id = message.from_user.id
-    
-    async with get_session() as session:
-        task_service = TaskService(session)
-        # Получаем все задачи пользователя
-        all_tasks = await task_service.get_tasks(str(user_id), {})
-        
-        # Фильтруем задачи по поисковому запросу
-        found_tasks = []
-        for task in all_tasks:
-            # Проверяем, содержится ли запрос в названии или описании задачи
-            title = task['title'].lower()
-            description = task['description'].lower() if task['description'] else ""
-            
-            if query_text.lower() in title or query_text.lower() in description:
-                found_tasks.append(task)
-        
-        # Если задачи не найдены, сообщаем об этом
-        if not found_tasks:
-            await message.answer(f"По запросу '{query_text}' ничего не найдено")
-            return
-        
-        # Формируем текст сообщения с результатами поиска
-        response = f"Результаты поиска по запросу '{query_text}' ({len(found_tasks)} найдено):\n\n"
-        
-        for task in found_tasks:
-            response += i18n.format_value("task-item", {
-                "id": task['id'],
-                "title": task['title']
-            }) + "\n"
-
-            if task['description']:
-                response += i18n.format_value("task-description-line", {
-                    "description": task['description']
-                }) + "\n"
-
-            if task['status']:
-                response += i18n.format_value("task-status-line", {
-                    "status": task['status']['name']
-                }) + "\n"
-
-            if task['priority']:
-                response += i18n.format_value("task-priority-line", {
-                    "priority": task['priority']['name']
-                }) + "\n"
-                
-            if task['deadline']:
-                response += i18n.format_value("task-deadline-line", {
-                    "deadline": task['deadline']
-                }) + "\n"
-                
-            response += "\n"
-        
-        # Создаем клавиатуру с кнопкой для просмотра всех задач
-        keyboard = [[InlineKeyboardButton(
-            text="Показать все задачи",
-            callback_data="tasks_page_1__"
-        )]]
-        
-        markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
-        
-        # Отправляем сообщение с результатами поиска
-        await message.answer(response, reply_markup=markup) 

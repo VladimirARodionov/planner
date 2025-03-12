@@ -75,29 +75,100 @@ export interface UpdateTaskDto {
     duration_id?: number;
 }
 
+export interface TaskFilters {
+    status_id?: number;
+    priority_id?: number;
+    duration_id?: number;
+    type_id?: number;
+    is_completed?: boolean;
+}
+
+export interface PaginationParams {
+    page: number;
+    page_size: number;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+    search?: string;
+}
+
+export interface PaginatedResponse {
+    tasks: Task[];
+    pagination: {
+        page: number;
+        page_size: number;
+        total_tasks: number;
+        total_pages: number;
+    };
+}
+
 export const TasksAPI = {
     // Задачи
-    getTasks: async (filters?: {
-        status_id?: number;
-        priority_id?: number;
-        duration_id?: number;
-        type_id?: number;
-        is_completed?: boolean;
-    }) => {
+    getTasks: async (filters?: TaskFilters) => {
         const response = await api.get<{ tasks: Task[] }>('/tasks/', { params: filters });
         return response.data.tasks;
     },
 
+    // Получить список задач с пагинацией, сортировкой и поиском
+    getTasksPaginated: async (
+        pagination: PaginationParams,
+        filters?: TaskFilters
+    ) => {
+        const response = await api.get<PaginatedResponse>('/tasks/paginated', {
+            params: {
+                ...pagination,
+                ...filters
+            }
+        });
+        return response.data;
+    },
+
+    // Поиск задач по названию и описанию
+    searchTasks: async (
+        query: string,
+        filters?: TaskFilters
+    ) => {
+        const response = await api.get<{ tasks: Task[] }>('/tasks/search', {
+            params: {
+                q: query,
+                ...filters
+            }
+        });
+        return response.data.tasks;
+    },
+
+    // Получить общее количество задач с учетом фильтров и поиска
+    getTaskCount: async (
+        filters?: TaskFilters,
+        search?: string
+    ) => {
+        const response = await api.get<{ count: number }>('/tasks/count', {
+            params: {
+                ...filters,
+                search
+            }
+        });
+        return response.data.count;
+    },
+
+    // Получить задачу по ID
+    getTask: async (taskId: number): Promise<Task> => {
+        const response = await api.get<Task>(`/tasks/${taskId}`);
+        return response.data;
+    },
+
+    // Создать задачу
     createTask: async (task: CreateTaskDto) => {
         const response = await api.post<Task>('/tasks/', task);
         return response.data;
     },
 
+    // Обновить задачу
     updateTask: async (taskId: number, task: UpdateTaskDto) => {
         const response = await api.put<Task>(`/tasks/${taskId}`, task);
         return response.data;
     },
 
+    // Удалить задачу
     deleteTask: async (taskId: number) => {
         await api.delete(`/tasks/${taskId}`);
     },
@@ -195,5 +266,5 @@ export const TasksAPI = {
 
     deleteTaskType: async (taskTypeId: number) => {
         await api.delete(`/settings/task-types/${taskTypeId}`);
-    },
+    }
 }; 

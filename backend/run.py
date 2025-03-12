@@ -92,6 +92,7 @@ def create_app():
     cache.init_app(app, config={'CACHE_TYPE': 'SimpleCache'})
     
     # Настройка CORS
+    #CORS(app, resources={r"/*": {"origins": "*"}})
     CORS(app, 
          resources={
              r"/api/*": {
