@@ -235,26 +235,26 @@ async def start_command(message: Message):
                     url=auth_url
                 )]
             ])
-            
-            # Создаем клавиатуру с кнопкой для входа через Mini App
-            mini_app_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(
-                    text=i18n.format_value("login-to-web-mini-app"),
-                    web_app={"url": auth_url}
-                )]
-            ])
-            
+
             # Отправляем сообщение с кнопкой для входа
             await message.answer(
                 i18n.format_value("web-auth-success"),
                 reply_markup=keyboard
             )
-            
-            # Отправляем сообщение с кнопкой для входа через Mini App
-            await message.answer(
-                i18n.format_value("web-auth-mini-app"),
-                reply_markup=mini_app_keyboard
-            )
+
+            if "https://" in auth_url:
+                # Создаем клавиатуру с кнопкой для входа через Mini App
+                mini_app_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text=i18n.format_value("login-to-web-mini-app"),
+                        web_app={"url": auth_url}
+                    )]
+                ])
+                # Отправляем сообщение с кнопкой для входа через Mini App
+                await message.answer(
+                    i18n.format_value("web-auth-mini-app"),
+                    reply_markup=mini_app_keyboard
+                )
         else:
             logger.error(f"Не найдено состояние авторизации для {auth_state}")
             await message.answer(i18n.format_value("web-auth-error"))

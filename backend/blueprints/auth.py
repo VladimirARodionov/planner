@@ -106,7 +106,7 @@ def telegram_login():
     # Telegram не принимает URL с localhost в качестве параметра для кнопок
     if "localhost" in redirect_url:
         # В продакшене нужно заменить на реальный домен
-        public_domain = env_config.get('PUBLIC_DOMAIN', 'https://viewstore-planner.example.com')
+        public_domain = env_config.get('PUBLIC_URL', 'http://127.0.0.1:3000')
         redirect_url = redirect_url.replace("http://localhost:3000", public_domain)
         logger.info(f"Заменен localhost URL на публичный домен: {redirect_url}")
     
