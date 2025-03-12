@@ -11,7 +11,7 @@ interface LoginFormProps {
     onLoginSuccess: (token: string) => void;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
+export const LoginForm: React.FC<LoginFormProps> = () => {
 
     const handleTelegramLogin = () => {
         // Получаем URL для авторизации через Telegram и перенаправляем пользователя

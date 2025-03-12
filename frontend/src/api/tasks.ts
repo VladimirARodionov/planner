@@ -1,4 +1,4 @@
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { Task, Settings, Status, Priority, Duration, TaskType } from '../types/task';
 import { AuthAPI } from './auth';
 
@@ -12,7 +12,7 @@ const api = axios.create({
 });
 
 // Добавляем токен к каждому запросу
-api.interceptors.request.use((config: any) => {
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('token');
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
