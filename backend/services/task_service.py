@@ -1,10 +1,11 @@
 from typing import List, Optional, Dict, Any, Tuple
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 import logging
 import asyncio
+from datetime import datetime
 
 from backend.db.models import Task, DurationSetting, TaskTypeSetting, StatusSetting, PrioritySetting
 from backend.services.auth_service import AuthService
@@ -39,6 +40,21 @@ class TaskService:
                 query = query.where(Task.duration_id == filters['duration_id'])
             if filters.get('type_id'):
                 query = query.where(Task.type_id == filters['type_id'])
+            
+            # Добавляем фильтрацию по дедлайну
+            deadline_conditions = []
+            if filters.get('deadline_from'):
+                deadline_from = datetime.strptime(filters['deadline_from'], '%Y-%m-%d')
+                # Устанавливаем время на начало дня (00:00:00)
+                deadline_from = deadline_from.replace(hour=0, minute=0, second=0, microsecond=0)
+                deadline_conditions.append(Task.deadline >= deadline_from)
+            if filters.get('deadline_to'):
+                deadline_to = datetime.strptime(filters['deadline_to'], '%Y-%m-%d')
+                # Устанавливаем время на конец дня (23:59:59)
+                deadline_to = deadline_to.replace(hour=23, minute=59, second=59, microsecond=999999)
+                deadline_conditions.append(Task.deadline <= deadline_to)
+            if deadline_conditions:
+                query = query.where(and_(*deadline_conditions))
 
         query = query.options(
             selectinload(Task.status),

@@ -12,6 +12,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, C
 from aiogram_dialog import DialogManager, StartMode
 from aiogram.fsm.state import State, StatesGroup
 import re
+from aiogram.fsm.context import FSMContext
 
 from backend.database import get_session, create_user_settings
 from backend.locale_config import i18n
@@ -511,11 +512,57 @@ def encode_filters(filters: dict) -> str:
     if not filters:
         return ""
     
+    # Создаем более компактное представление фильтров
+    compact_filters = {}
+    
+    # Используем короткие ключи для уменьшения размера
+    key_mapping = {
+        'status_id': 's',
+        'priority_id': 'p',
+        'type_id': 't',
+        'duration_id': 'd',
+        'deadline_from': 'df',
+        'deadline_to': 'dt',
+        'search': 'q'
+    }
+    
+    # Преобразуем даты в более короткий формат (YYMMDD)
+    for key, value in filters.items():
+        if key in key_mapping:
+            # Для дат используем более короткий формат
+            if key in ['deadline_from', 'deadline_to'] and value:
+                try:
+                    # Предполагаем, что значение в формате YYYY-MM-DD
+                    date_parts = value.split('-')
+                    if len(date_parts) == 3:
+                        # Преобразуем в формат YYMMDD
+                        year = date_parts[0][2:]  # Берем только последние 2 цифры года
+                        month = date_parts[1]
+                        day = date_parts[2]
+                        compact_filters[key_mapping[key]] = f"{year}{month}{day}"
+                    else:
+                        compact_filters[key_mapping[key]] = value
+                except Exception as e:
+                    logger.error(f"Ошибка при преобразовании даты {value}: {e}")
+                    compact_filters[key_mapping[key]] = value
+            else:
+                compact_filters[key_mapping[key]] = value
+        else:
+            compact_filters[key] = value
+    
     # Преобразуем словарь в JSON-строку
-    json_str = json.dumps(filters)
+    json_str = json.dumps(compact_filters, separators=(',', ':'))
     
     # Кодируем в base64 для безопасной передачи в callback_data
     encoded = base64.urlsafe_b64encode(json_str.encode()).decode()
+    
+    # Если размер все еще слишком большой, обрезаем некоторые данные
+    if len(encoded) > 60:  # Оставляем небольшой запас до лимита в 64 байта
+        logger.warning(f"Encoded filters too large: {len(encoded)} bytes")
+        # Оставляем только самые важные фильтры
+        essential_filters = {k: v for k, v in compact_filters.items() if k in ['s', 'p', 't']}
+        json_str = json.dumps(essential_filters, separators=(',', ':'))
+        encoded = base64.urlsafe_b64encode(json_str.encode()).decode()
     
     return encoded
 
@@ -529,7 +576,37 @@ def decode_filters(encoded: str) -> dict:
         json_str = base64.urlsafe_b64decode(encoded.encode()).decode()
         
         # Преобразуем JSON-строку в словарь
-        filters = json.loads(json_str)
+        compact_filters = json.loads(json_str)
+        
+        # Преобразуем короткие ключи обратно в полные
+        key_mapping = {
+            's': 'status_id',
+            'p': 'priority_id',
+            't': 'type_id',
+            'd': 'duration_id',
+            'df': 'deadline_from',
+            'dt': 'deadline_to',
+            'q': 'search'
+        }
+        
+        filters = {}
+        for key, value in compact_filters.items():
+            if key in key_mapping:
+                # Для дат преобразуем обратно в формат YYYY-MM-DD
+                if key in ['df', 'dt'] and value and len(value) == 6:
+                    try:
+                        # Предполагаем, что значение в формате YYMMDD
+                        year = "20" + value[:2]  # Добавляем "20" к году
+                        month = value[2:4]
+                        day = value[4:6]
+                        filters[key_mapping[key]] = f"{year}-{month}-{day}"
+                    except Exception as e:
+                        logger.error(f"Ошибка при преобразовании даты {value}: {e}")
+                        filters[key_mapping[key]] = value
+                else:
+                    filters[key_mapping[key]] = value
+            else:
+                filters[key] = value
         
         return filters
     except Exception as e:
@@ -1101,6 +1178,132 @@ async def on_filter_button_callback(callback_query: CallbackQuery):
     )
     await callback_query.answer()
 
+# Обработчик выбора фильтра по статусу
+@router.callback_query(F.data == "tasks_filter_status")
+async def on_filter_status_callback(callback_query: CallbackQuery):
+    """Обработчик выбора фильтра по статусу"""
+    logger.debug("Получен колбэк для фильтрации по статусу")
+    
+    user_id = callback_query.from_user.id
+    
+    async with get_session() as session:
+        settings_service = SettingsService(session)
+        statuses = await settings_service.get_statuses(str(user_id))
+        
+        if not statuses:
+            await callback_query.answer("Статусы не найдены")
+            return
+        
+        # Создаем клавиатуру с кнопками для выбора статуса
+        keyboard = []
+        
+        # Группируем кнопки по 2 в ряд
+        for i in range(0, len(statuses), 2):
+            row = []
+            # Добавляем первую кнопку в ряд
+            row.append(InlineKeyboardButton(
+                text=f"{statuses[i]['name']}",
+                callback_data=f"tasks_filter_status_set_{statuses[i]['id']}"
+            ))
+            
+            # Добавляем вторую кнопку, если она есть
+            if i + 1 < len(statuses):
+                row.append(InlineKeyboardButton(
+                    text=f"{statuses[i + 1]['name']}",
+                    callback_data=f"tasks_filter_status_set_{statuses[i + 1]['id']}"
+                ))
+            
+            keyboard.append(row)
+        
+        # Добавляем кнопку "Назад"
+        keyboard.append([InlineKeyboardButton(
+            text="↩️ Назад",
+            callback_data="tasks_filter"
+        )])
+        
+        markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+        
+        # Отправляем сообщение с клавиатурой для выбора статуса
+        await callback_query.message.edit_text(
+            "Выберите статус задачи:",
+            reply_markup=markup
+        )
+        await callback_query.answer()
+
+# Обработчик установки фильтра по статусу
+@router.callback_query(F.data.startswith("tasks_filter_status_set_"))
+async def on_filter_status_set_callback(callback_query: CallbackQuery):
+    """Обработчик установки фильтра по статусу"""
+    logger.debug("Получен колбэк для установки фильтра по статусу")
+    
+    # Извлекаем ID статуса из callback_data
+    status_id = int(callback_query.data.split("_")[-1])
+    
+    # Извлекаем текущие фильтры из сообщения
+    message_text = callback_query.message.text
+    filters = {}
+    sort_by = None
+    sort_order = "asc"
+    
+    # Проверяем, есть ли информация о фильтрах в сообщении
+    if "Фильтры:" in message_text:
+        filter_line = next((line for line in message_text.split('\n') if "Фильтры:" in line), None)
+        if filter_line:
+            filter_text = filter_line.replace("Фильтры:", "").strip()
+            filter_parts = filter_text.split(", ")
+            
+            for part in filter_parts:
+                if ":" in part:
+                    key, value = part.split(":", 1)
+                    key = key.strip().lower()
+                    value = value.strip()
+                    
+                    if key == "приоритет":
+                        filters["priority_id"] = value
+                    elif key == "тип":
+                        filters["type_id"] = value
+                    elif key == "дедлайн от":
+                        filters["deadline_from"] = value
+                    elif key == "дедлайн до":
+                        filters["deadline_to"] = value
+    
+    # Проверяем, есть ли информация о поиске в сообщении
+    if "Поиск:" in message_text:
+        search_line = next((line for line in message_text.split('\n') if "Поиск:" in line), None)
+        if search_line:
+            search_query = search_line.replace("Поиск:", "").strip()
+            # Удаляем кавычки вокруг запроса
+            search_query = search_query.strip("'")
+            if search_query:
+                filters["search"] = search_query
+    
+    # Проверяем, есть ли информация о сортировке в сообщении
+    if "Сортировка:" in message_text:
+        sort_line = next((line for line in message_text.split('\n') if "Сортировка:" in line), None)
+        if sort_line:
+            # Извлекаем поле сортировки
+            for field, name in {
+                "title": "по названию",
+                "deadline": "по дедлайну",
+                "priority": "по приоритету",
+                "status": "по статусу",
+                "created_at": "по дате создания",
+                "completed_at": "по дате завершения"
+            }.items():
+                if name in sort_line:
+                    sort_by = field
+                    break
+            
+            # Определяем порядок сортировки
+            sort_order = "desc" if "по убыванию" in sort_line else "asc"
+    
+    # Добавляем фильтр по статусу
+    filters["status_id"] = status_id
+    
+    # Показываем первую страницу с примененным фильтром
+    await show_tasks_page(callback_query.from_user.id, callback_query.message, page=1, filters=filters, sort_by=sort_by, sort_order=sort_order)
+    await callback_query.answer("Фильтр по статусу применен")
+
 # Обработчик нажатия на кнопку сортировки
 @router.callback_query(F.data == "tasks_sort")
 async def on_sort_button_callback(callback_query: CallbackQuery):
@@ -1387,16 +1590,6 @@ async def on_filter_back_callback(callback_query: CallbackQuery):
                     elif key == "дедлайн до":
                         filters["deadline_to"] = value
     
-    # Проверяем, есть ли информация о поиске в сообщении
-    if "Поиск:" in message_text:
-        search_line = next((line for line in message_text.split('\n') if "Поиск:" in line), None)
-        if search_line:
-            search_query = search_line.replace("Поиск:", "").strip()
-            # Удаляем кавычки вокруг запроса
-            search_query = search_query.strip("'")
-            if search_query:
-                filters["search"] = search_query
-    
     # Проверяем, есть ли информация о сортировке в сообщении
     if "Сортировка:" in message_text:
         sort_line = next((line for line in message_text.split('\n') if "Сортировка:" in line), None)
@@ -1617,3 +1810,572 @@ async def on_settings_task_types_callback(callback_query: CallbackQuery):
             response += f"  По умолчанию: {'✅' if task_type['is_default'] else '❌'}\n\n"
 
         await callback_query.message.answer(response)
+
+# Обработчик выбора фильтра по приоритету
+@router.callback_query(F.data == "tasks_filter_priority")
+async def on_filter_priority_callback(callback_query: CallbackQuery):
+    """Обработчик выбора фильтра по приоритету"""
+    logger.debug("Получен колбэк для фильтрации по приоритету")
+    
+    user_id = callback_query.from_user.id
+    
+    async with get_session() as session:
+        settings_service = SettingsService(session)
+        priorities = await settings_service.get_priorities(str(user_id))
+        
+        if not priorities:
+            await callback_query.answer("Приоритеты не найдены")
+            return
+        
+        # Создаем клавиатуру с кнопками для выбора приоритета
+        keyboard = []
+        
+        # Группируем кнопки по 2 в ряд
+        for i in range(0, len(priorities), 2):
+            row = []
+            # Добавляем первую кнопку в ряд
+            row.append(InlineKeyboardButton(
+                text=f"{priorities[i]['name']}",
+                callback_data=f"tasks_filter_priority_set_{priorities[i]['id']}"
+            ))
+            
+            # Добавляем вторую кнопку, если она есть
+            if i + 1 < len(priorities):
+                row.append(InlineKeyboardButton(
+                    text=f"{priorities[i + 1]['name']}",
+                    callback_data=f"tasks_filter_priority_set_{priorities[i + 1]['id']}"
+                ))
+            
+            keyboard.append(row)
+        
+        # Добавляем кнопку "Назад"
+        keyboard.append([InlineKeyboardButton(
+            text="↩️ Назад",
+            callback_data="tasks_filter"
+        )])
+        
+        markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+        
+        # Отправляем сообщение с клавиатурой для выбора приоритета
+        await callback_query.message.edit_text(
+            "Выберите приоритет задачи:",
+            reply_markup=markup
+        )
+        await callback_query.answer()
+
+# Обработчик установки фильтра по приоритету
+@router.callback_query(F.data.startswith("tasks_filter_priority_set_"))
+async def on_filter_priority_set_callback(callback_query: CallbackQuery):
+    """Обработчик установки фильтра по приоритету"""
+    logger.debug("Получен колбэк для установки фильтра по приоритету")
+    
+    # Извлекаем ID приоритета из callback_data
+    priority_id = int(callback_query.data.split("_")[-1])
+    
+    # Извлекаем текущие фильтры из сообщения
+    message_text = callback_query.message.text
+    filters = {}
+    sort_by = None
+    sort_order = "asc"
+    
+    # Проверяем, есть ли информация о фильтрах в сообщении
+    if "Фильтры:" in message_text:
+        filter_line = next((line for line in message_text.split('\n') if "Фильтры:" in line), None)
+        if filter_line:
+            filter_text = filter_line.replace("Фильтры:", "").strip()
+            filter_parts = filter_text.split(", ")
+            
+            for part in filter_parts:
+                if ":" in part:
+                    key, value = part.split(":", 1)
+                    key = key.strip().lower()
+                    value = value.strip()
+                    
+                    if key == "статус":
+                        filters["status_id"] = value
+                    elif key == "тип":
+                        filters["type_id"] = value
+                    elif key == "дедлайн от":
+                        filters["deadline_from"] = value
+                    elif key == "дедлайн до":
+                        filters["deadline_to"] = value
+    
+    # Проверяем, есть ли информация о поиске в сообщении
+    if "Поиск:" in message_text:
+        search_line = next((line for line in message_text.split('\n') if "Поиск:" in line), None)
+        if search_line:
+            search_query = search_line.replace("Поиск:", "").strip()
+            # Удаляем кавычки вокруг запроса
+            search_query = search_query.strip("'")
+            if search_query:
+                filters["search"] = search_query
+    
+    # Проверяем, есть ли информация о сортировке в сообщении
+    if "Сортировка:" in message_text:
+        sort_line = next((line for line in message_text.split('\n') if "Сортировка:" in line), None)
+        if sort_line:
+            # Извлекаем поле сортировки
+            for field, name in {
+                "title": "по названию",
+                "deadline": "по дедлайну",
+                "priority": "по приоритету",
+                "status": "по статусу",
+                "created_at": "по дате создания",
+                "completed_at": "по дате завершения"
+            }.items():
+                if name in sort_line:
+                    sort_by = field
+                    break
+            
+            # Определяем порядок сортировки
+            sort_order = "desc" if "по убыванию" in sort_line else "asc"
+    
+    # Добавляем фильтр по приоритету
+    filters["priority_id"] = priority_id
+    
+    # Показываем первую страницу с примененным фильтром
+    await show_tasks_page(callback_query.from_user.id, callback_query.message, page=1, filters=filters, sort_by=sort_by, sort_order=sort_order)
+    await callback_query.answer("Фильтр по приоритету применен")
+
+# Обработчик выбора фильтра по типу задачи
+@router.callback_query(F.data == "tasks_filter_type")
+async def on_filter_type_callback(callback_query: CallbackQuery):
+    """Обработчик выбора фильтра по типу задачи"""
+    logger.debug("Получен колбэк для фильтрации по типу задачи")
+    
+    user_id = callback_query.from_user.id
+    
+    async with get_session() as session:
+        settings_service = SettingsService(session)
+        task_types = await settings_service.get_task_types(str(user_id))
+        
+        if not task_types:
+            await callback_query.answer("Типы задач не найдены")
+            return
+        
+        # Создаем клавиатуру с кнопками для выбора типа задачи
+        keyboard = []
+        
+        # Группируем кнопки по 2 в ряд
+        for i in range(0, len(task_types), 2):
+            row = []
+            # Добавляем первую кнопку в ряд
+            row.append(InlineKeyboardButton(
+                text=f"{task_types[i]['name']}",
+                callback_data=f"tasks_filter_type_set_{task_types[i]['id']}"
+            ))
+            
+            # Добавляем вторую кнопку, если она есть
+            if i + 1 < len(task_types):
+                row.append(InlineKeyboardButton(
+                    text=f"{task_types[i + 1]['name']}",
+                    callback_data=f"tasks_filter_type_set_{task_types[i + 1]['id']}"
+                ))
+            
+            keyboard.append(row)
+        
+        # Добавляем кнопку "Назад"
+        keyboard.append([InlineKeyboardButton(
+            text="↩️ Назад",
+            callback_data="tasks_filter"
+        )])
+        
+        markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+        
+        # Отправляем сообщение с клавиатурой для выбора типа задачи
+        await callback_query.message.edit_text(
+            "Выберите тип задачи:",
+            reply_markup=markup
+        )
+        await callback_query.answer()
+
+# Обработчик установки фильтра по типу задачи
+@router.callback_query(F.data.startswith("tasks_filter_type_set_"))
+async def on_filter_type_set_callback(callback_query: CallbackQuery):
+    """Обработчик установки фильтра по типу задачи"""
+    logger.debug("Получен колбэк для установки фильтра по типу задачи")
+    
+    # Извлекаем ID типа задачи из callback_data
+    type_id = int(callback_query.data.split("_")[-1])
+    
+    # Извлекаем текущие фильтры из сообщения
+    message_text = callback_query.message.text
+    filters = {}
+    sort_by = None
+    sort_order = "asc"
+    
+    # Проверяем, есть ли информация о фильтрах в сообщении
+    if "Фильтры:" in message_text:
+        filter_line = next((line for line in message_text.split('\n') if "Фильтры:" in line), None)
+        if filter_line:
+            filter_text = filter_line.replace("Фильтры:", "").strip()
+            filter_parts = filter_text.split(", ")
+            
+            for part in filter_parts:
+                if ":" in part:
+                    key, value = part.split(":", 1)
+                    key = key.strip().lower()
+                    value = value.strip()
+                    
+                    if key == "статус":
+                        filters["status_id"] = value
+                    elif key == "приоритет":
+                        filters["priority_id"] = value
+                    elif key == "дедлайн от":
+                        filters["deadline_from"] = value
+                    elif key == "дедлайн до":
+                        filters["deadline_to"] = value
+    
+    # Проверяем, есть ли информация о поиске в сообщении
+    if "Поиск:" in message_text:
+        search_line = next((line for line in message_text.split('\n') if "Поиск:" in line), None)
+        if search_line:
+            search_query = search_line.replace("Поиск:", "").strip()
+            # Удаляем кавычки вокруг запроса
+            search_query = search_query.strip("'")
+            if search_query:
+                filters["search"] = search_query
+    
+    # Проверяем, есть ли информация о сортировке в сообщении
+    if "Сортировка:" in message_text:
+        sort_line = next((line for line in message_text.split('\n') if "Сортировка:" in line), None)
+        if sort_line:
+            # Извлекаем поле сортировки
+            for field, name in {
+                "title": "по названию",
+                "deadline": "по дедлайну",
+                "priority": "по приоритету",
+                "status": "по статусу",
+                "created_at": "по дате создания",
+                "completed_at": "по дате завершения"
+            }.items():
+                if name in sort_line:
+                    sort_by = field
+                    break
+            
+            # Определяем порядок сортировки
+            sort_order = "desc" if "по убыванию" in sort_line else "asc"
+    
+    # Добавляем фильтр по типу задачи
+    filters["type_id"] = type_id
+    
+    # Показываем первую страницу с примененным фильтром
+    await show_tasks_page(callback_query.from_user.id, callback_query.message, page=1, filters=filters, sort_by=sort_by, sort_order=sort_order)
+    await callback_query.answer("Фильтр по типу задачи применен")
+
+# Обработчик выбора фильтра по дедлайну
+@router.callback_query(F.data == "tasks_filter_deadline")
+async def on_filter_deadline_callback(callback_query: CallbackQuery):
+    """Обработчик выбора фильтра по дедлайну"""
+    logger.debug("Получен колбэк для фильтрации по дедлайну")
+    
+    # Создаем клавиатуру с кнопками для выбора периода дедлайна
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                text="Сегодня",
+                callback_data="deadline_set_today"
+            ),
+            InlineKeyboardButton(
+                text="Завтра",
+                callback_data="deadline_set_tomorrow"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="Эта неделя",
+                callback_data="deadline_set_thisweek"
+            ),
+            InlineKeyboardButton(
+                text="Следующая неделя",
+                callback_data="deadline_set_nextweek"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="Этот месяц",
+                callback_data="deadline_set_thismonth"
+            ),
+            InlineKeyboardButton(
+                text="Следующий месяц",
+                callback_data="deadline_set_nextmonth"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="Просроченные",
+                callback_data="deadline_set_overdue"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="↩️ Назад",
+                callback_data="tasks_filter"
+            )
+        ]
+    ]
+    
+    markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+    
+    # Отправляем сообщение с клавиатурой для выбора периода дедлайна
+    await callback_query.message.edit_text(
+        "Выберите период дедлайна:",
+        reply_markup=markup
+    )
+    await callback_query.answer()
+
+# Обработчик установки фильтра по дедлайну
+@router.callback_query(F.data.startswith("deadline_set_"))
+async def on_filter_deadline_set_callback(callback_query: CallbackQuery):
+    """Обработчик установки фильтра по дедлайну"""
+    logger.debug("Получен колбэк для установки фильтра по дедлайну")
+    
+    # Извлекаем период дедлайна из callback_data
+    period = callback_query.data.split("_")[-1]
+    logger.debug(f"Выбран период дедлайна: {period}")
+    
+    # Получаем даты для фильтрации
+    today = datetime.now().date()
+    
+    # Определяем даты начала и конца периода
+    date_from = None
+    date_to = None
+    
+    try:
+        if period == "today":
+            date_from = today
+            date_to = today
+        elif period == "tomorrow":
+            date_from = today + timedelta(days=1)
+            date_to = date_from
+        elif period == "thisweek":
+            # Начало недели - понедельник
+            date_from = today - timedelta(days=today.weekday())
+            # Конец недели - воскресенье
+            date_to = date_from + timedelta(days=6)
+        elif period == "nextweek":
+            # Начало следующей недели
+            date_from = today + timedelta(days=(7 - today.weekday()))
+            # Конец следующей недели
+            date_to = date_from + timedelta(days=6)
+        elif period == "thismonth":
+            # Начало текущего месяца
+            date_from = today.replace(day=1)
+            # Конец текущего месяца
+            if today.month == 12:
+                date_to = today.replace(day=31)
+            else:
+                date_to = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
+        elif period == "nextmonth":
+            # Начало следующего месяца
+            if today.month == 12:
+                date_from = today.replace(year=today.year + 1, month=1, day=1)
+            else:
+                date_from = today.replace(month=today.month + 1, day=1)
+            # Конец следующего месяца
+            if date_from.month == 12:
+                date_to = date_from.replace(day=31)
+            else:
+                date_to = date_from.replace(month=date_from.month + 1, day=1) - timedelta(days=1)
+        elif period == "overdue":
+            date_to = today - timedelta(days=1)
+            date_from = None  # Для просроченных задач не устанавливаем нижнюю границу
+        else:
+            logger.error(f"Неверный период дедлайна: {period}")
+            await callback_query.answer("Неверный период")
+            return
+            
+        logger.debug(f"Рассчитанные даты: с {date_from} по {date_to}")
+    except Exception as e:
+        logger.error(f"Ошибка при расчете дат для периода {period}: {e}")
+        await callback_query.answer("Ошибка при установке фильтра")
+        return
+    
+    # Создаем минимальный набор фильтров для дедлайна
+    filters = {}
+    
+    # Добавляем фильтр по дедлайну
+    if date_from:
+        filters["deadline_from"] = date_from.strftime("%Y-%m-%d")
+    if date_to:
+        filters["deadline_to"] = date_to.strftime("%Y-%m-%d")
+    
+    try:
+        # Показываем первую страницу с примененным фильтром
+        await show_tasks_page(callback_query.from_user.id, callback_query.message, page=1, filters=filters)
+        await callback_query.answer("Фильтр по дедлайну применен")
+    except Exception as e:
+        logger.error(f"Ошибка при применении фильтра по дедлайну: {e}")
+        await callback_query.answer("Ошибка при применении фильтра")
+        # Возвращаемся к экрану фильтров
+        await on_filter_button_callback(callback_query)
+
+# Обработчик нажатия на кнопку поиска
+@router.callback_query(F.data.startswith("tasks_search_"))
+async def on_search_button_callback(callback_query: CallbackQuery, state: FSMContext):
+    """Обработчик нажатия на кнопку поиска"""
+    logger.debug("Получен колбэк для поиска задач")
+    
+    # Извлекаем фильтры и параметры сортировки из callback_data
+    parts = callback_query.data.split("_", 3)
+    
+    # Сохраняем текущие фильтры и параметры сортировки в состоянии
+    filters = {}
+    sort_by = None
+    sort_order = "asc"
+    
+    if len(parts) > 3:
+        # Формат: tasks_search_encoded_filters_sort_by_sort_order
+        remaining_parts = parts[3].split("_")
+        
+        if len(remaining_parts) >= 1 and remaining_parts[0]:
+            filters = decode_filters(remaining_parts[0])
+        
+        if len(remaining_parts) >= 2 and remaining_parts[1]:
+            sort_by = remaining_parts[1]
+        
+        if len(remaining_parts) >= 3 and remaining_parts[2]:
+            sort_order = remaining_parts[2]
+    
+    # Сохраняем данные в состоянии
+    await state.set_state(SearchStates.waiting_for_query)
+    await state.update_data(
+        filters=filters,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        message_id=callback_query.message.message_id
+    )
+    
+    # Отправляем сообщение с запросом поискового запроса
+    await callback_query.message.answer(
+        "Введите текст для поиска задач (или отправьте /cancel для отмены):"
+    )
+    await callback_query.answer()
+
+# Обработчик ввода поискового запроса
+@router.message(SearchStates.waiting_for_query)
+async def on_search_query_input(message: Message, state: FSMContext):
+    """Обработчик ввода поискового запроса"""
+    # Получаем данные из состояния
+    data = await state.get_data()
+    filters = data.get('filters', {})
+    sort_by = data.get('sort_by')
+    sort_order = data.get('sort_order', 'asc')
+    
+    # Получаем поисковый запрос
+    search_query = message.text.strip()
+    
+    # Проверяем, не отменил ли пользователь поиск
+    if search_query.lower() == '/cancel':
+        await state.clear()
+        await message.answer("Поиск отменен")
+        return
+    
+    # Добавляем поисковый запрос в фильтры
+    filters['search'] = search_query
+    
+    # Очищаем состояние
+    await state.clear()
+    
+    # Показываем результаты поиска
+    await show_tasks_page(message.from_user.id, message, page=1, filters=filters, sort_by=sort_by, sort_order=sort_order)
+    
+    # Отправляем сообщение об успешном поиске
+    await message.answer(f"Поиск по запросу: '{search_query}'")
+
+# Обработчик нажатия на кнопку "Сбросить фильтры"
+@router.callback_query(F.data == "tasks_reset_filters")
+async def on_reset_filters_callback(callback_query: CallbackQuery):
+    """Обработчик нажатия на кнопку сброса фильтров"""
+    logger.debug("Получен колбэк для сброса фильтров")
+    
+    # Извлекаем информацию о сортировке из текста сообщения
+    message_text = callback_query.message.text
+    sort_by = None
+    sort_order = "asc"
+    
+    # Проверяем, есть ли информация о сортировке в сообщении
+    if "Сортировка:" in message_text:
+        sort_line = next((line for line in message_text.split('\n') if "Сортировка:" in line), None)
+        if sort_line:
+            # Извлекаем поле сортировки
+            for field, name in {
+                "title": "по названию",
+                "deadline": "по дедлайну",
+                "priority": "по приоритету",
+                "status": "по статусу",
+                "created_at": "по дате создания",
+                "completed_at": "по дате завершения"
+            }.items():
+                if name in sort_line:
+                    sort_by = field
+                    break
+            
+            # Определяем порядок сортировки
+            sort_order = "desc" if "по убыванию" in sort_line else "asc"
+    
+    # Показываем первую страницу без фильтров, но с сохранением сортировки, если она была
+    await show_tasks_page(
+        callback_query.from_user.id, 
+        callback_query.message, 
+        page=1, 
+        filters={}, 
+        sort_by=sort_by, 
+        sort_order=sort_order
+    )
+    
+    await callback_query.answer("Фильтры сброшены")
+
+# Обработчик нажатия на кнопку "Сбросить сортировку"
+@router.callback_query(F.data == "tasks_reset_sort")
+async def on_reset_sort_callback(callback_query: CallbackQuery):
+    """Обработчик нажатия на кнопку сброса сортировки"""
+    logger.debug("Получен колбэк для сброса сортировки")
+    
+    # Извлекаем информацию о фильтрах из текста сообщения
+    message_text = callback_query.message.text
+    filters = {}
+    
+    # Проверяем, есть ли информация о фильтрах в сообщении
+    if "Фильтры:" in message_text:
+        filter_line = next((line for line in message_text.split('\n') if "Фильтры:" in line), None)
+        if filter_line:
+            filter_text = filter_line.replace("Фильтры:", "").strip()
+            filter_parts = filter_text.split(", ")
+            
+            for part in filter_parts:
+                if ":" in part:
+                    key, value = part.split(":", 1)
+                    key = key.strip().lower()
+                    value = value.strip()
+                    
+                    if key == "статус":
+                        filters["status_id"] = value
+                    elif key == "приоритет":
+                        filters["priority_id"] = value
+                    elif key == "тип":
+                        filters["type_id"] = value
+                    elif key == "дедлайн от":
+                        filters["deadline_from"] = value
+                    elif key == "дедлайн до":
+                        filters["deadline_to"] = value
+    
+    # Проверяем, есть ли информация о поиске в сообщении
+    if "Поиск:" in message_text:
+        search_line = next((line for line in message_text.split('\n') if "Поиск:" in line), None)
+        if search_line:
+            search_query = search_line.replace("Поиск:", "").strip()
+            # Удаляем кавычки вокруг запроса
+            search_query = search_query.strip("'")
+            if search_query:
+                filters["search"] = search_query
+    
+    # Показываем первую страницу с текущими фильтрами, но без сортировки
+    await show_tasks_page(
+        callback_query.from_user.id, 
+        callback_query.message, 
+        page=1, 
+        filters=filters
+    )
+    
+    await callback_query.answer("Сортировка сброшена")
