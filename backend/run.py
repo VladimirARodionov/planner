@@ -15,7 +15,7 @@ from flask_cors import CORS
 from backend.cache_config import cache
 from backend.create_bot import main_bot, dp
 from backend.dialogs.task_dialogs import task_dialog
-from backend.handlers import task_handlers
+from backend.handlers import task_handlers, show_task_handlers
 from backend.load_env import env_config
 from backend.locale_config import i18n
 
@@ -67,6 +67,7 @@ async def main():
     
     # Регистрируем роутеры
     dp.include_router(task_handlers.router)
+    dp.include_router(show_task_handlers.router)
     dp.include_router(task_dialog)
     # Регистрируем диалоги
     setup_dialogs(dp)
