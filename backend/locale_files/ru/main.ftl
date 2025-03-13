@@ -56,6 +56,86 @@ task-duration-line = ⏱️ Длительность: {$duration}
 task-deadline-line = ⏰ Дедлайн: {$deadline}
 tasks-menu = 📋 Список задач
 
+# Диалог списка задач
+task-list-title = Ваши задачи (страница {$page}/{$total_pages}, всего {$total_tasks}):
+task-list-error = ❌ Ошибка: {$error}
+task-list-filter-description = {$filter_description}
+task-list-search-query = Поиск: '{$search_query}'
+task-list-sort-description = Сортировка: {$sort_description}
+task-list-empty = У вас нет задач\n\nСоздайте новую задачу с помощью команды /add_task
+task-list-item = 📌 {$title} (ID: {$id})
+    Описание: {$description}
+    Тип: {$type}
+    Статус: {$status}
+    Приоритет: {$priority}
+    Дедлайн: {$deadline}
+    Завершена: {$completed}
+
+# Кнопки диалога списка задач
+task-list-filter-button = 🔍 Фильтр
+task-list-search-button = 🔎 Поиск
+task-list-sort-button = 📊 Сортировка
+task-list-reset-filters-button = ❌ Сбросить фильтры
+task-list-reset-sort-button = ❌ Сбросить сортировку
+task-list-close-button = Закрыть
+
+# Фильтры
+task-list-filter-menu-title = Выберите тип фильтра:
+task-list-filter-status-button = 🔄 Статус
+task-list-filter-priority-button = 🔥 Приоритет
+task-list-filter-type-button = 📋 Тип задачи
+task-list-filter-deadline-button = 📅 Дедлайн
+task-list-filter-completed-button = ✅ Показать завершенные
+task-list-back-button = ↩️ Назад
+
+# Фильтр по статусу
+task-list-filter-status-title = Выберите статус для фильтрации:
+
+# Фильтр по приоритету
+task-list-filter-priority-title = Выберите приоритет для фильтрации:
+
+# Фильтр по типу задачи
+task-list-filter-type-title = Выберите тип задачи для фильтрации:
+
+# Фильтр по дедлайну
+task-list-filter-deadline-title = Выберите период дедлайна для фильтрации:
+task-list-filter-deadline-today = Сегодня
+task-list-filter-deadline-tomorrow = Завтра
+task-list-filter-deadline-week = Эта неделя
+task-list-filter-deadline-month = Этот месяц
+task-list-filter-deadline-overdue = Просроченные
+
+# Фильтр по завершенности
+task-list-filter-completed-title = Выберите фильтр по завершенности:
+task-list-filter-completed-all = Показать все задачи
+task-list-filter-completed-only = Только завершенные
+task-list-filter-uncompleted-only = Только незавершенные
+
+# Сортировка
+task-list-sort-title = Выберите параметр сортировки:
+task-list-sort-by-title = По названию
+task-list-sort-by-deadline = По дедлайну
+task-list-sort-by-priority = По приоритету
+task-list-sort-by-created = По дате создания
+task-list-sort-asc = По возрастанию
+task-list-sort-desc = По убыванию
+
+# Названия полей сортировки
+sort-field-title = Название
+sort-field-created_at = Дата создания
+sort-field-deadline = Дедлайн
+sort-field-priority = Приоритет
+sort-field-status = Статус
+sort-field-type = Тип
+
+# Направления сортировки
+sort-direction-asc = по возрастанию
+sort-direction-desc = по убыванию
+
+# Поиск
+task-list-search-title = Введите поисковый запрос:
+task-list-search-cancel = ↩️ Отмена
+
 # Создание задачи
 task-created = ✅ Задача успешно создана!
 task-created-details =

@@ -142,7 +142,7 @@ async def get_tasks_data(dialog_manager: DialogManager, **kwargs):
         sort_description = ""
         if sort_by:
             sort_name = get_sort_name_display(sort_by)
-            sort_direction = "по возрастанию" if sort_order == "asc" else "по убыванию"
+            sort_direction = i18n.format_value(f"sort-direction-{sort_order}")
             sort_description = f"{sort_name} {sort_direction}"
         
         # Форматируем задачи для отображения в виджете List
@@ -257,15 +257,8 @@ async def get_filter_description(filters: dict, user_id: str = None) -> str:
 
 def get_sort_name_display(sort_by: str) -> str:
     """Возвращает отображаемое имя поля сортировки"""
-    sort_names = {
-        "title": "Название",
-        "created_at": "Дата создания",
-        "deadline": "Дедлайн",
-        "priority": "Приоритет",
-        "status": "Статус",
-        "type": "Тип"
-    }
-    return sort_names.get(sort_by, sort_by)
+    sort_field_key = f"sort-field-{sort_by}"
+    return i18n.format_value(sort_field_key, {}, default=sort_by)
 
 # Обработчики событий
 async def on_page_prev(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -453,39 +446,43 @@ task_list_dialog = Dialog(
     # Основной экран со списком задач
     Window(
         # Заголовок с информацией о странице и общем количестве задач
-        Format("Ваши задачи (страница {page}/{total_pages}, всего {total_tasks}):\n"),
+        Format(i18n.format_value("task-list-title", {"page": "{page}", "total_pages": "{total_pages}", "total_tasks": "{total_tasks}"})),
         
         # Сообщение об ошибке, если она возникла
-        Format("❌ Ошибка: {error}\n", when=has_error),
+        Format(i18n.format_value("task-list-error", {"error": "{error}"}), when=has_error),
         
         # Информация о фильтрах, если они есть
-        Format("{filter_description}\n", when=has_filters_and_description),
+        Format(i18n.format_value("task-list-filter-description", {"filter_description": "{filter_description}"}), when=has_filters_and_description),
         
         # Информация о поисковом запросе, если он есть
-        Format("Поиск: '{search_query}'\n", when=has_search_and_query),
+        Format(i18n.format_value("task-list-search-query", {"search_query": "{search_query}"}), when=has_search_and_query),
         
         # Информация о сортировке, если она есть
-        Format("Сортировка: {sort_description}\n", when=has_sort_and_description),
+        Format(i18n.format_value("task-list-sort-description", {"sort_description": "{sort_description}"}), when=has_sort_and_description),
         
         # Список задач с использованием виджета List
         List(
             Format(
-                "📌 {item[title]} (ID: {item[id]})\n"
-                "Описание: {item[description]}\n"
-                "Тип: {item[type]}\n"
-                "Статус: {item[status]}\n"
-                "Приоритет: {item[priority]}\n"
-                "Дедлайн: {item[deadline]}\n"
-                "Завершена: {item[completed]}\n"
+                i18n.format_value("task-list-item", {
+                    "title": "{item[title]}",
+                    "id": "{item[id]}",
+                    "description": "{item[description]}",
+                    "type": "{item[type]}",
+                    "status": "{item[status]}",
+                    "priority": "{item[priority]}",
+                    "deadline": "{item[deadline]}",
+                    "completed": "{item[completed]}"
+                })
             ),
             items="tasks",
             id="tasks_list",
+            sep="\n\n",
             page_size=3,
             when=has_tasks
         ),
         
         # Сообщение, если задач нет
-        Format("У вас нет задач\n\nСоздайте новую задачу с помощью команды /add_task", when=has_no_tasks),
+        Format(i18n.format_value("task-list-empty"), when=has_no_tasks),
         
         # Создаем StubScroll для управления пагинацией
         StubScroll(
@@ -533,20 +530,20 @@ task_list_dialog = Dialog(
         
         # Кнопки действий
         Row(
-            SwitchTo(Const("🔍 Фильтр"), id="to_filter", state=TaskListStates.filter_menu),
-            SwitchTo(Const("🔎 Поиск"), id="to_search", state=TaskListStates.search),
-            SwitchTo(Const("📊 Сортировка"), id="to_sort", state=TaskListStates.sort),
+            SwitchTo(Const(i18n.format_value("task-list-filter-button")), id="to_filter", state=TaskListStates.filter_menu),
+            SwitchTo(Const(i18n.format_value("task-list-search-button")), id="to_search", state=TaskListStates.search),
+            SwitchTo(Const(i18n.format_value("task-list-sort-button")), id="to_sort", state=TaskListStates.sort),
         ),
         
         # Кнопки сброса фильтров и сортировки
         Row(
-            Button(Const("❌ Сбросить фильтры"), id="reset_filters", on_click=on_reset_filters, when=has_filters),
-            Button(Const("❌ Сбросить сортировку"), id="reset_sort", on_click=on_reset_sort, when=has_sort),
+            Button(Const(i18n.format_value("task-list-reset-filters-button")), id="reset_filters", on_click=on_reset_filters, when=has_filters),
+            Button(Const(i18n.format_value("task-list-reset-sort-button")), id="reset_sort", on_click=on_reset_sort, when=has_sort),
         ),
         
         # Кнопка закрытия диалога
         Row(
-            Cancel(Const("Закрыть")),
+            Cancel(Const(i18n.format_value("task-list-close-button"))),
         ),
         
         state=TaskListStates.main,
@@ -555,27 +552,27 @@ task_list_dialog = Dialog(
     
     # Экран выбора типа фильтра
     Window(
-        Const("Выберите тип фильтра:"),
+        Const(i18n.format_value("task-list-filter-menu-title")),
         Row(
-            SwitchTo(Const("🔄 Статус"), id="to_status", state=TaskListStates.filter_status),
-            SwitchTo(Const("🔥 Приоритет"), id="to_priority", state=TaskListStates.filter_priority),
+            SwitchTo(Const(i18n.format_value("task-list-filter-status-button")), id="to_status", state=TaskListStates.filter_status),
+            SwitchTo(Const(i18n.format_value("task-list-filter-priority-button")), id="to_priority", state=TaskListStates.filter_priority),
         ),
         Row(
-            SwitchTo(Const("📋 Тип задачи"), id="to_type", state=TaskListStates.filter_type),
-            SwitchTo(Const("📅 Дедлайн"), id="to_deadline", state=TaskListStates.filter_deadline),
+            SwitchTo(Const(i18n.format_value("task-list-filter-type-button")), id="to_type", state=TaskListStates.filter_type),
+            SwitchTo(Const(i18n.format_value("task-list-filter-deadline-button")), id="to_deadline", state=TaskListStates.filter_deadline),
         ),
         Row(
-            SwitchTo(Const("✅ Показать завершенные"), id="to_completed", state=TaskListStates.filter_completed),
+            SwitchTo(Const(i18n.format_value("task-list-filter-completed-button")), id="to_completed", state=TaskListStates.filter_completed),
         ),
         Row(
-            SwitchTo(Const("↩️ Назад"), id="back_to_main", state=TaskListStates.main),
+            SwitchTo(Const(i18n.format_value("task-list-back-button")), id="back_to_main", state=TaskListStates.main),
         ),
         state=TaskListStates.filter_menu,
     ),
     
     # Экран фильтра по статусу
     Window(
-        Const("Выберите статус для фильтрации:"),
+        Const(i18n.format_value("task-list-filter-status-title")),
         Group(
             Select(
                 Format("{item[name]}"),
@@ -587,7 +584,7 @@ task_list_dialog = Dialog(
             width=2,
         ),
         Row(
-            SwitchTo(Const("↩️ Назад"), id="back_to_filter", state=TaskListStates.filter_menu),
+            SwitchTo(Const(i18n.format_value("task-list-back-button")), id="back_to_filter", state=TaskListStates.filter_menu),
         ),
         state=TaskListStates.filter_status,
         getter=get_statuses,
@@ -595,7 +592,7 @@ task_list_dialog = Dialog(
     
     # Экран фильтра по приоритету
     Window(
-        Const("Выберите приоритет для фильтрации:"),
+        Const(i18n.format_value("task-list-filter-priority-title")),
         Group(
             Select(
                 Format("{item[name]}"),
@@ -607,7 +604,7 @@ task_list_dialog = Dialog(
             width=2,
         ),
         Row(
-            SwitchTo(Const("↩️ Назад"), id="back_to_filter", state=TaskListStates.filter_menu),
+            SwitchTo(Const(i18n.format_value("task-list-back-button")), id="back_to_filter", state=TaskListStates.filter_menu),
         ),
         state=TaskListStates.filter_priority,
         getter=get_priorities,
@@ -615,7 +612,7 @@ task_list_dialog = Dialog(
     
     # Экран фильтра по типу задачи
     Window(
-        Const("Выберите тип задачи для фильтрации:"),
+        Const(i18n.format_value("task-list-filter-type-title")),
         Group(
             Select(
                 Format("{item[name]}"),
@@ -627,7 +624,7 @@ task_list_dialog = Dialog(
             width=2,
         ),
         Row(
-            SwitchTo(Const("↩️ Назад"), id="back_to_filter", state=TaskListStates.filter_menu),
+            SwitchTo(Const(i18n.format_value("task-list-back-button")), id="back_to_filter", state=TaskListStates.filter_menu),
         ),
         state=TaskListStates.filter_type,
         getter=get_task_types,
@@ -635,69 +632,69 @@ task_list_dialog = Dialog(
     
     # Экран фильтра по дедлайну
     Window(
-        Const("Выберите период дедлайна для фильтрации:"),
+        Const(i18n.format_value("task-list-filter-deadline-title")),
         Row(
-            Button(Const("Сегодня"), id="deadline_today", on_click=on_deadline_today),
-            Button(Const("Завтра"), id="deadline_tomorrow", on_click=on_deadline_tomorrow),
+            Button(Const(i18n.format_value("task-list-filter-deadline-today")), id="deadline_today", on_click=on_deadline_today),
+            Button(Const(i18n.format_value("task-list-filter-deadline-tomorrow")), id="deadline_tomorrow", on_click=on_deadline_tomorrow),
         ),
         Row(
-            Button(Const("Эта неделя"), id="deadline_week", on_click=on_deadline_week),
-            Button(Const("Этот месяц"), id="deadline_month", on_click=on_deadline_month),
+            Button(Const(i18n.format_value("task-list-filter-deadline-week")), id="deadline_week", on_click=on_deadline_week),
+            Button(Const(i18n.format_value("task-list-filter-deadline-month")), id="deadline_month", on_click=on_deadline_month),
         ),
         Row(
-            Button(Const("Просроченные"), id="deadline_overdue", on_click=on_deadline_overdue),
+            Button(Const(i18n.format_value("task-list-filter-deadline-overdue")), id="deadline_overdue", on_click=on_deadline_overdue),
         ),
         Row(
-            SwitchTo(Const("↩️ Назад"), id="back_to_filter", state=TaskListStates.filter_menu),
+            SwitchTo(Const(i18n.format_value("task-list-back-button")), id="back_to_filter", state=TaskListStates.filter_menu),
         ),
         state=TaskListStates.filter_deadline,
     ),
     
     # Экран фильтра по завершенности
     Window(
-        Const("Выберите фильтр по завершенности:"),
+        Const(i18n.format_value("task-list-filter-completed-title")),
         Row(
-            Button(Const("Показать все задачи"), id="completed_all", on_click=on_completed_all),
+            Button(Const(i18n.format_value("task-list-filter-completed-all")), id="completed_all", on_click=on_completed_all),
         ),
         Row(
-            Button(Const("Только незавершенные"), id="uncompleted_only", on_click=on_uncompleted_only),
+            Button(Const(i18n.format_value("task-list-filter-uncompleted-only")), id="uncompleted_only", on_click=on_uncompleted_only),
         ),
         Row(
-            Button(Const("Только завершенные"), id="completed_only", on_click=on_completed_only),
+            Button(Const(i18n.format_value("task-list-filter-completed-only")), id="completed_only", on_click=on_completed_only),
         ),
         Row(
-            SwitchTo(Const("↩️ Назад"), id="back_to_filter", state=TaskListStates.filter_menu),
+            SwitchTo(Const(i18n.format_value("task-list-back-button")), id="back_to_filter", state=TaskListStates.filter_menu),
         ),
         state=TaskListStates.filter_completed,
     ),
     
     # Экран сортировки
     Window(
-        Const("Выберите параметр сортировки:"),
+        Const(i18n.format_value("task-list-sort-title")),
         Row(
-            Button(Const("По названию"), id="sort_title", on_click=on_sort_by_title),
-            Button(Const("По дедлайну"), id="sort_deadline", on_click=on_sort_by_deadline),
+            Button(Const(i18n.format_value("task-list-sort-by-title")), id="sort_title", on_click=on_sort_by_title),
+            Button(Const(i18n.format_value("task-list-sort-by-deadline")), id="sort_deadline", on_click=on_sort_by_deadline),
         ),
         Row(
-            Button(Const("По приоритету"), id="sort_priority", on_click=on_sort_by_priority),
-            Button(Const("По дате создания"), id="sort_created", on_click=on_sort_by_created),
+            Button(Const(i18n.format_value("task-list-sort-by-priority")), id="sort_priority", on_click=on_sort_by_priority),
+            Button(Const(i18n.format_value("task-list-sort-by-created")), id="sort_created", on_click=on_sort_by_created),
         ),
         Row(
-            Button(Const("По возрастанию"), id="sort_asc", on_click=on_sort_asc),
-            Button(Const("По убыванию"), id="sort_desc", on_click=on_sort_desc),
+            Button(Const(i18n.format_value("task-list-sort-asc")), id="sort_asc", on_click=on_sort_asc),
+            Button(Const(i18n.format_value("task-list-sort-desc")), id="sort_desc", on_click=on_sort_desc),
         ),
         Row(
-            SwitchTo(Const("↩️ Назад"), id="back_to_main", state=TaskListStates.main),
+            SwitchTo(Const(i18n.format_value("task-list-back-button")), id="back_to_main", state=TaskListStates.main),
         ),
         state=TaskListStates.sort,
     ),
     
     # Экран поиска
     Window(
-        Const("Введите поисковый запрос:"),
+        Const(i18n.format_value("task-list-search-title")),
         TextInput(id="search_query", on_success=SimpleEventProcessor(on_search_query_input)),
         Row(
-            SwitchTo(Const("↩️ Отмена"), id="back_to_main", state=TaskListStates.main),
+            SwitchTo(Const(i18n.format_value("task-list-search-cancel")), id="back_to_main", state=TaskListStates.main),
         ),
         state=TaskListStates.search,
     ),
