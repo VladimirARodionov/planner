@@ -16,7 +16,7 @@ class DurationType(enum.Enum):
     YEARS = "years"
     
     @classmethod
-    def _missing_(cls, value):
+    def _missing_(cls, value:str):
         """Обработка отсутствующих значений перечисления"""
         # Проверяем, есть ли значение в нижнем регистре
         for member in cls:
@@ -218,7 +218,7 @@ class Task(Base):
 
     def is_overdue(self) -> bool:
         """Проверить, просрочена ли задача"""
-        if not self.deadline or self.status.is_final:
+        if not self.deadline or self.completed_at or (self.status and self.status.is_final):
             return False
         return datetime.now() > self.deadline
 
