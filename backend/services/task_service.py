@@ -21,7 +21,7 @@ class TaskService:
         self,
         user_id: str,
         filters: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
+    ) -> list[Any] | tuple[Any]:
         """Получить список задач пользователя с фильтрами"""
         user = await self.auth_service.get_user_by_id(user_id)
         if not user:

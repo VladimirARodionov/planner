@@ -18,6 +18,7 @@ from backend.locale_config import i18n
 from backend.services.task_service import TaskService
 from backend.services.settings_service import SettingsService
 from backend.database import get_session
+from backend.utils import escape_html
 
 logger = logging.getLogger(__name__)
 
@@ -84,10 +85,12 @@ async def get_tasks_data(dialog_manager: DialogManager, **kwargs):
     # Получаем текущую страницу из StubScroll, если он существует
     try:
         page = await dialog_manager.find("tasks_scroll").get_page() + 1  # +1 т.к. StubScroll считает с 0
+        logger.info(f"Page from dialog_manager = {page}")
     except (AttributeError, ValueError):
         # Если StubScroll не найден или произошла ошибка, используем значение из dialog_data
         page = dialog_manager.dialog_data.get("page", dialog_manager.start_data.get("page", 1))
-    
+        logger.info(f"Page from except = {page}")
+
     # Сохраняем текущую страницу в dialog_data для совместимости
     dialog_manager.dialog_data["page"] = page
     
@@ -97,12 +100,16 @@ async def get_tasks_data(dialog_manager: DialogManager, **kwargs):
     sort_order = dialog_manager.dialog_data.get("sort_order", dialog_manager.start_data.get("sort_order", "asc"))
     search_query = filters.get("search", "")
     
+    # Безопасное отображение поискового запроса
+    safe_search_query = search_query
+    
     page_size = 3  # Количество задач на странице
     
     async with get_session() as session:
         task_service = TaskService(session)
         
         # Получаем задачи с пагинацией и общее количество
+        logger.info(f"Page={page} page_size={page_size}")
         try:
             tasks, total_tasks = await task_service.get_tasks_paginated(
                 str(user_id),
@@ -111,7 +118,7 @@ async def get_tasks_data(dialog_manager: DialogManager, **kwargs):
                 filters=filters,
                 sort_by=sort_by,
                 sort_order=sort_order,
-                search_query=search_query
+                search_query=safe_search_query
             )
         except Exception as e:
             logger.error(f"Ошибка при получении задач: {e}")
@@ -132,11 +139,17 @@ async def get_tasks_data(dialog_manager: DialogManager, **kwargs):
                 filters=filters,
                 sort_by=sort_by,
                 sort_order=sort_order,
-                search_query=search_query
+                search_query=safe_search_query
             )
         
+        # Обновляем StubScroll с текущей страницей (0-based)
+        try:
+            await dialog_manager.find("tasks_scroll").set_page(page - 1)
+        except (AttributeError, ValueError):
+            logger.warning("Не удалось обновить StubScroll")
+        
         # Формируем описание фильтров
-        filter_description = await get_filter_description(filters, user_id)
+        filter_description = await get_filter_description(filters, str(user_id))
         
         # Формируем описание сортировки
         sort_description = ""
@@ -148,16 +161,16 @@ async def get_tasks_data(dialog_manager: DialogManager, **kwargs):
         # Форматируем задачи для отображения в виджете List
         formatted_tasks = []
         for task in tasks:
-            description = task['description'] if task['description'] else "Нет описания"
-            status = task['status']['name'] if task['status'] else "Не указан"
-            priority = task['priority']['name'] if task['priority'] else "Не указан"
-            task_type = task['type']['name'] if task['type'] else "Не указан"
-            deadline = task['deadline'] if task['deadline'] else "Не указан"
+            description = escape_html(task['description'] if task['description'] else "Нет описания")
+            status = escape_html(task['status']['name'] if task['status'] else "Не указан")
+            priority = escape_html(task['priority']['name'] if task['priority'] else "Не указан")
+            task_type = escape_html(task['type']['name'] if task['type'] else "Не указан")
+            deadline = escape_html(str(task['deadline']) if task['deadline'] else "Не указан")
             completed = "✅" if task['completed_at'] is not None else "❌"
             
             task_info = {
                 "id": task['id'],
-                "title": task['title'],
+                "title": escape_html(task['title']),
                 "description": description,
                 "status": status,
                 "priority": priority,
@@ -175,8 +188,8 @@ async def get_tasks_data(dialog_manager: DialogManager, **kwargs):
             "page": page,
             "has_filters": bool(filters),
             "filter_description": filter_description,
-            "has_search": bool(search_query),
-            "search_query": search_query,
+            "has_search": bool(safe_search_query),
+            "search_query": safe_search_query,
             "has_sort": bool(sort_by),
             "sort_description": sort_description
         }
@@ -227,9 +240,9 @@ async def get_filter_description(filters: dict, user_id: str = None) -> str:
         settings_service = SettingsService(session)
         settings = await settings_service.get_settings(user_id)
         
-        statuses = {status["id"]: status["name"] for status in settings["statuses"]}
-        priorities = {priority["id"]: priority["name"] for priority in settings["priorities"]}
-        task_types = {task_type["id"]: task_type["name"] for task_type in settings["task_types"]}
+        statuses = {status["id"]: escape_html(status["name"]) for status in settings["statuses"]}
+        priorities = {priority["id"]: escape_html(priority["name"]) for priority in settings["priorities"]}
+        task_types = {task_type["id"]: escape_html(task_type["name"]) for task_type in settings["task_types"]}
     
     if 'status_id' in filters_copy:
         status_name = statuses.get(filters_copy['status_id'], f"Статус {filters_copy['status_id']}")
@@ -244,10 +257,12 @@ async def get_filter_description(filters: dict, user_id: str = None) -> str:
         filter_parts.append(f"Тип: {type_name}")
     
     if 'deadline_from' in filters_copy:
-        filter_parts.append(f"Дедлайн от: {filters_copy['deadline_from']}")
+        deadline_from = escape_html(str(filters_copy['deadline_from']))
+        filter_parts.append(f"Дедлайн от: {deadline_from}")
     
     if 'deadline_to' in filters_copy:
-        filter_parts.append(f"Дедлайн до: {filters_copy['deadline_to']}")
+        deadline_to = escape_html(str(filters_copy['deadline_to']))
+        filter_parts.append(f"Дедлайн до: {deadline_to}")
     
     if 'is_completed' in filters_copy:
         completed_status = "Завершенные" if filters_copy['is_completed'] else "Незавершенные"
@@ -256,9 +271,9 @@ async def get_filter_description(filters: dict, user_id: str = None) -> str:
     return ", ".join(filter_parts)
 
 def get_sort_name_display(sort_by: str) -> str:
-    """Возвращает отображаемое имя поля сортировки"""
+    """Получить отображаемое имя поля сортировки"""
     sort_field_key = f"sort-field-{sort_by}"
-    return i18n.format_value(sort_field_key, {}, default=sort_by)
+    return i18n.format_value(sort_field_key)
 
 # Обработчики событий
 async def on_page_prev(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -266,7 +281,15 @@ async def on_page_prev(c: CallbackQuery, button: Button, manager: DialogManager)
     # Просто уменьшаем номер страницы, но не меньше 1
     page = manager.dialog_data.get("page", 1)
     if page > 1:
-        manager.dialog_data["page"] = page - 1
+        page -= 1
+        manager.dialog_data["page"] = page
+        
+        # Обновляем StubScroll с текущей страницей (0-based)
+        try:
+            await manager.find("tasks_scroll").set_page(page - 1)
+        except (AttributeError, ValueError):
+            logger.warning("Не удалось обновить StubScroll в on_page_prev")
+    
     await manager.update(data={})
 
 async def on_page_next(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -274,7 +297,15 @@ async def on_page_next(c: CallbackQuery, button: Button, manager: DialogManager)
     # Просто увеличиваем номер страницы, проверка на максимальное количество страниц
     # будет выполнена в getter-функции
     page = manager.dialog_data.get("page", 1)
-    manager.dialog_data["page"] = page + 1
+    page += 1
+    manager.dialog_data["page"] = page
+    
+    # Обновляем StubScroll с текущей страницей (0-based)
+    try:
+        await manager.find("tasks_scroll").set_page(page - 1)
+    except (AttributeError, ValueError):
+        logger.warning("Не удалось обновить StubScroll в on_page_next")
+    
     await manager.update(data={})
 
 async def on_reset_filters(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -430,7 +461,9 @@ async def on_sort_desc(c: CallbackQuery, button: Button, manager: DialogManager)
 
 async def on_search_query_input(message: Message, widget: Any, manager: DialogManager, data: dict = None):
     """Обработчик ввода поискового запроса"""
-    search_query = message.text.strip()
+    # Экранируем специальные символы в поисковом запросе
+    search_query = escape_html(message.text.strip())
+    
     filters = manager.dialog_data.get("filters", {})
     filters["search"] = search_query
     manager.dialog_data["filters"] = filters
@@ -439,12 +472,23 @@ async def on_search_query_input(message: Message, widget: Any, manager: DialogMa
 async def on_page_selected(c: CallbackQuery, button: Any, manager: DialogManager, page: int):
     """Обработчик выбора страницы в NumberedPager"""
     manager.dialog_data["page"] = page
+    # Обновляем StubScroll с текущей страницей (0-based)
+    try:
+        await manager.find("tasks_scroll").set_page(page - 1)
+    except (AttributeError, ValueError):
+        logger.warning("Не удалось обновить StubScroll")
     await manager.update(data={})
 
 # Создаем диалог для списка задач
 task_list_dialog = Dialog(
     # Основной экран со списком задач
     Window(
+        # Создаем StubScroll для управления пагинацией
+        StubScroll(
+            id="tasks_scroll",
+            pages="total_pages"
+        ),
+        
         # Заголовок с информацией о странице и общем количестве задач
         Format(i18n.format_value("task-list-title", {"page": "{page}", "total_pages": "{total_pages}", "total_tasks": "{total_tasks}"})),
         
@@ -484,12 +528,6 @@ task_list_dialog = Dialog(
         # Сообщение, если задач нет
         Format(i18n.format_value("task-list-empty"), when=has_no_tasks),
         
-        # Создаем StubScroll для управления пагинацией
-        StubScroll(
-            id="tasks_scroll",
-            pages=lambda data: data.get("total_pages", 1)
-        ),
-        
         # Пагинация для списка задач с использованием NumberedPager
         NumberedPager(
             scroll="tasks_scroll",
@@ -525,6 +563,13 @@ task_list_dialog = Dialog(
                 text=Format("{target_page} ⏭️"),
                 when=is_not_last_page_and_more_than_two_pages
             ),
+            when=has_multiple_pages
+        ),
+        
+        # Простые кнопки навигации (не зависят от StubScroll)
+        Row(
+            Button(Const("◀️ Назад"), id="prev_page", on_click=on_page_prev, when=is_not_first_page),
+            Button(Const("Вперед ▶️"), id="next_page", on_click=on_page_next, when=is_not_last_page),
             when=has_multiple_pages
         ),
         

@@ -14,6 +14,7 @@ from backend.locale_config import i18n
 from backend.services.task_service import TaskService
 from backend.services.settings_service import SettingsService
 from backend.database import get_session
+from backend.utils import escape_html
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +156,7 @@ async def get_task_summary(dialog_manager: DialogManager, **kwargs):
             logger.debug(f"Looking for type_id: {task_data['type_id']} in {len(settings['task_types'])} task types")
             for task_type in settings["task_types"]:
                 if str(task_type["id"]) == str(task_data["type_id"]):
-                    type_name = task_type["name"]
+                    type_name = escape_html(task_type["name"])
                     logger.debug(f"Found type name: {type_name}")
                     break
                     
@@ -163,7 +164,7 @@ async def get_task_summary(dialog_manager: DialogManager, **kwargs):
             logger.debug(f"Looking for status_id: {task_data['status_id']} in {len(settings['statuses'])} statuses")
             for status in settings["statuses"]:
                 if str(status["id"]) == str(task_data["status_id"]):
-                    status_name = status["name"]
+                    status_name = escape_html(status["name"])
                     logger.debug(f"Found status name: {status_name}")
                     break
                     
@@ -171,7 +172,7 @@ async def get_task_summary(dialog_manager: DialogManager, **kwargs):
             logger.debug(f"Looking for priority_id: {task_data['priority_id']} in {len(settings['priorities'])} priorities")
             for priority in settings["priorities"]:
                 if str(priority["id"]) == str(task_data["priority_id"]):
-                    priority_name = priority["name"]
+                    priority_name = escape_html(priority["name"])
                     logger.debug(f"Found priority name: {priority_name}")
                     break
                     
@@ -179,13 +180,17 @@ async def get_task_summary(dialog_manager: DialogManager, **kwargs):
             logger.debug(f"Looking for duration_id: {task_data['duration_id']} in {len(settings['durations'])} durations")
             for duration in settings["durations"]:
                 if str(duration["id"]) == str(task_data["duration_id"]):
-                    duration_name = duration["name"]
+                    duration_name = escape_html(duration["name"])
                     logger.debug(f"Found duration name: {duration_name}")
                     break
         
+        # Экранируем все текстовые поля
+        title = escape_html(task_data.get("title", "Новая задача"))
+        description = escape_html(task_data.get("description", "Нет описания") or "Нет описания")
+        
         result = {
-            "title": task_data.get("title", "Новая задача"),
-            "description": task_data.get("description", "Нет описания"),
+            "title": title,
+            "description": description,
             "type_name": type_name,
             "status_name": status_name,
             "priority_name": priority_name,
