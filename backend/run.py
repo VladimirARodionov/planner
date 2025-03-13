@@ -21,6 +21,7 @@ from backend.locale_config import i18n
 
 logging.config.fileConfig(fname=pathlib.Path(__file__).resolve().parent.parent / 'logging.ini',
                           disable_existing_loggers=False)
+logging.getLogger('aiosqlite').propagate = False
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +93,7 @@ def create_app():
     cache.init_app(app, config={'CACHE_TYPE': 'SimpleCache'})
     
     # Настройка CORS
+    #CORS(app, resources={r"/*": {"origins": "*"}})
     CORS(app, 
          resources={
              r"/api/*": {

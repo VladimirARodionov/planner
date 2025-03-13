@@ -1,4 +1,4 @@
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { Task, Settings, Status, Priority, Duration, TaskType } from '../types/task';
 import { AuthAPI } from './auth';
 
@@ -12,7 +12,7 @@ const api = axios.create({
 });
 
 // Добавляем токен к каждому запросу
-api.interceptors.request.use((config: any) => {
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('token');
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -75,29 +75,102 @@ export interface UpdateTaskDto {
     duration_id?: number;
 }
 
+export interface TaskFilters {
+    status_id?: number;
+    priority_id?: number;
+    duration_id?: number;
+    type_id?: number;
+    is_completed?: boolean;
+    deadline_from?: string;
+    deadline_to?: string;
+}
+
+export interface PaginationParams {
+    page: number;
+    page_size: number;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+    search?: string;
+}
+
+export interface PaginatedResponse {
+    tasks: Task[];
+    pagination: {
+        page: number;
+        page_size: number;
+        total_tasks: number;
+        total_pages: number;
+    };
+}
+
 export const TasksAPI = {
     // Задачи
-    getTasks: async (filters?: {
-        status_id?: number;
-        priority_id?: number;
-        duration_id?: number;
-        type_id?: number;
-        is_completed?: boolean;
-    }) => {
+    getTasks: async (filters?: TaskFilters) => {
         const response = await api.get<{ tasks: Task[] }>('/tasks/', { params: filters });
         return response.data.tasks;
     },
 
+    // Получить список задач с пагинацией, сортировкой и поиском
+    getTasksPaginated: async (
+        pagination: PaginationParams,
+        filters?: TaskFilters
+    ) => {
+        const response = await api.get<PaginatedResponse>('/tasks/paginated', {
+            params: {
+                ...pagination,
+                ...filters
+            }
+        });
+        return response.data;
+    },
+
+    // Поиск задач по названию и описанию
+    searchTasks: async (
+        query: string,
+        filters?: TaskFilters
+    ) => {
+        const response = await api.get<{ tasks: Task[] }>('/tasks/search', {
+            params: {
+                q: query,
+                ...filters
+            }
+        });
+        return response.data.tasks;
+    },
+
+    // Получить общее количество задач с учетом фильтров и поиска
+    getTaskCount: async (
+        filters?: TaskFilters,
+        search?: string
+    ) => {
+        const response = await api.get<{ count: number }>('/tasks/count', {
+            params: {
+                ...filters,
+                search
+            }
+        });
+        return response.data.count;
+    },
+
+    // Получить задачу по ID
+    getTask: async (taskId: number): Promise<Task> => {
+        const response = await api.get<Task>(`/tasks/${taskId}`);
+        return response.data;
+    },
+
+    // Создать задачу
     createTask: async (task: CreateTaskDto) => {
         const response = await api.post<Task>('/tasks/', task);
         return response.data;
     },
 
+    // Обновить задачу
     updateTask: async (taskId: number, task: UpdateTaskDto) => {
         const response = await api.put<Task>(`/tasks/${taskId}`, task);
         return response.data;
     },
 
+    // Удалить задачу
     deleteTask: async (taskId: number) => {
         await api.delete(`/tasks/${taskId}`);
     },
@@ -105,6 +178,12 @@ export const TasksAPI = {
     // Настройки
     getSettings: async () => {
         const response = await api.get<Settings>('/settings/');
+        return response.data;
+    },
+
+    // Типы задач
+    getTaskTypes: async () => {
+        const response = await api.get<TaskType[]>('/settings/task-types/');
         return response.data;
     },
 
@@ -148,9 +227,17 @@ export const TasksAPI = {
         return response.data;
     },
 
+    deleteStatus: async (statusId: number) => {
+        await api.delete(`/settings/status/${statusId}`);
+    },
+
     updatePriority: async (priorityId: number, priority: Partial<Priority>) => {
         const response = await api.put<Priority>(`/settings/priority/${priorityId}`, priority);
         return response.data;
+    },
+
+    deletePriority: async (priorityId: number) => {
+        await api.delete(`/settings/priority/${priorityId}`);
     },
 
     updateDuration: async (durationId: number, duration: Partial<Duration>) => {
@@ -158,29 +245,13 @@ export const TasksAPI = {
         return response.data;
     },
 
-    deleteStatus: async (statusId: number) => {
-        await api.delete(`/settings/status/${statusId}`);
-    },
-
-    deletePriority: async (priorityId: number) => {
-        await api.delete(`/settings/priority/${priorityId}`);
-    },
-
     deleteDuration: async (durationId: number) => {
         await api.delete(`/settings/duration/${durationId}`);
     },
 
-    // Типы задач
-    getTaskTypes: async () => {
-        const response = await api.get<TaskType[]>('/settings/task-types/');
-        return response.data;
-    },
-
     createTaskType: async (taskType: {
         name: string;
-        description?: string;
         color?: string;
-        order?: number;
         is_active?: boolean;
         is_default?: boolean;
     }) => {
@@ -195,5 +266,5 @@ export const TasksAPI = {
 
     deleteTaskType: async (taskTypeId: number) => {
         await api.delete(`/settings/task-types/${taskTypeId}`);
-    },
-}; 
+    }
+}

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Box, CircularProgress, Typography } from '@mui/material';
-import { AuthAPI } from '../api/auth';
 
 const TelegramCallback: React.FC = () => {
     const location = useLocation();

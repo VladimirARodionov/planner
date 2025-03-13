@@ -1,11 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
     Box,
     Button,
-    TextField,
     Typography,
     Paper,
-    Divider,
 } from '@mui/material';
 import { AuthAPI } from '../api/auth';
 
@@ -13,30 +11,7 @@ interface LoginFormProps {
     onLoginSuccess: (token: string) => void;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
-
-    const handleSubmit = async (event: React.FormEvent) => {
-        event.preventDefault();
-        setError(null);
-        setLoading(true);
-
-        try {
-            const response = await AuthAPI.login(username, password);
-            localStorage.setItem('token', response.access);
-            localStorage.setItem('refreshToken', response.refresh);
-            localStorage.setItem('user', response.user);
-            onLoginSuccess(response.access);
-        } catch (err) {
-            setError('Ошибка авторизации. Проверьте логин и пароль.');
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
+export const LoginForm: React.FC<LoginFormProps> = () => {
 
     const handleTelegramLogin = () => {
         // Получаем URL для авторизации через Telegram и перенаправляем пользователя

@@ -13,6 +13,26 @@ bp = Blueprint("planner", __name__)
 logger = logging.getLogger(__name__)
 
 # Маршруты для работы с задачами
+@bp.route('/api/tasks/<int:task_id>', methods=['GET', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+@async_route
+async def get_task(task_id):
+    if request.method == 'OPTIONS':
+        return '', 200
+    """Получить задачу по ID"""
+    user_id = get_jwt_identity()
+
+    async with get_session() as session:
+        task_service = TaskService(session)
+        tasks = await task_service.get_tasks(user_id, {'id': task_id})
+
+    if tasks and len(tasks) > 0:
+        return jsonify(tasks[0])
+    else:
+        return jsonify({'error': 'Task not found'}), 404
+
+
 @bp.route('/api/tasks/', methods=['GET', 'OPTIONS'])
 @cross_origin()
 @jwt_required()
@@ -29,13 +49,17 @@ async def get_tasks():
     try:
         current_user = get_jwt_identity()
         logger.info(f"Идентификатор пользователя из токена: {current_user}")
-        
-        filters = {
-            'status_id': request.args.get('status_id', type=int),
-            'priority_id': request.args.get('priority_id', type=int),
-            'duration_id': request.args.get('duration_id', type=int),
-            'is_completed': request.args.get('is_completed', type=bool, default=False)
-        }
+
+        # Получаем параметры фильтрации из запроса
+        filters = {}
+        if request.args.get('status_id'):
+            filters['status_id'] = int(request.args.get('status_id'))
+        if request.args.get('priority_id'):
+            filters['priority_id'] = int(request.args.get('priority_id'))
+        if request.args.get('duration_id'):
+            filters['duration_id'] = int(request.args.get('duration_id'))
+        if request.args.get('type_id'):
+            filters['type_id'] = int(request.args.get('type_id'))
         
         async with get_session() as session:
             task_service = TaskService(session)
@@ -45,6 +69,125 @@ async def get_tasks():
     except Exception as e:
         logger.error(f"Ошибка при получении задач: {e}")
         return jsonify({'error': str(e)}), 500
+
+@bp.route('/api/tasks/paginated', methods=['GET', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+@async_route
+async def get_tasks_paginated():
+    if request.method == 'OPTIONS':
+        return '', 200
+    """Получить список задач пользователя с пагинацией, сортировкой и поиском"""
+    user_id = get_jwt_identity()
+
+    # Получаем параметры пагинации из запроса
+    page = int(request.args.get('page', 1))
+    page_size = int(request.args.get('page_size', 10))
+
+    # Получаем параметры сортировки из запроса
+    sort_by = request.args.get('sort_by')
+    sort_order = request.args.get('sort_order', 'asc')
+
+    # Получаем параметр поиска из запроса
+    search_query = request.args.get('search')
+
+    # Получаем параметры фильтрации из запроса
+    filters = {}
+    if request.args.get('status_id'):
+        filters['status_id'] = int(request.args.get('status_id'))
+    if request.args.get('priority_id'):
+        filters['priority_id'] = int(request.args.get('priority_id'))
+    if request.args.get('duration_id'):
+        filters['duration_id'] = int(request.args.get('duration_id'))
+    if request.args.get('type_id'):
+        filters['type_id'] = int(request.args.get('type_id'))
+
+    async with get_session() as session:
+        task_service = TaskService(session)
+        tasks, total_tasks = await task_service.get_tasks_paginated(
+            user_id,
+            page,
+            page_size,
+            filters,
+            sort_by,
+            sort_order,
+            search_query
+        )
+
+        # Вычисляем общее количество страниц
+        total_pages = (total_tasks + page_size - 1) // page_size if total_tasks > 0 else 0
+
+        response = {
+            'tasks': tasks,
+            'pagination': {
+                'page': page,
+                'page_size': page_size,
+                'total_tasks': total_tasks,
+                'total_pages': total_pages
+            }
+        }
+
+    return jsonify(response)
+
+@bp.route('/api/tasks/search', methods=['GET', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+@async_route
+async def search_tasks():
+    if request.method == 'OPTIONS':
+        return '', 200
+    """Поиск задач по названию и описанию"""
+    user_id = get_jwt_identity()
+
+    # Получаем параметр поиска из запроса
+    search_query = request.args.get('q', '')
+
+    # Получаем параметры фильтрации из запроса
+    filters = {}
+    if request.args.get('status_id'):
+        filters['status_id'] = int(request.args.get('status_id'))
+    if request.args.get('priority_id'):
+        filters['priority_id'] = int(request.args.get('priority_id'))
+    if request.args.get('duration_id'):
+        filters['duration_id'] = int(request.args.get('duration_id'))
+    if request.args.get('type_id'):
+        filters['type_id'] = int(request.args.get('type_id'))
+
+    async with get_session() as session:
+        task_service = TaskService(session)
+        tasks = await task_service.search_tasks(user_id, search_query, filters)
+
+    return jsonify(tasks)
+
+@bp.route('/api/tasks/count', methods=['GET', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+@async_route
+async def get_task_count():
+    if request.method == 'OPTIONS':
+        return '', 200
+    """Получить общее количество задач пользователя с учетом фильтров и поиска"""
+    user_id = get_jwt_identity()
+
+    # Получаем параметр поиска из запроса
+    search_query = request.args.get('search')
+
+    # Получаем параметры фильтрации из запроса
+    filters = {}
+    if request.args.get('status_id'):
+        filters['status_id'] = int(request.args.get('status_id'))
+    if request.args.get('priority_id'):
+        filters['priority_id'] = int(request.args.get('priority_id'))
+    if request.args.get('duration_id'):
+        filters['duration_id'] = int(request.args.get('duration_id'))
+    if request.args.get('type_id'):
+        filters['type_id'] = int(request.args.get('type_id'))
+
+    async with get_session() as session:
+        task_service = TaskService(session)
+        count = await task_service.get_task_count(user_id, filters, search_query)
+
+    return jsonify({'count': count})
 
 @bp.route('/api/tasks/', methods=['POST', 'OPTIONS'])
 @cross_origin()

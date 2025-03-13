@@ -58,7 +58,7 @@ export interface Task {
     is_overdue: boolean;
     reminders: string[];
     tags: string[];
-    custom_fields: Record<string, any>;
+    custom_fields: Record<string, unknown>;
 }
 
 export interface Settings {

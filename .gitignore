@@ -173,9 +173,9 @@ cython_debug/
 /.idea/
 /*.iml
 /.gigaide/
-logs.log.*
 /backend/db.sqlite3
 /templates/*
 
 # PostgreSQL backups
 /pg_backups/*
+auth_states.json

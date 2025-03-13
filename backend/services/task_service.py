@@ -1,10 +1,11 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 import logging
 import asyncio
+from datetime import datetime
 
 from backend.db.models import Task, DurationSetting, TaskTypeSetting, StatusSetting, PrioritySetting
 from backend.services.auth_service import AuthService
@@ -29,6 +30,8 @@ class TaskService:
         query = select(Task).where(Task.user_id == user.telegram_id)
 
         if filters:
+            if filters.get('id'):
+                query = query.where(Task.id == filters['id'])
             if filters.get('status_id'):
                 query = query.where(Task.status_id == filters['status_id'])
             if filters.get('priority_id'):
@@ -37,6 +40,21 @@ class TaskService:
                 query = query.where(Task.duration_id == filters['duration_id'])
             if filters.get('type_id'):
                 query = query.where(Task.type_id == filters['type_id'])
+            
+            # Добавляем фильтрацию по дедлайну
+            deadline_conditions = []
+            if filters.get('deadline_from'):
+                deadline_from = datetime.strptime(filters['deadline_from'], '%Y-%m-%d')
+                # Устанавливаем время на начало дня (00:00:00)
+                deadline_from = deadline_from.replace(hour=0, minute=0, second=0, microsecond=0)
+                deadline_conditions.append(Task.deadline >= deadline_from)
+            if filters.get('deadline_to'):
+                deadline_to = datetime.strptime(filters['deadline_to'], '%Y-%m-%d')
+                # Устанавливаем время на конец дня (23:59:59)
+                deadline_to = deadline_to.replace(hour=23, minute=59, second=59, microsecond=999999)
+                deadline_conditions.append(Task.deadline <= deadline_to)
+            if deadline_conditions:
+                query = query.where(and_(*deadline_conditions))
 
         query = query.options(
             selectinload(Task.status),
@@ -50,6 +68,172 @@ class TaskService:
 
         # Используем asyncio.gather для параллельного выполнения
         return await asyncio.gather(*[self._task_to_dict(task) for task in tasks])
+
+    async def get_tasks_paginated(
+        self,
+        user_id: str,
+        page: int = 1,
+        page_size: int = 10,
+        filters: Optional[Dict[str, Any]] = None,
+        sort_by: Optional[str] = None,
+        sort_order: str = "asc",
+        search_query: Optional[str] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """
+        Получить список задач пользователя с пагинацией, сортировкой и поиском
+        
+        Args:
+            user_id: ID пользователя
+            page: Номер страницы (начиная с 1)
+            page_size: Количество задач на странице
+            filters: Словарь с фильтрами (status_id, priority_id, duration_id, type_id)
+            sort_by: Поле для сортировки (title, deadline, priority, status)
+            sort_order: Порядок сортировки (asc, desc)
+            search_query: Строка для поиска в названии и описании задачи
+            
+        Returns:
+            Tuple[List[Dict[str, Any]], int]: Список задач и общее количество задач
+        """
+        user = await self.auth_service.get_user_by_id(user_id)
+        if not user:
+            return [], 0
+            
+        # Получаем все задачи с фильтрами
+        all_tasks = await self.get_tasks(user_id, filters)
+        
+        # Применяем поиск, если указан
+        if search_query and search_query.strip():
+            search_query = search_query.lower()
+            filtered_tasks = []
+            for task in all_tasks:
+                title = task['title'].lower()
+                description = task['description'].lower() if task['description'] else ""
+                
+                if search_query in title or search_query in description:
+                    filtered_tasks.append(task)
+            all_tasks = filtered_tasks
+        
+        # Применяем сортировку, если указана
+        if sort_by:
+            reverse = sort_order.lower() == "desc"
+            
+            if sort_by == "title":
+                all_tasks.sort(key=lambda x: x['title'].lower(), reverse=reverse)
+            elif sort_by == "deadline":
+                # Сортируем по дедлайну, задачи без дедлайна в конце
+                all_tasks.sort(
+                    key=lambda x: (x['deadline'] is None, x['deadline']), 
+                    reverse=reverse
+                )
+            elif sort_by == "priority":
+                # Сортируем по приоритету, задачи без приоритета в конце
+                all_tasks.sort(
+                    key=lambda x: (
+                        x['priority'] is None, 
+                        -x['priority']['order'] if x['priority'] else 0
+                    ), 
+                    reverse=reverse
+                )
+            elif sort_by == "status":
+                # Сортируем по статусу, задачи без статуса в конце
+                all_tasks.sort(
+                    key=lambda x: (
+                        x['status'] is None, 
+                        x['status']['order'] if x['status'] else 0
+                    ), 
+                    reverse=reverse
+                )
+        
+        # Получаем общее количество задач
+        total_tasks = len(all_tasks)
+        
+        # Вычисляем смещение для пагинации
+        offset = (page - 1) * page_size
+        
+        # Получаем задачи для текущей страницы
+        paginated_tasks = all_tasks[offset:offset + page_size] if offset < total_tasks else []
+        
+        return paginated_tasks, total_tasks
+        
+    async def search_tasks(
+        self,
+        user_id: str,
+        search_query: str,
+        filters: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Поиск задач по названию и описанию
+        
+        Args:
+            user_id: ID пользователя
+            search_query: Строка для поиска
+            filters: Словарь с фильтрами (status_id, priority_id, duration_id, type_id)
+            
+        Returns:
+            List[Dict[str, Any]]: Список найденных задач
+        """
+        if not search_query.strip():
+            return []
+            
+        # Получаем все задачи с фильтрами
+        all_tasks = await self.get_tasks(user_id, filters)
+        
+        # Применяем поиск
+        search_query = search_query.lower()
+        found_tasks = []
+        
+        for task in all_tasks:
+            title = task['title'].lower()
+            description = task['description'].lower() if task['description'] else ""
+            
+            if search_query in title or search_query in description:
+                found_tasks.append(task)
+                
+        return found_tasks
+        
+    async def get_task_count(
+        self,
+        user_id: str,
+        filters: Optional[Dict[str, Any]] = None,
+        search_query: Optional[str] = None
+    ) -> int:
+        """
+        Получить общее количество задач пользователя с учетом фильтров и поиска
+        
+        Args:
+            user_id: ID пользователя
+            filters: Словарь с фильтрами (status_id, priority_id, duration_id, type_id)
+            search_query: Строка для поиска в названии и описании задачи
+            
+        Returns:
+            int: Общее количество задач
+        """
+        # Если есть поисковый запрос, используем метод search_tasks
+        if search_query and search_query.strip():
+            tasks = await self.search_tasks(user_id, search_query, filters)
+            return len(tasks)
+            
+        # Иначе получаем количество задач с фильтрами
+        user = await self.auth_service.get_user_by_id(user_id)
+        if not user:
+            return 0
+            
+        query = select(func.count()).select_from(Task).where(Task.user_id == user.telegram_id)
+        
+        if filters:
+            if filters.get('status_id'):
+                query = query.where(Task.status_id == filters['status_id'])
+            if filters.get('priority_id'):
+                query = query.where(Task.priority_id == filters['priority_id'])
+            if filters.get('duration_id'):
+                query = query.where(Task.duration_id == filters['duration_id'])
+            if filters.get('type_id'):
+                query = query.where(Task.type_id == filters['type_id'])
+                
+        result = await self.session.execute(query)
+        count = result.scalar()
+        
+        return count or 0
 
     async def create_task(
         self,
@@ -274,12 +458,14 @@ class TaskService:
                 'status': {
                     'id': status.id,
                     'name': status.name,
-                    'color': status.color
+                    'color': status.color,
+                    'order': status.order
                 } if status else None,
                 'priority': {
                     'id': priority.id,
                     'name': priority.name,
-                    'color': priority.color
+                    'color': priority.color,
+                    'order': priority.order
                 } if priority else None,
                 'duration': duration_data,
                 'deadline': task.deadline.isoformat() if task.deadline else None,
