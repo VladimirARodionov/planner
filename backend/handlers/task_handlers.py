@@ -11,6 +11,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, C
 from aiogram_dialog import DialogManager, StartMode
 
 from backend.database import get_session, create_user_settings
+from backend.dialogs.task_list_dialog import TaskListStates
 from backend.locale_config import i18n
 from backend.services.task_service import TaskService
 from backend.services.auth_service import AuthService
@@ -456,55 +457,12 @@ async def on_settings_task_types_callback(callback_query: CallbackQuery):
 
         await callback_query.message.answer(response)
 
-# Обработчик выбора фильтра по приоритету
-@router.callback_query(F.data == "tasks_filter_priority")
-async def on_filter_priority_callback(callback_query: CallbackQuery):
-    """Обработчик выбора фильтра по приоритету"""
-    logger.debug("Получен колбэк для фильтрации по приоритету")
-    
-    user_id = callback_query.from_user.id
-    
-    async with get_session() as session:
-        settings_service = SettingsService(session)
-        priorities = await settings_service.get_priorities(str(user_id))
-        
-        if not priorities:
-            await callback_query.answer("Приоритеты не найдены")
-            return
-        
-        # Создаем клавиатуру с кнопками для выбора приоритета
-        keyboard = []
-        
-        # Группируем кнопки по 2 в ряд
-        for i in range(0, len(priorities), 2):
-            row = []
-            # Добавляем первую кнопку в ряд
-            row.append(InlineKeyboardButton(
-                text=f"{priorities[i]['name']}",
-                callback_data=f"tasks_filter_priority_set_{priorities[i]['id']}"
-            ))
-            
-            # Добавляем вторую кнопку, если она есть
-            if i + 1 < len(priorities):
-                row.append(InlineKeyboardButton(
-                    text=f"{priorities[i + 1]['name']}",
-                    callback_data=f"tasks_filter_priority_set_{priorities[i + 1]['id']}"
-                ))
-            
-            keyboard.append(row)
-        
-        # Добавляем кнопку "Назад"
-        keyboard.append([InlineKeyboardButton(
-            text="↩️ Назад",
-            callback_data="tasks_filter"
-        )])
-        
-        markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
-        
-        # Отправляем сообщение с клавиатурой для выбора приоритета
-        await callback_query.message.edit_text(
-            "Выберите приоритет задачи:",
-            reply_markup=markup
-        )
-        await callback_query.answer()
-
+@router.message(Command("tasks"))
+async def list_tasks(message: Message, dialog_manager: DialogManager):
+    """Показать список задач с пагинацией"""
+    try:
+        # Запускаем диалог списка задач с начальными данными
+        await dialog_manager.start(TaskListStates.main, data={"page": 1, "filters": {}})
+    except Exception as e:
+        logger.exception(f"Ошибка при запуске диалога списка задач: {e}")
+        await message.answer(f"Произошла ошибка при загрузке списка задач: {e}")
