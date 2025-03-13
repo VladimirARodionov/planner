@@ -60,9 +60,9 @@ tasks-menu = 📋 Список задач
 task-list-title = Ваши задачи (страница {$page}/{$total_pages}, всего {$total_tasks}):
 task-list-error = ❌ Ошибка: {$error}
 task-list-filter-description = {$filter_description}
-task-list-search-query = Поиск: '{$search_query}'
+task-list-search-query = Поиск: {$search_query}
 task-list-sort-description = Сортировка: {$sort_description}
-task-list-empty = У вас нет задач\n\nСоздайте новую задачу с помощью команды /add_task
+task-list-empty = У вас нет задач. Создайте новую задачу с помощью команды /add_task
 task-list-item = 📌 {$title} (ID: {$id})
     Описание: {$description}
     Тип: {$type}
@@ -149,7 +149,7 @@ task-created-details =
 
 # Подтверждение создания задачи
 task-confirm-header = 📋 Подтвердите создание задачи:
-task-confirm-details = 
+task-confirm-details =
     📝 {$title}
     Описание: {$description}
     Тип: {$type}
