@@ -523,7 +523,8 @@ def encode_filters(filters: dict) -> str:
         'duration_id': 'd',
         'deadline_from': 'df',
         'deadline_to': 'dt',
-        'search': 'q'
+        'search': 'q',
+        'is_completed': 'c'
     }
     
     # Преобразуем даты в более короткий формат (YYMMDD)
@@ -560,7 +561,7 @@ def encode_filters(filters: dict) -> str:
     if len(encoded) > 60:  # Оставляем небольшой запас до лимита в 64 байта
         logger.warning(f"Encoded filters too large: {len(encoded)} bytes")
         # Оставляем только самые важные фильтры
-        essential_filters = {k: v for k, v in compact_filters.items() if k in ['s', 'p', 't']}
+        essential_filters = {k: v for k, v in compact_filters.items() if k in ['s', 'p', 't', 'c']}
         json_str = json.dumps(essential_filters, separators=(',', ':'))
         encoded = base64.urlsafe_b64encode(json_str.encode()).decode()
     
@@ -586,7 +587,8 @@ def decode_filters(encoded: str) -> dict:
             'd': 'duration_id',
             'df': 'deadline_from',
             'dt': 'deadline_to',
-            'q': 'search'
+            'q': 'search',
+            'c': 'is_completed'
         }
         
         filters = {}
@@ -1163,6 +1165,12 @@ async def on_filter_button_callback(callback_query: CallbackQuery):
         ],
         [
             InlineKeyboardButton(
+                text="✅ Показать завершенные",
+                callback_data="tasks_filter_completed"
+            )
+        ],
+        [
+            InlineKeyboardButton(
                 text="↩️ Назад",
                 callback_data="tasks_filter_back"
             )
@@ -1642,6 +1650,10 @@ def get_filter_description(filters: dict) -> str:
     
     if 'deadline_to' in filters_copy:
         filter_parts.append(f"Дедлайн до: {filters_copy['deadline_to']}")
+    
+    if 'is_completed' in filters_copy:
+        completed_status = "Завершенные" if filters_copy['is_completed'] else "Незавершенные"
+        filter_parts.append(f"Статус: {completed_status}")
     
     return ", ".join(filter_parts)
 
@@ -2206,6 +2218,78 @@ async def on_filter_deadline_set_callback(callback_query: CallbackQuery):
         await callback_query.answer("Фильтр по дедлайну применен")
     except Exception as e:
         logger.error(f"Ошибка при применении фильтра по дедлайну: {e}")
+        await callback_query.answer("Ошибка при применении фильтра")
+        # Возвращаемся к экрану фильтров
+        await on_filter_button_callback(callback_query)
+
+# Обработчик нажатия на кнопку "Показать завершенные"
+@router.callback_query(F.data == "tasks_filter_completed")
+async def on_filter_completed_callback(callback_query: CallbackQuery):
+    """Обработчик нажатия на кнопку 'Показать завершенные'"""
+    logger.debug("Получен колбэк для фильтрации по завершенным задачам")
+    
+    # Создаем клавиатуру с кнопками для выбора
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                text="Показать все задачи",
+                callback_data="completed_set_all"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="Только незавершенные",
+                callback_data="completed_set_uncompleted"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="Только завершенные",
+                callback_data="completed_set_completed"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="↩️ Назад",
+                callback_data="tasks_filter"
+            )
+        ]
+    ]
+    
+    markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+    
+    # Отправляем сообщение с клавиатурой для выбора
+    await callback_query.message.edit_text(
+        "Выберите фильтр по завершенности:",
+        reply_markup=markup
+    )
+    await callback_query.answer()
+
+# Обработчик установки фильтра по завершенности
+@router.callback_query(F.data.startswith("completed_set_"))
+async def on_filter_completed_set_callback(callback_query: CallbackQuery):
+    """Обработчик установки фильтра по завершенности"""
+    logger.debug("Получен колбэк для установки фильтра по завершенности")
+    
+    # Извлекаем тип фильтра из callback_data
+    filter_type = callback_query.data.split("_")[-1]
+    logger.debug(f"Выбран тип фильтра по завершенности: {filter_type}")
+    
+    # Создаем фильтр
+    filters = {}
+    
+    if filter_type == "uncompleted":
+        filters["is_completed"] = False
+    elif filter_type == "completed":
+        filters["is_completed"] = True
+    # Для "all" не устанавливаем фильтр is_completed
+    
+    try:
+        # Показываем первую страницу с примененным фильтром
+        await show_tasks_page(callback_query.from_user.id, callback_query.message, page=1, filters=filters)
+        await callback_query.answer("Фильтр по завершенности применен")
+    except Exception as e:
+        logger.error(f"Ошибка при применении фильтра по завершенности: {e}")
         await callback_query.answer("Ошибка при применении фильтра")
         # Возвращаемся к экрану фильтров
         await on_filter_button_callback(callback_query)

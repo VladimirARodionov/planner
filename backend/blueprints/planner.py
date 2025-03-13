@@ -60,7 +60,17 @@ async def get_tasks():
             filters['duration_id'] = int(request.args.get('duration_id'))
         if request.args.get('type_id'):
             filters['type_id'] = int(request.args.get('type_id'))
+        if 'is_completed' in request.args:
+            # Преобразуем строковое значение 'true'/'false' в булево
+            is_completed_str = request.args.get('is_completed').lower()
+            filters['is_completed'] = is_completed_str == 'true'
         
+        # Добавляем фильтрацию по дедлайну
+        if request.args.get('deadline_from'):
+            filters['deadline_from'] = request.args.get('deadline_from')
+        if request.args.get('deadline_to'):
+            filters['deadline_to'] = request.args.get('deadline_to')
+
         async with get_session() as session:
             task_service = TaskService(session)
             tasks = await task_service.get_tasks(current_user, filters)
@@ -101,6 +111,16 @@ async def get_tasks_paginated():
         filters['duration_id'] = int(request.args.get('duration_id'))
     if request.args.get('type_id'):
         filters['type_id'] = int(request.args.get('type_id'))
+    if 'is_completed' in request.args:
+        # Преобразуем строковое значение 'true'/'false' в булево
+        is_completed_str = request.args.get('is_completed').lower()
+        filters['is_completed'] = is_completed_str == 'true'
+    
+    # Добавляем фильтрацию по дедлайну
+    if request.args.get('deadline_from'):
+        filters['deadline_from'] = request.args.get('deadline_from')
+    if request.args.get('deadline_to'):
+        filters['deadline_to'] = request.args.get('deadline_to')
 
     async with get_session() as session:
         task_service = TaskService(session)
@@ -152,6 +172,16 @@ async def search_tasks():
         filters['duration_id'] = int(request.args.get('duration_id'))
     if request.args.get('type_id'):
         filters['type_id'] = int(request.args.get('type_id'))
+    if 'is_completed' in request.args:
+        # Преобразуем строковое значение 'true'/'false' в булево
+        is_completed_str = request.args.get('is_completed').lower()
+        filters['is_completed'] = is_completed_str == 'true'
+    
+    # Добавляем фильтрацию по дедлайну
+    if request.args.get('deadline_from'):
+        filters['deadline_from'] = request.args.get('deadline_from')
+    if request.args.get('deadline_to'):
+        filters['deadline_to'] = request.args.get('deadline_to')
 
     async with get_session() as session:
         task_service = TaskService(session)
@@ -182,6 +212,16 @@ async def get_task_count():
         filters['duration_id'] = int(request.args.get('duration_id'))
     if request.args.get('type_id'):
         filters['type_id'] = int(request.args.get('type_id'))
+    if 'is_completed' in request.args:
+        # Преобразуем строковое значение 'true'/'false' в булево
+        is_completed_str = request.args.get('is_completed').lower()
+        filters['is_completed'] = is_completed_str == 'true'
+    
+    # Добавляем фильтрацию по дедлайну
+    if request.args.get('deadline_from'):
+        filters['deadline_from'] = request.args.get('deadline_from')
+    if request.args.get('deadline_to'):
+        filters['deadline_to'] = request.args.get('deadline_to')
 
     async with get_session() as session:
         task_service = TaskService(session)

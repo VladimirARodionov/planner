@@ -41,6 +41,15 @@ class TaskService:
             if filters.get('type_id'):
                 query = query.where(Task.type_id == filters['type_id'])
             
+            # Фильтрация по завершенным/незавершенным задачам
+            if 'is_completed' in filters:
+                if filters['is_completed'] is False:
+                    # Показываем только незавершенные задачи (completed_at is NULL)
+                    query = query.where(Task.completed_at == None)
+                elif filters['is_completed'] is True:
+                    # Показываем только завершенные задачи (completed_at is NOT NULL)
+                    query = query.where(Task.completed_at != None)
+            
             # Добавляем фильтрацию по дедлайну
             deadline_conditions = []
             if filters.get('deadline_from'):
@@ -229,6 +238,30 @@ class TaskService:
                 query = query.where(Task.duration_id == filters['duration_id'])
             if filters.get('type_id'):
                 query = query.where(Task.type_id == filters['type_id'])
+            
+            # Фильтрация по завершенным/незавершенным задачам
+            if 'is_completed' in filters:
+                if filters['is_completed'] is False:
+                    # Показываем только незавершенные задачи (completed_at is NULL)
+                    query = query.where(Task.completed_at == None)
+                elif filters['is_completed'] is True:
+                    # Показываем только завершенные задачи (completed_at is NOT NULL)
+                    query = query.where(Task.completed_at != None)
+            
+            # Добавляем фильтрацию по дедлайну
+            deadline_conditions = []
+            if filters.get('deadline_from'):
+                deadline_from = datetime.strptime(filters['deadline_from'], '%Y-%m-%d')
+                # Устанавливаем время на начало дня (00:00:00)
+                deadline_from = deadline_from.replace(hour=0, minute=0, second=0, microsecond=0)
+                deadline_conditions.append(Task.deadline >= deadline_from)
+            if filters.get('deadline_to'):
+                deadline_to = datetime.strptime(filters['deadline_to'], '%Y-%m-%d')
+                # Устанавливаем время на конец дня (23:59:59)
+                deadline_to = deadline_to.replace(hour=23, minute=59, second=59, microsecond=999999)
+                deadline_conditions.append(Task.deadline <= deadline_to)
+            if deadline_conditions:
+                query = query.where(and_(*deadline_conditions))
                 
         result = await self.session.execute(query)
         count = result.scalar()
@@ -311,11 +344,20 @@ class TaskService:
             title=task_data['title'],
             description=task_data.get('description'),
             type_id=task_data.get('type_id'),
-            status_id=task_data.get('status_id'),
             priority_id=task_data.get('priority_id'),
             duration_id=task_data.get('duration_id')
         )
         logger.debug(f"Created task object: {task}")
+
+        # Устанавливаем статус и проверяем, является ли он финальным
+        if task_data.get('status_id'):
+            status_query = select(StatusSetting).where(StatusSetting.id == task_data['status_id'])
+            status_result = await self.session.execute(status_query)
+            status = status_result.scalar_one_or_none()
+            if status:
+                task.change_status(status)
+            else:
+                task.status_id = task_data.get('status_id')
 
         if task.duration_id:
             logger.debug(f"Task has duration_id {task.duration_id}, calculating deadline")
@@ -368,7 +410,17 @@ class TaskService:
         if 'type_id' in task_data:
             task.type_id = task_data['type_id']
         if 'status_id' in task_data:
-            task.status_id = task_data['status_id']
+            # Получаем новый статус
+            status_query = select(StatusSetting).where(StatusSetting.id == task_data['status_id'])
+            status_result = await self.session.execute(status_query)
+            new_status = status_result.scalar_one_or_none()
+            
+            if new_status:
+                # Используем метод change_status для обновления статуса и completed_at
+                task.change_status(new_status)
+            else:
+                # Если статус не найден, просто обновляем status_id
+                task.status_id = task_data['status_id']
         if 'priority_id' in task_data:
             task.priority_id = task_data['priority_id']
         if 'duration_id' in task_data:

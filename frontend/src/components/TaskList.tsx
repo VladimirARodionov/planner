@@ -164,6 +164,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
             newFilters.deadline_to = deadlineTo.toISOString().split('T')[0];
         }
         
+        // Если не показываем завершенные задачи, устанавливаем is_completed = false
         if (!showCompleted) {
             newFilters.is_completed = false;
         }
