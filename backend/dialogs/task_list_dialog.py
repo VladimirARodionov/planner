@@ -12,8 +12,7 @@ from aiogram_dialog.widgets.kbd import Button, Row, Select, Group, Cancel, Switc
 from aiogram.types import Message, CallbackQuery
 from aiogram_dialog import DialogManager
 from aiogram_dialog.widgets.widget_event import SimpleEventProcessor
-from typing import Any, Dict, List as TypeList, Optional, Callable
-from aiogram_dialog.widgets.common import WhenCondition
+from typing import Any
 
 from backend.locale_config import i18n
 from backend.services.task_service import TaskService
@@ -24,106 +23,7 @@ from backend.dialogs.task_edit_dialog import TaskEditStates
 
 logger = logging.getLogger(__name__)
 
-# Пользовательский класс для списка задач с кнопками
-class TaskList(List):
-    def __init__(
-        self,
-        text_factory: Format,
-        items: str,
-        id: str,
-        edit_button_text: Format,
-        delete_button_text: Format,
-        on_edit_click: Callable,
-        on_delete_click: Callable,
-        sep: str = "\n",
-        page_size: Optional[int] = None,
-        when: WhenCondition = None,
-    ):
-        # Вызываем конструктор базового класса с правильными параметрами
-        super().__init__(
-            field=text_factory,
-            items=items,
-            id=id,
-            sep=sep,
-            page_size=page_size,
-            when=when
-        )
-        self.edit_button_text = edit_button_text
-        self.delete_button_text = delete_button_text
-        self.on_edit_click = on_edit_click
-        self.on_delete_click = on_delete_click
-
-    async def _render_text(self, data: Dict, manager: DialogManager) -> str:
-        """Переопределяем метод _render_text для добавления кнопок к каждому элементу списка"""
-        # Получаем элементы из данных с помощью items_getter
-        items = self.items_getter(data)
-        
-        # Применяем пагинацию, если нужно
-        pages = self._get_page_count(items)
-        if self.page_size is None:
-            current_page = 0
-            start = 0
-        else:
-            last_page = pages - 1
-            current_page = min(last_page, await self.get_page(manager))
-            start = current_page * self.page_size
-            items = items[start:start + self.page_size]
-        
-        if not items:
-            return ""
-        
-        rendered_items = []
-        for pos, item in enumerate(items, start):
-            # Создаем контекст для рендеринга текста элемента
-            item_context = {
-                "current_page": current_page,
-                "current_page1": current_page + 1,
-                "pages": pages,
-                "data": data,
-                "item": item,
-                "pos": pos + 1,
-                "pos0": pos,
-            }
-            
-            # Рендерим текст элемента с помощью field
-            item_text = await self.field.render_text(item_context, manager)
-            
-            # Получаем ID задачи
-            item_id = item["id"]
-            
-            # Форматируем кнопки
-            edit_button = await self.edit_button_text.render_text({"item": item}, manager)
-            delete_button = await self.delete_button_text.render_text({"item": item}, manager)
-            
-            # Добавляем кнопки к тексту задачи
-            buttons = f"\n<a href='edit:{item_id}'>{edit_button}</a> | <a href='delete:{item_id}'>{delete_button}</a>"
-            
-            rendered_items.append(item_text + buttons)
-        
-        return self.sep.join(filter(None, rendered_items))
-    
-    async def process_event(self, event, manager: DialogManager) -> bool:
-        """Обрабатывает события от кнопок в списке задач"""
-        # Сначала проверяем, может ли базовый класс обработать событие
-        if await super().process_event(event, manager):
-            return True
-            
-        if not isinstance(event, CallbackQuery):
-            return False
-            
-        data = event.data
-        
-        if data.startswith("edit:"):
-            item_id = data.split(":", 1)[1]
-            await self.on_edit_click(event, self, manager, item_id)
-            return True
-        
-        if data.startswith("delete:"):
-            item_id = data.split(":", 1)[1]
-            await self.on_delete_click(event, self, manager, item_id)
-            return True
-        
-        return False
+page_size = 5  # Количество задач на странице
 
 # Определяем состояния для диалога списка задач
 class TaskListStates(StatesGroup):
@@ -206,9 +106,7 @@ async def get_tasks_data(dialog_manager: DialogManager, **kwargs):
     
     # Безопасное отображение поискового запроса
     safe_search_query = search_query
-    
-    page_size = 3  # Количество задач на странице
-    
+
     async with get_session() as session:
         task_service = TaskService(session)
         
@@ -617,6 +515,11 @@ async def on_cancel_delete(c: CallbackQuery, button: Button, manager: DialogMana
     """Обработчик отмены удаления задачи"""
     await manager.switch_to(TaskListStates.main)
 
+async def get_delete_confirmation_data(dialog_manager: DialogManager, **kwargs):
+    """Получает данные для экрана подтверждения удаления задачи"""
+    task_id = dialog_manager.dialog_data.get("task_to_delete", "")
+    return {"task_to_delete": task_id}
+
 # Создаем диалог для списка задач
 task_list_dialog = Dialog(
     # Основной экран со списком задач
@@ -642,8 +545,8 @@ task_list_dialog = Dialog(
         # Информация о сортировке, если она есть
         Format(i18n.format_value("task-list-sort-description", {"sort_description": "{sort_description}"}), when=has_sort_and_description),
         
-        # Список задач с использованием пользовательского виджета TaskList
-        TaskList(
+        # Список задач с использованием стандартного виджета List
+        List(
             Format(
                 i18n.format_value("task-list-item", {
                     "title": "{item[title]}",
@@ -658,12 +561,33 @@ task_list_dialog = Dialog(
             ),
             items="tasks",
             id="tasks_list",
-            edit_button_text=Format(i18n.format_value("task-list-edit-button", {"id": "{item[id]}"})),
-            delete_button_text=Format(i18n.format_value("task-list-delete-button", {"id": "{item[id]}"})),
-            on_edit_click=on_edit_task_click,
-            on_delete_click=on_delete_task_click,
             sep="\n\n",
-            page_size=3,
+            page_size=page_size,
+            when=has_tasks
+        ),
+        
+        # Кнопки для каждой задачи
+        Group(
+            Select(
+                Format(i18n.format_value("task-list-edit-button", {"id": "{item[id]}"})),
+                id="edit_task",
+                item_id_getter=lambda x: x["id"],
+                items="tasks",
+                on_click=on_edit_task_click,
+            ),
+            width=page_size,
+            when=has_tasks
+        ),
+        
+        Group(
+            Select(
+                Format(i18n.format_value("task-list-delete-button", {"id": "{item[id]}"})),
+                id="delete_task",
+                item_id_getter=lambda x: x["id"],
+                items="tasks",
+                on_click=on_delete_task_click,
+            ),
+            width=page_size,
             when=has_tasks
         ),
         
@@ -895,5 +819,6 @@ task_list_dialog = Dialog(
             Button(Const(i18n.format_value("task-delete-confirm-no")), id="cancel_delete", on_click=on_cancel_delete),
         ),
         state=TaskListStates.confirm_delete,
+        getter=get_delete_confirmation_data,
     ),
 ) 
