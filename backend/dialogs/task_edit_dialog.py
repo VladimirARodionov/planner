@@ -55,8 +55,8 @@ async def get_task_data(dialog_manager: DialogManager, **kwargs):
             "priority_name": escape_html(task["priority"]["name"]) if task["priority"] else "Не выбран",
             "duration_id": task["duration"]["id"] if task["duration"] else None,
             "duration_name": escape_html(task["duration"]["name"]) if task["duration"] else "Не выбрана",
-            "deadline": task["deadline"].strftime("%Y-%m-%d") if task["deadline"] else None,
-            "deadline_display": task["deadline"].strftime("%d.%m.%Y") if task["deadline"] else "Не установлен",
+            "deadline": task["deadline"] if task["deadline"] else None,
+            "deadline_display": task["deadline"].strftime("%d.%m.%Y") if isinstance(task["deadline"], datetime) else task["deadline"] if task["deadline"] else "Не установлен",
             "completed": task["completed_at"] is not None,
             "completed_at": task["completed_at"].strftime("%d.%m.%Y %H:%M") if task["completed_at"] else None
         }
@@ -65,7 +65,7 @@ async def get_task_data(dialog_manager: DialogManager, **kwargs):
     async with get_session() as session:
         task_service = TaskService(session)
         # Получаем задачу по ID
-        tasks, _ = await task_service.get_tasks(
+        tasks = await task_service.get_tasks(
             str(user_id),
             filters={"id": task_id}
         )
@@ -92,8 +92,8 @@ async def get_task_data(dialog_manager: DialogManager, **kwargs):
             "priority_name": escape_html(task["priority"]["name"]) if task["priority"] else "Не выбран",
             "duration_id": task["duration"]["id"] if task["duration"] else None,
             "duration_name": escape_html(task["duration"]["name"]) if task["duration"] else "Не выбрана",
-            "deadline": task["deadline"].strftime("%Y-%m-%d") if task["deadline"] else None,
-            "deadline_display": task["deadline"].strftime("%d.%m.%Y") if task["deadline"] else "Не установлен",
+            "deadline": task["deadline"] if task["deadline"] else None,
+            "deadline_display": task["deadline"].strftime("%d.%m.%Y") if isinstance(task["deadline"], datetime) else task["deadline"] if task["deadline"] else "Не установлен",
             "completed": task["completed_at"] is not None,
             "completed_at": task["completed_at"].strftime("%d.%m.%Y %H:%M") if task["completed_at"] else None
         }
