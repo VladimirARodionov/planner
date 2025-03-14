@@ -3,12 +3,12 @@ from datetime import timedelta
 
 from aiogram.fsm.state import State, StatesGroup
 from aiogram_dialog import Dialog, Window
-from aiogram_dialog.widgets.text import List
+from aiogram_dialog.widgets.text import List, Format
 from aiogram_dialog.widgets.kbd import NumberedPager, StubScroll
 from aiogram_dialog.widgets.kbd import FirstPage, LastPage, NextPage, PrevPage, CurrentPage
 from aiogram_dialog.widgets.input import TextInput
-from aiogram_dialog.widgets.text import Const, Format
-from aiogram_dialog.widgets.kbd import Button, Row, Select, Group, Cancel, SwitchTo
+from aiogram_dialog.widgets.text import Const
+from aiogram_dialog.widgets.kbd import Button, Row, Select, Group, Cancel, SwitchTo, Start
 from aiogram.types import Message, CallbackQuery
 from aiogram_dialog import DialogManager
 from aiogram_dialog.widgets.widget_event import SimpleEventProcessor
@@ -19,8 +19,11 @@ from backend.services.task_service import TaskService
 from backend.services.settings_service import SettingsService
 from backend.database import get_session
 from backend.utils import escape_html
+from backend.dialogs.task_edit_dialog import TaskEditStates
 
 logger = logging.getLogger(__name__)
+
+page_size = 5  # Количество задач на странице
 
 # Определяем состояния для диалога списка задач
 class TaskListStates(StatesGroup):
@@ -33,6 +36,7 @@ class TaskListStates(StatesGroup):
     filter_completed = State()  # Фильтр по завершенности
     search = State()  # Поиск задач
     sort = State()  # Сортировка задач
+    confirm_delete = State()  # Подтверждение удаления задачи
 
 # Функции-обработчики для условий when
 def has_error(data: dict, widget: Any, manager: DialogManager) -> bool:
@@ -102,9 +106,7 @@ async def get_tasks_data(dialog_manager: DialogManager, **kwargs):
     
     # Безопасное отображение поискового запроса
     safe_search_query = search_query
-    
-    page_size = 3  # Количество задач на странице
-    
+
     async with get_session() as session:
         task_service = TaskService(session)
         
@@ -479,6 +481,45 @@ async def on_page_selected(c: CallbackQuery, button: Any, manager: DialogManager
         logger.warning("Не удалось обновить StubScroll")
     await manager.update(data={})
 
+async def on_edit_task_click(c: CallbackQuery, widget: Any, manager: DialogManager, item_id: str):
+    """Обработчик нажатия на кнопку редактирования задачи"""
+    await manager.start(TaskEditStates.main, data={"task_id": item_id})
+
+async def on_delete_task_click(c: CallbackQuery, widget: Any, manager: DialogManager, item_id: str):
+    """Обработчик нажатия на кнопку удаления задачи"""
+    manager.dialog_data["task_to_delete"] = item_id
+    await manager.switch_to(TaskListStates.confirm_delete)
+
+async def on_confirm_delete(c: CallbackQuery, button: Button, manager: DialogManager):
+    """Обработчик подтверждения удаления задачи"""
+    user_id = str(manager.event.from_user.id)
+    task_id = manager.dialog_data.get("task_to_delete")
+    
+    if not task_id:
+        await c.answer(i18n.format_value("task-delete-error-no-id"))
+        await manager.switch_to(TaskListStates.main)
+        return
+    
+    async with get_session() as session:
+        task_service = TaskService(session)
+        success = await task_service.delete_task(user_id, task_id)
+        
+        if success:
+            await c.answer(i18n.format_value("task-delete-success", {"id": task_id}))
+        else:
+            await c.answer(i18n.format_value("task-delete-error", {"id": task_id}))
+    
+    await manager.switch_to(TaskListStates.main)
+
+async def on_cancel_delete(c: CallbackQuery, button: Button, manager: DialogManager):
+    """Обработчик отмены удаления задачи"""
+    await manager.switch_to(TaskListStates.main)
+
+async def get_delete_confirmation_data(dialog_manager: DialogManager, **kwargs):
+    """Получает данные для экрана подтверждения удаления задачи"""
+    task_id = dialog_manager.dialog_data.get("task_to_delete", "")
+    return {"task_to_delete": task_id}
+
 # Создаем диалог для списка задач
 task_list_dialog = Dialog(
     # Основной экран со списком задач
@@ -504,7 +545,7 @@ task_list_dialog = Dialog(
         # Информация о сортировке, если она есть
         Format(i18n.format_value("task-list-sort-description", {"sort_description": "{sort_description}"}), when=has_sort_and_description),
         
-        # Список задач с использованием виджета List
+        # Список задач с использованием стандартного виджета List
         List(
             Format(
                 i18n.format_value("task-list-item", {
@@ -521,7 +562,32 @@ task_list_dialog = Dialog(
             items="tasks",
             id="tasks_list",
             sep="\n\n",
-            page_size=3,
+            page_size=page_size,
+            when=has_tasks
+        ),
+        
+        # Кнопки для каждой задачи
+        Group(
+            Select(
+                Format(i18n.format_value("task-list-edit-button", {"id": "{item[id]}"})),
+                id="edit_task",
+                item_id_getter=lambda x: x["id"],
+                items="tasks",
+                on_click=on_edit_task_click,
+            ),
+            width=page_size,
+            when=has_tasks
+        ),
+        
+        Group(
+            Select(
+                Format(i18n.format_value("task-list-delete-button", {"id": "{item[id]}"})),
+                id="delete_task",
+                item_id_getter=lambda x: x["id"],
+                items="tasks",
+                on_click=on_delete_task_click,
+            ),
+            width=page_size,
             when=has_tasks
         ),
         
@@ -742,5 +808,17 @@ task_list_dialog = Dialog(
             SwitchTo(Const(i18n.format_value("task-list-search-cancel")), id="back_to_main", state=TaskListStates.main),
         ),
         state=TaskListStates.search,
+    ),
+    
+    # Экран подтверждения удаления задачи
+    Window(
+        Const(i18n.format_value("task-delete-confirm-title")),
+        Format(i18n.format_value("task-delete-confirm-text", {"id": "{task_to_delete}"})),
+        Row(
+            Button(Const(i18n.format_value("task-delete-confirm-yes")), id="confirm_delete", on_click=on_confirm_delete),
+            Button(Const(i18n.format_value("task-delete-confirm-no")), id="cancel_delete", on_click=on_cancel_delete),
+        ),
+        state=TaskListStates.confirm_delete,
+        getter=get_delete_confirmation_data,
     ),
 ) 
