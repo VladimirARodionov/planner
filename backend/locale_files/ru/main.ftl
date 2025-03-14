@@ -179,3 +179,51 @@ deadline-not-set = Не указан
 type-not-set = Не указан
 
 stop_menu = Остановить бота
+
+# Строки для диалога редактирования задачи
+task-edit-title = 🔄 Редактирование задачи
+task-edit-error = Ошибка: {$error}
+task-edit-details = 
+    <b>Задача:</b> {$title}
+    <b>Описание:</b> {$description}
+    <b>Тип:</b> {$type_name}
+    <b>Статус:</b> {$status_name}
+    <b>Приоритет:</b> {$priority_name}
+    <b>Продолжительность:</b> {$duration_name}
+    <b>Дедлайн:</b> {$deadline_display}
+    <b>Завершена:</b> {$completed}
+    {$completed_at ->
+        [null] {}
+        *[other] <b>Дата завершения:</b> {$completed_at}
+    }
+
+task-edit-button-title = ✏️ Заголовок
+task-edit-button-description = 📝 Описание
+task-edit-button-type = 🏷️ Тип
+task-edit-button-status = 📊 Статус
+task-edit-button-priority = ⚡ Приоритет
+task-edit-button-duration = ⏱️ Продолжительность
+task-edit-button-deadline = 📅 Дедлайн
+task-edit-button-mark-completed = ✅ Отметить как выполненную
+task-edit-button-mark-uncompleted = ❌ Отметить как невыполненную
+task-edit-button-save = 💾 Сохранить изменения
+task-edit-button-cancel = 🔙 Отмена
+task-edit-button-back = 🔙 Назад
+task-edit-button-clear = ❌ Не выбирать
+task-edit-button-clear-deadline = ❌ Убрать дедлайн
+
+task-edit-title-prompt = ✏️ Введите новый заголовок задачи:
+task-edit-description-prompt = 📝 Введите новое описание задачи:
+task-edit-description-hint = (Введите '-' чтобы удалить описание)
+task-edit-type-prompt = 🏷️ Выберите тип задачи:
+task-edit-status-prompt = 📊 Выберите статус задачи:
+task-edit-priority-prompt = ⚡ Выберите приоритет задачи:
+task-edit-duration-prompt = ⏱️ Выберите продолжительность задачи:
+task-edit-deadline-prompt = 📅 Выберите дедлайн задачи:
+
+task-edit-success = Задача успешно обновлена!
+task-edit-error-update = Не удалось обновить задачу
+task-edit-error-generic = Ошибка: {$error}
+
+# Кнопка редактирования в списке задач
+task-list-edit-button = ✏️ Редактировать #{$id}

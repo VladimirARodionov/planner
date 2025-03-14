@@ -8,7 +8,7 @@ from aiogram_dialog.widgets.kbd import NumberedPager, StubScroll
 from aiogram_dialog.widgets.kbd import FirstPage, LastPage, NextPage, PrevPage, CurrentPage
 from aiogram_dialog.widgets.input import TextInput
 from aiogram_dialog.widgets.text import Const, Format
-from aiogram_dialog.widgets.kbd import Button, Row, Select, Group, Cancel, SwitchTo
+from aiogram_dialog.widgets.kbd import Button, Row, Select, Group, Cancel, SwitchTo, Start
 from aiogram.types import Message, CallbackQuery
 from aiogram_dialog import DialogManager
 from aiogram_dialog.widgets.widget_event import SimpleEventProcessor
@@ -19,6 +19,7 @@ from backend.services.task_service import TaskService
 from backend.services.settings_service import SettingsService
 from backend.database import get_session
 from backend.utils import escape_html
+from backend.dialogs.task_edit_dialog import TaskEditStates
 
 logger = logging.getLogger(__name__)
 
@@ -479,6 +480,10 @@ async def on_page_selected(c: CallbackQuery, button: Any, manager: DialogManager
         logger.warning("Не удалось обновить StubScroll")
     await manager.update(data={})
 
+async def on_task_selected(c: CallbackQuery, widget: Any, manager: DialogManager, item_id: str):
+    """Обработчик выбора задачи для редактирования"""
+    await manager.start(TaskEditStates.main, data={"task_id": item_id})
+
 # Создаем диалог для списка задач
 task_list_dialog = Dialog(
     # Основной экран со списком задач
@@ -522,6 +527,19 @@ task_list_dialog = Dialog(
             id="tasks_list",
             sep="\n\n",
             page_size=3,
+            when=has_tasks
+        ),
+        
+        # Кнопки редактирования для каждой задачи
+        Group(
+            Select(
+                Format("✏️ Редактировать #{item[id]}"),
+                id="edit_task",
+                item_id_getter=lambda x: x["id"],
+                items="tasks",
+                on_click=on_task_selected,
+            ),
+            width=1,
             when=has_tasks
         ),
         
