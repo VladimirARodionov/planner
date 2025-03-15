@@ -345,7 +345,8 @@ class TaskService:
             description=task_data.get('description'),
             type_id=task_data.get('type_id'),
             priority_id=task_data.get('priority_id'),
-            duration_id=task_data.get('duration_id')
+            duration_id=task_data.get('duration_id'),
+            deadline=task_data.get('deadline')
         )
         logger.debug(f"Created task object: {task}")
 
@@ -359,7 +360,7 @@ class TaskService:
             else:
                 task.status_id = task_data.get('status_id')
 
-        if task.duration_id:
+        if task.duration_id and not task.deadline:
             logger.debug(f"Task has duration_id {task.duration_id}, calculating deadline")
             duration = await self.session.get(DurationSetting, task.duration_id)
             if duration:
@@ -367,6 +368,8 @@ class TaskService:
                 logger.debug(f"Calculated deadline: {task.deadline}")
             else:
                 logger.warning(f"Duration {task.duration_id} not found")
+        elif task.deadline:
+            logger.debug(f"Using manually set deadline: {task.deadline}")
 
         logger.debug("Adding task to session")
         self.session.add(task)
@@ -423,11 +426,19 @@ class TaskService:
                 task.status_id = task_data['status_id']
         if 'priority_id' in task_data:
             task.priority_id = task_data['priority_id']
+        if 'completed_at' in task_data:
+            task.completed_at = task_data['completed_at']
+        if 'deadline' in task_data:
+            task.deadline = task_data['deadline']
+            logger.debug(f"Manually updating deadline to: {task.deadline}")
         if 'duration_id' in task_data:
             task.duration_id = task_data['duration_id']
-            duration = await self.session.get(DurationSetting, task.duration_id)
-            if duration:
-                task.deadline = await duration.calculate_deadline_async(self.session)
+            # Вычисляем дедлайн на основе продолжительности только если дедлайн не задан вручную
+            if task.duration_id and 'deadline' not in task_data:
+                duration = await self.session.get(DurationSetting, task.duration_id)
+                if duration:
+                    task.deadline = await duration.calculate_deadline_async(self.session)
+                    logger.debug(f"Calculated deadline based on duration: {task.deadline}")
         self.session.add(task)
         await self.session.commit()
         await self.session.refresh(task)
