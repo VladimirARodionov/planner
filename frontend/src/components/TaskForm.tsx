@@ -90,6 +90,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 
                 const deadlineDate = task.deadline_iso ? new Date(task.deadline_iso) : (task.deadline ? new Date(task.deadline) : null);
                 
+                // Определяем, является ли задача завершенной на основе completed_at или статуса
+                const isCompleted = !!(task.completed || 
+                                    task.completed_at || 
+                                    (task.status && task.status.is_final));
+                
                 setFormData({
                     title: task.title,
                     description: task.description || '',
@@ -98,7 +103,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                     priority_id: priorityId,
                     duration_id: durationId,
                     deadline: deadlineDate,
-                    completed: task.completed || false
+                    completed: !!isCompleted
                 });
                 
                 // Синхронизируем selectedDate с deadline
@@ -112,7 +117,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                     priority_id: priorityId,
                     duration_id: durationId,
                     deadline: deadlineDate,
-                    completed: task.completed || false
+                    completed: !!isCompleted
                 });
             } else {
                 setFormData({
@@ -173,6 +178,14 @@ export const TaskForm: React.FC<TaskFormProps> = ({
             ...formData,
             [field]: newValue
         };
+        
+        // Если изменился статус, проверяем, является ли он финальным
+        if (field === 'status_id' && newValue !== '') {
+            const selectedStatus = statuses.find(status => status.id === Number(newValue));
+            if (selectedStatus) {
+                updatedFormData.completed = selectedStatus.is_final;
+            }
+        }
         
         // Сразу устанавливаем обновленные данные формы
         setFormData(updatedFormData);
@@ -548,7 +561,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                                     control={
                                         <Checkbox
                                             name="completed"
-                                            checked={!!formData.completed}
+                                            checked={formData.completed}
                                             onChange={(e) => {
                                                 const target = e.target as HTMLInputElement;
                                                 setFormData({

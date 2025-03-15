@@ -222,22 +222,22 @@ export const TasksAPI = {
 
     // Приоритеты
     getPriorities: async () => {
-        const response = await api.get<Priority[]>('/settings/priorities');
+        const response = await api.get<Priority[]>('/settings/priority/');
         return response.data;
     },
 
     createPriority: async (priority: { name: string; color: string; position?: number; is_active?: boolean; is_default?: boolean }) => {
-        const response = await api.post<Priority>('/settings/priorities', priority);
+        const response = await api.post<Priority>('/settings/priority/', priority);
         return response.data;
     },
 
     updatePriority: async (id: number, priority: { name?: string; color?: string; position?: number; is_active?: boolean; is_default?: boolean }) => {
-        const response = await api.put<Priority>(`/settings/priorities/${id}`, priority);
+        const response = await api.put<Priority>(`/settings/priority/${id}`, priority);
         return response.data;
     },
 
     deletePriority: async (id: number) => {
-        await api.delete(`/settings/priorities/${id}`);
+        await api.delete(`/settings/priority/${id}`);
     },
 
     createDuration: async (duration: {

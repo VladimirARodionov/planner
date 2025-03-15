@@ -502,3 +502,55 @@ async def calculate_deadline(duration_id):
         except Exception as e:
             logger.error(f"Error calculating deadline: {e}")
             return jsonify({'error': str(e)}), 500
+
+@bp.route('/api/settings/priority/', methods=['GET', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+@async_route
+async def get_priorities():
+    """Получить список приоритетов пользователя"""
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    current_user = get_jwt_identity()
+    logger.debug(f"Получение приоритетов для пользователя {current_user}")
+    
+    async with get_session() as session:
+        settings_service = SettingsService(session)
+        priorities = await settings_service.get_priorities(current_user)
+        logger.debug(f"Найдено {len(priorities)} приоритетов")
+        return jsonify(priorities)
+
+
+@bp.route('/api/settings/status/', methods=['GET', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+@async_route
+async def get_statuses():
+    """Получить список статусов пользователя"""
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    current_user = get_jwt_identity()
+    
+    async with get_session() as session:
+        settings_service = SettingsService(session)
+        statuses = await settings_service.get_statuses(current_user)
+        return jsonify(statuses)
+
+
+@bp.route('/api/settings/duration/', methods=['GET', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+@async_route
+async def get_durations():
+    """Получить список длительностей пользователя"""
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    current_user = get_jwt_identity()
+    
+    async with get_session() as session:
+        settings_service = SettingsService(session)
+        durations = await settings_service.get_durations(current_user)
+        return jsonify(durations)
