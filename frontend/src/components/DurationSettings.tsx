@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Duration, DurationType } from '../types/task';
 import { TasksAPI } from '../api/tasks';
 import {
@@ -25,6 +26,7 @@ import {
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 
 export const DurationSettings: React.FC = () => {
+    const { t } = useTranslation();
     const [durations, setDurations] = useState<Duration[]>([]);
     const [open, setOpen] = useState(false);
     const [editingDuration, setEditingDuration] = useState<Duration | null>(null);
@@ -42,19 +44,19 @@ export const DurationSettings: React.FC = () => {
             case DurationType.DAYS:
             case "DAYS":
             case "days":
-                return 'дней';
+                return t('duration_types.days');
             case DurationType.WEEKS:
             case "WEEKS":
             case "weeks":
-                return 'недель';
+                return t('duration_types.weeks');
             case DurationType.MONTHS:
             case "MONTHS":
             case "months":
-                return 'месяцев';
+                return t('duration_types.months');
             case DurationType.YEARS:
             case "YEARS":
             case "years":
-                return 'лет';
+                return t('duration_types.years');
             default:
                 return String(type);
         }
@@ -175,7 +177,7 @@ export const DurationSettings: React.FC = () => {
     };
 
     const handleDelete = async (id: number) => {
-        if (window.confirm('Вы уверены, что хотите удалить эту длительность?')) {
+        if (window.confirm(t('settings.delete_confirmation'))) {
             try {
                 await TasksAPI.deleteDuration(id);
                 loadDurations();
@@ -188,14 +190,14 @@ export const DurationSettings: React.FC = () => {
     return (
         <Box>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">Длительности</Typography>
+                <Typography variant="h6">{t('settings.durations')}</Typography>
                 <Button
                     variant="contained"
                     color="primary"
                     startIcon={<AddIcon />}
                     onClick={() => handleOpen()}
                 >
-                    Добавить длительность
+                    {t('settings.add_duration')}
                 </Button>
             </Box>
 
@@ -235,25 +237,25 @@ export const DurationSettings: React.FC = () => {
 
             <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
                 <DialogTitle>
-                    {editingDuration ? 'Редактировать длительность' : 'Новая длительность'}
+                    {editingDuration ? t('settings.edit_duration') : t('settings.add_duration')}
                 </DialogTitle>
                 <DialogContent>
                     <Box display="flex" flexDirection="column" gap={2} mt={2}>
                         <TextField
-                            label="Название"
+                            label={t('settings.name')}
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             fullWidth
                         />
                         <FormControl fullWidth>
-                            <InputLabel>Тип</InputLabel>
+                            <InputLabel>{t('tasks.type')}</InputLabel>
                             <Select
                                 value={formData.type}
                                 onChange={(e) => {
                                     console.log('Selected type:', e.target.value);
                                     setFormData({ ...formData, type: e.target.value as DurationType });
                                 }}
-                                label="Тип"
+                                label={t('tasks.type')}
                             >
                                 <MenuItem key={DurationType.DAYS} value={DurationType.DAYS}>
                                     {getDurationTypeLabel(DurationType.DAYS)} ({DurationType.DAYS})
@@ -270,7 +272,7 @@ export const DurationSettings: React.FC = () => {
                             </Select>
                         </FormControl>
                         <TextField
-                            label="Значение"
+                            label={t('settings.value')}
                             type="number"
                             value={formData.value}
                             onChange={(e) => setFormData({ ...formData, value: parseInt(e.target.value) })}
@@ -283,7 +285,7 @@ export const DurationSettings: React.FC = () => {
                                     onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })}
                                 />
                             }
-                            label="По умолчанию"
+                            label={t('common.default')}
                         />
                         <FormControlLabel
                             control={
@@ -292,14 +294,14 @@ export const DurationSettings: React.FC = () => {
                                     onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                                 />
                             }
-                            label="Активен"
+                            label={t('common.active')}
                         />
                     </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleClose}>Отмена</Button>
+                    <Button onClick={handleClose}>{t('common.cancel')}</Button>
                     <Button onClick={handleSubmit} variant="contained" color="primary">
-                        {editingDuration ? 'Сохранить' : 'Создать'}
+                        {editingDuration ? t('common.save') : t('common.create')}
                     </Button>
                 </DialogActions>
             </Dialog>

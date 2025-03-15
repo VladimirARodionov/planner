@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { 
   Drawer, 
   List, 
@@ -28,14 +29,15 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onOpen }) => {
+  const { t } = useTranslation();
   const location = useLocation();
   const drawerWidth = 240;
 
   // Определение списка пунктов меню с абсолютными путями
   const menuItems = [
-    { title: 'Список задач', path: '/', icon: <ListIcon /> },
-    { title: 'Настройки', path: '/settings', icon: <SettingsIcon /> },
-    { title: 'О приложении', path: '/about', icon: <InfoIcon /> }
+    { title: t('sidebar.task_list'), path: '/', icon: <ListIcon /> },
+    { title: t('sidebar.settings'), path: '/settings', icon: <SettingsIcon /> },
+    { title: t('sidebar.about'), path: '/about', icon: <InfoIcon /> }
   ];
 
   // Кнопка открытия меню (показывается, когда меню закрыто)
@@ -72,7 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onOpen }) => {
       >
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1 }}>
           <Typography variant="h6" sx={{ pl: 1 }}>
-            Планировщик
+            {t('common.app_name')}
           </Typography>
           <IconButton onClick={onClose}>
             <ChevronLeftIcon />

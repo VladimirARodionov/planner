@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { TasksAPI, PaginationParams, TaskFilters, PaginatedResponse } from '../api/tasks';
 import { Task, Status, Priority, TaskType } from '../types/task';
 import TaskItem from './TaskItem';
@@ -39,6 +40,7 @@ interface TaskListProps {
 }
 
 export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }) => {
+    const { t, i18n } = useTranslation();
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [taskData, setTaskData] = useState<PaginatedResponse | null>(null);
@@ -104,11 +106,11 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
             setError(null);
         } catch (err) {
             console.error('Error fetching tasks:', err);
-            setError('Не удалось загрузить задачи. Пожалуйста, попробуйте позже.');
+            setError(t('tasks.error_loading'));
         } finally {
             setLoading(false);
         }
-    }, [pagination, searchQuery, sortField, sortDirection, filters]);
+    }, [pagination, searchQuery, sortField, sortDirection, filters, t]);
     
     // Единый useEffect для инициализации и обработки событий
     useEffect(() => {
@@ -287,7 +289,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
         <Box>
             <Box mb={3}>
                 <Typography variant="h5" component="h2" gutterBottom>
-                    Список задач
+                    {t('tasks.task_list')}
                 </Typography>
                 
                 {/* Поиск */}
@@ -295,7 +297,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
                     <Grid item xs={12} sm={6} md={4}>
                         <TextField
                             fullWidth
-                            label="Поиск"
+                            label={t('common.search')}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -307,7 +309,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
                             variant="contained" 
                             onClick={handleSearch}
                         >
-                            Найти
+                            {t('common.find')}
                         </Button>
                     </Grid>
                 </Grid>
@@ -321,7 +323,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
                     >
                         <Box display="flex" alignItems="center">
                             <FilterListIcon sx={{ mr: 1 }} />
-                            <Typography>Фильтры</Typography>
+                            <Typography>{t('common.filters')}</Typography>
                         </Box>
                     </AccordionSummary>
                     <AccordionDetails>
@@ -329,16 +331,16 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
                             {/* Фильтр по статусу */}
                             <Grid item xs={12} sm={6} md={3}>
                                 <FormControl fullWidth>
-                                    <InputLabel id="status-filter-label">Статус</InputLabel>
+                                    <InputLabel id="status-filter-label">{t('tasks.status')}</InputLabel>
                                     <Select
                                         labelId="status-filter-label"
                                         id="status-filter"
                                         value={selectedStatus}
-                                        label="Статус"
+                                        label={t('tasks.status')}
                                         onChange={(e) => setSelectedStatus(e.target.value as number)}
                                     >
                                         <MenuItem value="">
-                                            <em>Все статусы</em>
+                                            <em>{t('tasks.all_statuses')}</em>
                                         </MenuItem>
                                         {statuses.map((status) => (
                                             <MenuItem key={status.id} value={status.id}>
@@ -361,16 +363,16 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
                             {/* Фильтр по приоритету */}
                             <Grid item xs={12} sm={6} md={3}>
                                 <FormControl fullWidth>
-                                    <InputLabel id="priority-filter-label">Приоритет</InputLabel>
+                                    <InputLabel id="priority-filter-label">{t('tasks.priority')}</InputLabel>
                                     <Select
                                         labelId="priority-filter-label"
                                         id="priority-filter"
                                         value={selectedPriority}
-                                        label="Приоритет"
+                                        label={t('tasks.priority')}
                                         onChange={(e) => setSelectedPriority(e.target.value as number)}
                                     >
                                         <MenuItem value="">
-                                            <em>Все приоритеты</em>
+                                            <em>{t('tasks.all_priorities')}</em>
                                         </MenuItem>
                                         {priorities.map((priority) => (
                                             <MenuItem key={priority.id} value={priority.id}>
@@ -393,16 +395,16 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
                             {/* Фильтр по типу задачи */}
                             <Grid item xs={12} sm={6} md={3}>
                                 <FormControl fullWidth>
-                                    <InputLabel id="type-filter-label">Тип задачи</InputLabel>
+                                    <InputLabel id="type-filter-label">{t('tasks.type')}</InputLabel>
                                     <Select
                                         labelId="type-filter-label"
                                         id="type-filter"
                                         value={selectedType}
-                                        label="Тип задачи"
+                                        label={t('tasks.type')}
                                         onChange={(e) => setSelectedType(e.target.value as number)}
                                     >
                                         <MenuItem value="">
-                                            <em>Все типы</em>
+                                            <em>{t('tasks.all_types')}</em>
                                         </MenuItem>
                                         {taskTypes.map((type) => (
                                             <MenuItem key={type.id} value={type.id}>
@@ -433,15 +435,15 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
                                             onChange={(e) => setShowCompleted(e.target.checked)}
                                         />
                                     }
-                                    label="Показывать завершенные"
+                                    label={t('common.show_completed')}
                                 />
                             </Grid>
                             
                             {/* Фильтр по дедлайну */}
                             <Grid item xs={12} sm={6} md={3}>
-                                <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ru}>
+                                <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={i18n.language === 'ru' ? ru : undefined}>
                                     <DatePicker
-                                        label="Дедлайн от"
+                                        label={t('tasks.deadline_from')}
                                         value={deadlineFrom}
                                         onChange={(date: Date | null) => setDeadlineFrom(date)}
                                         slotProps={{ textField: { fullWidth: true } }}
@@ -450,9 +452,9 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
                             </Grid>
                             
                             <Grid item xs={12} sm={6} md={3}>
-                                <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ru}>
+                                <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={i18n.language === 'ru' ? ru : undefined}>
                                     <DatePicker
-                                        label="Дедлайн до"
+                                        label={t('tasks.deadline_to')}
                                         value={deadlineTo}
                                         onChange={(date: Date | null) => setDeadlineTo(date)}
                                         slotProps={{ textField: { fullWidth: true } }}
@@ -463,38 +465,38 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
                             {/* Сортировка */}
                             <Grid item xs={12} sm={6} md={3}>
                                 <FormControl fullWidth>
-                                    <InputLabel id="sort-field-label">Сортировка</InputLabel>
+                                    <InputLabel id="sort-field-label">{t('tasks.sort.sort_by')}</InputLabel>
                                     <Select
                                         labelId="sort-field-label"
                                         id="sort-field"
                                         value={sortField}
-                                        label="Сортировка"
+                                        label={t('tasks.sort.sort_by')}
                                         onChange={(e) => setSortField(e.target.value)}
                                     >
                                         <MenuItem value="">
-                                            <em>Без сортировки</em>
+                                            <em>{t('tasks.sort.no_sort')}</em>
                                         </MenuItem>
-                                        <MenuItem value="title">По названию</MenuItem>
-                                        <MenuItem value="deadline">По дедлайну</MenuItem>
-                                        <MenuItem value="priority">По приоритету</MenuItem>
-                                        <MenuItem value="status">По статусу</MenuItem>
-                                        <MenuItem value="created_at">По дате создания</MenuItem>
+                                        <MenuItem value="title">{t('tasks.sort.by_title')}</MenuItem>
+                                        <MenuItem value="deadline">{t('tasks.sort.by_deadline')}</MenuItem>
+                                        <MenuItem value="priority">{t('tasks.sort.by_priority')}</MenuItem>
+                                        <MenuItem value="status">{t('tasks.sort.by_status')}</MenuItem>
+                                        <MenuItem value="created_at">{t('tasks.sort.by_created_date')}</MenuItem>
                                     </Select>
                                 </FormControl>
                             </Grid>
                             
                             <Grid item xs={12} sm={6} md={3}>
                                 <FormControl fullWidth disabled={!sortField}>
-                                    <InputLabel id="sort-direction-label">Направление</InputLabel>
+                                    <InputLabel id="sort-direction-label">{t('tasks.sort.direction')}</InputLabel>
                                     <Select
                                         labelId="sort-direction-label"
                                         id="sort-direction"
                                         value={sortDirection}
-                                        label="Направление"
+                                        label={t('tasks.sort.direction')}
                                         onChange={(e) => setSortDirection(e.target.value as 'asc' | 'desc')}
                                     >
-                                        <MenuItem value="asc">По возрастанию</MenuItem>
-                                        <MenuItem value="desc">По убыванию</MenuItem>
+                                        <MenuItem value="asc">{t('tasks.sort.ascending')}</MenuItem>
+                                        <MenuItem value="desc">{t('tasks.sort.descending')}</MenuItem>
                                     </Select>
                                 </FormControl>
                             </Grid>
@@ -507,7 +509,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
                                         onClick={handleClearFilters}
                                         startIcon={<ClearIcon />}
                                     >
-                                        Сбросить все
+                                        {t('common.reset')}
                                     </Button>
                                     <Button 
                                         variant="contained" 
@@ -517,7 +519,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
                                         }}
                                         startIcon={<FilterListIcon />}
                                     >
-                                        Применить
+                                        {t('common.apply')}
                                     </Button>
                                 </Box>
                             </Grid>
@@ -529,7 +531,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
                 {activeFilters.length > 0 && (
                     <Box mt={2} mb={2}>
                         <Typography variant="subtitle2" gutterBottom>
-                            Активные фильтры:
+                            {t('tasks.active_filters')}:
                         </Typography>
                         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                             {activeFilters.map((filter, index) => (
@@ -570,7 +572,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
                     </Box>
                 </>
             ) : (
-                <Typography align="center">Задачи не найдены</Typography>
+                <Typography align="center">{t('tasks.no_tasks')}</Typography>
             )}
         </Box>
     );

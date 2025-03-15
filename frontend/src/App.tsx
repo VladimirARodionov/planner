@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { TaskList } from './components/TaskList';
 import { TaskForm } from './components/TaskForm';
-import { LoginForm } from './components/LoginForm';
+import LoginForm from './components/LoginForm';
 import { Sidebar } from './components/Sidebar';
 import { SettingsPage } from './pages/SettingsPage';
 import { AboutPage } from './pages/AboutPage';
 import TelegramCallback from './components/TelegramCallback';
 import { Task } from './types/task';
 import { TasksAPI, CreateTaskDto, UpdateTaskDto } from './api/tasks';
+import { useTranslation } from 'react-i18next';
+import { LanguageSwitcher } from './components/LanguageSwitcher';
 import {
     AppBar,
     Box,
@@ -33,6 +35,7 @@ const ProtectedRoute: React.FC<{ element: React.ReactNode }> = ({ element }) => 
 
 // Компонент макета для авторизованного пользователя
 const AppLayout: React.FC = () => {
+    const { t } = useTranslation();
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const [isMenuOpen, setIsMenuOpen] = useState(!isMobile);
@@ -165,18 +168,20 @@ const AppLayout: React.FC = () => {
                         onOpen={handleToggleMenu} 
                     />
                     <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                        Планировщик задач
+                        {t('common.app_name')}
                     </Typography>
                     <IconButton
                         color="inherit"
                         aria-label="create task"
                         onClick={handleCreateTask}
                         sx={{ mr: 2 }}
+                        title={t('tasks.new_task')}
                     >
                         <AddIcon />
                     </IconButton>
+                    <LanguageSwitcher />
                     <Button color="inherit" onClick={handleLogout}>
-                        Выйти
+                        {t('common.logout')}
                     </Button>
                 </Toolbar>
             </AppBar>

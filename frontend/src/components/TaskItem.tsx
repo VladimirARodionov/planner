@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Task, DurationType } from '../types/task';
 import { TasksAPI } from '../api/tasks';
 import { Box, Typography, Chip, IconButton, Card, CardContent, CardActions } from '@mui/material';
@@ -10,8 +11,10 @@ interface TaskItemProps {
     onEditTask?: (task: Task) => void;
  }
 const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask }) => {
+    const { t } = useTranslation();
+    
     const handleDelete = async () => {
-        if (window.confirm(`Вы уверены, что хотите удалить задачу "${task.title}"?`)) {
+        if (window.confirm(t('tasks.delete_confirmation', { title: task.title }))) {
             try {
                 await TasksAPI.deleteTask(task.id);
                 
@@ -25,7 +28,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask }) 
                 window.dispatchEvent(new Event('refresh-tasks'));
             } catch (error) {
                 console.error('Error deleting task:', error);
-                alert('Не удалось удалить задачу. Пожалуйста, попробуйте позже.');
+                alert(t('tasks.delete_error'));
             }
         }
     };
@@ -47,7 +50,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask }) 
     const formatDate = (dateString: string) => {
         // Проверяем, в ISO формате ли строка (содержит T и, возможно, символ Z)
         if (dateString.includes('T')) {
-            return new Date(dateString).toLocaleDateString('ru-RU', {
+            return new Date(dateString).toLocaleDateString(t('locale_code'), {
                 day: '2-digit',
                 month: '2-digit',
                 year: 'numeric'
@@ -62,19 +65,19 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask }) 
             case DurationType.DAYS:
             case "DAYS":
             case "days":
-                return 'дней';
+                return t('duration_types.days');
             case DurationType.WEEKS:
             case "WEEKS":
             case "weeks":
-                return 'недель';
+                return t('duration_types.weeks');
             case DurationType.MONTHS:
             case "MONTHS":
             case "months":
-                return 'месяцев';
+                return t('duration_types.months');
             case DurationType.YEARS:
             case "YEARS":
             case "years":
-                return 'лет';
+                return t('duration_types.years');
             default:
                 return String(type);
         }
@@ -130,24 +133,24 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask }) 
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                     {task.deadline && (
                         <Typography variant="body2" color={task.is_overdue ? "error" : "text.secondary"}>
-                            Срок: {formatDate(task.deadline)}
-                            {task.is_overdue && " (просрочено)"}
+                            {t('tasks.deadline')}: {formatDate(task.deadline)}
+                            {task.is_overdue && ` (${t('tasks.overdue')})`}
                         </Typography>
                     )}
                     
                     {task.duration && (
                         <Typography variant="body2" color="text.secondary">
-                            Длительность: {task.duration.name} ({task.duration.value} {getDurationTypeLabel(task.duration.type || task.duration.duration_type || '')})
+                            {t('tasks.duration')}: {task.duration.name} ({task.duration.value} {getDurationTypeLabel(task.duration.type || task.duration.duration_type || '')})
                         </Typography>
                     )}
                     
                     <Typography variant="body2" color="text.secondary">
-                        Создано: {formatDate(task.created_at)}
+                        {t('tasks.created')}: {formatDate(task.created_at)}
                     </Typography>
                     
                     {task.completed_at && (
                         <Typography variant="body2" color="text.secondary">
-                            Завершено: {formatDate(task.completed_at)}
+                            {t('tasks.completed')}: {formatDate(task.completed_at)}
                         </Typography>
                     )}
                 </Box>
@@ -158,10 +161,16 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask }) 
                     size="small" 
                     color="primary" 
                     onClick={handleEdit}
+                    title={t('common.edit')}
                 >
                     <EditIcon />
                 </IconButton>
-                <IconButton size="small" color="error" onClick={handleDelete}>
+                <IconButton 
+                    size="small" 
+                    color="error" 
+                    onClick={handleDelete}
+                    title={t('common.delete')}
+                >
                     <DeleteIcon />
                 </IconButton>
             </CardActions>

@@ -5,6 +5,9 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { App } from './App';
 import { theme } from './theme';
 
+// Импортируем конфигурацию i18n до рендеринга приложения
+import './i18n';
+
 const root = ReactDOM.createRoot(
     document.getElementById('root') as HTMLElement
 );

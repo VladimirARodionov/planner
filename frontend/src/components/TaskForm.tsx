@@ -14,18 +14,26 @@ import {
     Select,
     MenuItem,
     Typography,
-    SelectChangeEvent
+    SelectChangeEvent,
+    Grid,
+    FormControlLabel,
+    Checkbox,
+    useMediaQuery,
+    Theme,
+    CircularProgress
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import ruLocale from 'date-fns/locale/ru';
+import { ru } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
 
 interface TaskFormProps {
     open: boolean;
     onClose: () => void;
     task?: Task;
     onSubmit: (task: CreateTaskDto | UpdateTaskDto) => void;
+    isEditing?: boolean;
 }
 
 type FormData = {
@@ -36,14 +44,19 @@ type FormData = {
     priority_id: number | '';
     duration_id: number | '';
     deadline: Date | null;
+    completed: boolean;
+    completed_at?: string | null;
 };
 
 export const TaskForm: React.FC<TaskFormProps> = ({
     open,
     onClose,
     task,
-    onSubmit
+    onSubmit,
+    isEditing = false
 }) => {
+    const { t, i18n } = useTranslation();
+    const isSmallScreen = useMediaQuery((theme: Theme) => theme.breakpoints.down('sm'));
     const [formData, setFormData] = useState<FormData>({
         title: '',
         description: '',
@@ -51,7 +64,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         status_id: '',
         priority_id: '',
         duration_id: '',
-        deadline: null
+        deadline: null,
+        completed: false
     });
     const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
     const [statuses, setStatuses] = useState<Status[]>([]);
@@ -60,6 +74,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
     const [loading, setLoading] = useState(false);
     const [calculatingDeadline, setCalculatingDeadline] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
     useEffect(() => {
         if (open) {
@@ -73,6 +88,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 const priorityId = task.priority && task.priority.id ? task.priority.id : '';
                 const durationId = task.duration && task.duration.id ? task.duration.id : '';
                 
+                const deadlineDate = task.deadline_iso ? new Date(task.deadline_iso) : (task.deadline ? new Date(task.deadline) : null);
+                
                 setFormData({
                     title: task.title,
                     description: task.description || '',
@@ -80,8 +97,12 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                     status_id: statusId,
                     priority_id: priorityId,
                     duration_id: durationId,
-                    deadline: task.deadline_iso ? new Date(task.deadline_iso) : (task.deadline ? new Date(task.deadline) : null)
+                    deadline: deadlineDate,
+                    completed: task.completed || false
                 });
+                
+                // Синхронизируем selectedDate с deadline
+                setSelectedDate(deadlineDate);
                 
                 console.log('Form data after set:', {
                     title: task.title,
@@ -90,7 +111,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                     status_id: statusId,
                     priority_id: priorityId,
                     duration_id: durationId,
-                    deadline: task.deadline_iso ? new Date(task.deadline_iso) : (task.deadline ? new Date(task.deadline) : null)
+                    deadline: deadlineDate,
+                    completed: task.completed || false
                 });
             } else {
                 setFormData({
@@ -100,8 +122,10 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                     status_id: '',
                     priority_id: '',
                     duration_id: '',
-                    deadline: null
+                    deadline: null,
+                    completed: false
                 });
+                setSelectedDate(null);
             }
         }
     }, [open, task]);
@@ -137,10 +161,12 @@ export const TaskForm: React.FC<TaskFormProps> = ({
     };
 
     const handleSelectChange = async (
-        event: SelectChangeEvent<number | ''>,
-        field: 'status_id' | 'priority_id' | 'duration_id'
+        event: SelectChangeEvent<number | string | ''>,
+        field: 'status_id' | 'priority_id' | 'duration_id' | 'type_id'
     ) => {
         const newValue = event.target.value;
+        
+        console.log(`Select changed: ${field} = ${newValue}, type: ${typeof newValue}`);
         
         // Обновляем форму с новым значением
         const updatedFormData = {
@@ -154,11 +180,17 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         // Если выбрана длительность, автоматически рассчитываем дедлайн
         if (field === 'duration_id' && newValue !== '') {
             try {
+                console.log(`Calculating deadline for duration_id: ${newValue}`);
                 // Показываем спиннер при расчете дедлайна
                 setCalculatingDeadline(true);
                 
+                // Преобразуем строку в число для API
+                const durationId = parseInt(String(newValue), 10);
+                console.log(`Parsed duration ID for API: ${durationId}`);
+                
                 // Рассчитываем дедлайн на основе выбранной длительности
-                const deadline = await TasksAPI.calculateDeadline(newValue as number);
+                const deadline = await TasksAPI.calculateDeadline(durationId);
+                console.log(`API response for deadline:`, deadline);
                 
                 // Устанавливаем дедлайн в форму, сохраняя обновленное значение длительности
                 if (deadline) {
@@ -172,6 +204,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                         deadline: deadline
                     });
                     console.log(`Deadline calculated: ${deadline.toLocaleString()}`);
+                    
+                    // Обновляем также состояние выбранной даты для DatePicker
+                    setSelectedDate(deadline);
+                } else {
+                    console.error('Deadline calculation returned null');
                 }
             } catch (err) {
                 console.error('Error calculating deadline:', err);
@@ -179,6 +216,23 @@ export const TaskForm: React.FC<TaskFormProps> = ({
             } finally {
                 setCalculatingDeadline(false);
             }
+        }
+    };
+
+    const handleDateChange = (date: Date | null) => {
+        console.log('Date picker changed:', date);
+        setSelectedDate(date);
+        
+        if (date) {
+            // Преобразуем дату в ISO строку для внутреннего использования
+            setFormData({ ...formData, deadline: date });
+        } else {
+            setFormData({ ...formData, deadline: null });
+        }
+        
+        // Если поле было с ошибкой, убираем ошибку
+        if (error) {
+            setError(null);
         }
     };
 
@@ -193,7 +247,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({
             status_id: formData.status_id !== '' ? Number(formData.status_id) : undefined,
             priority_id: formData.priority_id !== '' ? Number(formData.priority_id) : undefined,
             duration_id: formData.duration_id !== '' ? Number(formData.duration_id) : undefined,
-            deadline: formData.deadline ? formData.deadline.toISOString() : undefined
+            deadline: formData.deadline ? formData.deadline.toISOString() : undefined,
+            completed: formData.completed
         };
         
         console.log('Submitting task data:', submitData);
@@ -233,270 +288,287 @@ export const TaskForm: React.FC<TaskFormProps> = ({
     }
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth fullScreen={isSmallScreen}>
             <DialogTitle>
-                {task ? 'Редактировать задачу' : 'Создать задачу'}
+                {isEditing ? t('tasks.edit_task') : t('tasks.new_task')}
             </DialogTitle>
             <form onSubmit={handleSubmit}>
                 <DialogContent>
-                    <Box display="flex" flexDirection="column" gap={2}>
-                        <TextField
-                            label="Название"
-                            value={formData.title}
-                            onChange={(e) => handleTextChange(e, 'title')}
-                            required
-                            fullWidth
-                        />
-                        <TextField
-                            label="Описание"
-                            value={formData.description}
-                            onChange={(e) => handleTextChange(e, 'description')}
-                            multiline
-                            rows={4}
-                            fullWidth
-                        />
-                        <FormControl fullWidth>
-                            <InputLabel>Тип задачи</InputLabel>
-                            <Select
-                                value={formData.type_id}
-                                onChange={(e) => setFormData({ ...formData, type_id: e.target.value })}
-                                label="Тип задачи"
-                            >
-                                <MenuItem 
-                                    value="" 
-                                    sx={{
-                                        '&.Mui-selected': {
-                                            backgroundColor: '#f5f5f5',
-                                            fontWeight: 'bold'
-                                        },
-                                        '&.Mui-selected:hover': {
-                                            backgroundColor: '#e0e0e0'
-                                        }
-                                    }}
+                    <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                            <TextField
+                                autoFocus
+                                name="title"
+                                label={t('tasks.title')}
+                                fullWidth
+                                value={formData.title}
+                                onChange={(e) => handleTextChange(e, 'title')}
+                                error={!!error}
+                                helperText={error}
+                                margin="normal"
+                            />
+                        </Grid>
+                        
+                        <Grid item xs={12}>
+                            <TextField
+                                name="description"
+                                label={t('tasks.description')}
+                                fullWidth
+                                multiline
+                                rows={4}
+                                value={formData.description}
+                                onChange={(e) => handleTextChange(e, 'description')}
+                                margin="normal"
+                            />
+                        </Grid>
+                        
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <InputLabel id="status-label">{t('tasks.status')}</InputLabel>
+                                <Select
+                                    labelId="status-label"
+                                    name="status_id"
+                                    value={formData.status_id}
+                                    label={t('tasks.status')}
+                                    onChange={(e) => handleSelectChange(e, 'status_id')}
                                 >
-                                    Не выбран
-                                </MenuItem>
-                                {taskTypes.map((type) => (
                                     <MenuItem 
-                                        key={type.id} 
-                                        value={type.id.toString()}
+                                        value="" 
                                         sx={{
-                                            backgroundColor: type.color || '#f0f0f0',
-                                            '&:hover': {
-                                                backgroundColor: type.color || '#e0e0e0',
-                                                opacity: 0.9
-                                            },
                                             '&.Mui-selected': {
-                                                backgroundColor: '#e3f2fd',
-                                                fontWeight: 'bold',
-                                                border: '2px solid #1976d2'
-                                            },
-                                            '&.Mui-selected:hover': {
-                                                backgroundColor: '#bbdefb',
-                                                opacity: 0.9
-                                            }
-                                        }}
-                                    >
-                                        {type.name}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                        <FormControl fullWidth>
-                            <InputLabel>Статус</InputLabel>
-                            <Select
-                                value={formData.status_id}
-                                onChange={(e) => handleSelectChange(e, 'status_id')}
-                                label="Статус"
-                            >
-                                <MenuItem 
-                                    value="" 
-                                    sx={{
-                                        '&.Mui-selected': {
-                                            backgroundColor: '#f5f5f5',
-                                            fontWeight: 'bold'
-                                        },
-                                        '&.Mui-selected:hover': {
-                                            backgroundColor: '#e0e0e0'
-                                        }
-                                    }}
-                                >
-                                    Не выбран
-                                </MenuItem>
-                                {statuses.map((status) => (
-                                    <MenuItem
-                                        key={status.id}
-                                        value={status.id}
-                                        sx={{
-                                            backgroundColor: status.color || '#ccc',
-                                            color: '#fff',
-                                            textShadow: '0px 0px 2px rgba(0, 0, 0, 0.7)',
-                                            '&:hover': {
-                                                backgroundColor: status.color || '#ccc',
-                                                opacity: 0.9
-                                            },
-                                            '&.Mui-selected': {
-                                                backgroundColor: status.color || '#ccc',
-                                                border: '2px solid #fff',
-                                                boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)',
+                                                backgroundColor: '#f5f5f5',
                                                 fontWeight: 'bold'
                                             },
                                             '&.Mui-selected:hover': {
+                                                backgroundColor: '#e0e0e0'
+                                            }
+                                        }}
+                                    >
+                                        Не выбран
+                                    </MenuItem>
+                                    {statuses.map((status) => (
+                                        <MenuItem
+                                            key={status.id}
+                                            value={status.id}
+                                            sx={{
                                                 backgroundColor: status.color || '#ccc',
-                                                opacity: 0.9,
-                                                border: '2px solid #fff',
-                                                boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)'
-                                            }
-                                        }}
-                                    >
-                                        {status.name}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                        <FormControl fullWidth>
-                            <InputLabel>Приоритет</InputLabel>
-                            <Select
-                                value={formData.priority_id}
-                                onChange={(e) => handleSelectChange(e, 'priority_id')}
-                                label="Приоритет"
-                            >
-                                <MenuItem 
-                                    value="" 
-                                    sx={{
-                                        '&.Mui-selected': {
-                                            backgroundColor: '#f5f5f5',
-                                            fontWeight: 'bold'
-                                        },
-                                        '&.Mui-selected:hover': {
-                                            backgroundColor: '#e0e0e0'
-                                        }
-                                    }}
+                                                color: '#fff',
+                                                textShadow: '0px 0px 2px rgba(0, 0, 0, 0.7)',
+                                                '&:hover': {
+                                                    backgroundColor: status.color || '#ccc',
+                                                    opacity: 0.9
+                                                },
+                                                '&.Mui-selected': {
+                                                    backgroundColor: status.color || '#ccc',
+                                                    border: '2px solid #fff',
+                                                    boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)',
+                                                    fontWeight: 'bold'
+                                                },
+                                                '&.Mui-selected:hover': {
+                                                    backgroundColor: status.color || '#ccc',
+                                                    opacity: 0.9,
+                                                    border: '2px solid #fff',
+                                                    boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)'
+                                                }
+                                            }}
+                                        >
+                                            {status.name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <InputLabel id="priority-label">{t('tasks.priority')}</InputLabel>
+                                <Select
+                                    labelId="priority-label"
+                                    name="priority_id"
+                                    value={formData.priority_id}
+                                    label={t('tasks.priority')}
+                                    onChange={(e) => handleSelectChange(e, 'priority_id')}
                                 >
-                                    Не выбран
-                                </MenuItem>
-                                {priorities.map((priority) => (
-                                    <MenuItem
-                                        key={priority.id}
-                                        value={priority.id}
-                                        sx={{
-                                            backgroundColor: priority.color || '#ccc',
-                                            color: '#fff',
-                                            textShadow: '0px 0px 2px rgba(0, 0, 0, 0.7)',
-                                            '&:hover': {
-                                                backgroundColor: priority.color || '#ccc',
-                                                opacity: 0.9
-                                            },
-                                            '&.Mui-selected': {
-                                                backgroundColor: priority.color || '#ccc',
-                                                border: '2px solid #fff',
-                                                boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)',
-                                                fontWeight: 'bold'
-                                            },
-                                            '&.Mui-selected:hover': {
-                                                backgroundColor: priority.color || '#ccc',
-                                                opacity: 0.9,
-                                                border: '2px solid #fff',
-                                                boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)'
-                                            }
-                                        }}
-                                    >
-                                        {priority.name}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                        <FormControl fullWidth>
-                            <InputLabel>Длительность</InputLabel>
-                            <Select
-                                value={formData.duration_id}
-                                onChange={(e) => handleSelectChange(e, 'duration_id')}
-                                label="Длительность"
-                            >
-                                <MenuItem 
-                                    value="" 
-                                    sx={{
-                                        '&.Mui-selected': {
-                                            backgroundColor: '#f5f5f5',
-                                            fontWeight: 'bold'
-                                        },
-                                        '&.Mui-selected:hover': {
-                                            backgroundColor: '#e0e0e0'
-                                        }
-                                    }}
-                                >
-                                    Не выбран
-                                </MenuItem>
-                                {durations.map((duration) => (
                                     <MenuItem 
-                                        key={duration.id} 
-                                        value={duration.id}
+                                        value="" 
                                         sx={{
                                             '&.Mui-selected': {
-                                                backgroundColor: '#e3f2fd',
+                                                backgroundColor: '#f5f5f5',
                                                 fontWeight: 'bold'
                                             },
                                             '&.Mui-selected:hover': {
-                                                backgroundColor: '#bbdefb'
+                                                backgroundColor: '#e0e0e0'
                                             }
                                         }}
                                     >
-                                        {duration.name} ({duration.value} {getDurationTypeLabel(duration.type || duration.duration_type || '')})
+                                        Не выбран
                                     </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                            {formData.deadline && (
-                                <Typography variant="body2" color="primary" sx={{ mb: 1 }}>
-                                    Текущий дедлайн: {formData.deadline.toLocaleString('ru-RU')}
-                                </Typography>
-                            )}
-                            {calculatingDeadline && (
-                                <Typography variant="body2" color="secondary" sx={{ mb: 1 }}>
-                                    Расчёт дедлайна...
-                                </Typography>
-                            )}
-                            <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ruLocale}>
-                                <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 1 }}>
-                                    <DatePicker
-                                        label="Дедлайн"
-                                        value={formData.deadline}
-                                        onChange={(newValue) => {
-                                            if (newValue) {
-                                                // Получаем текущее время
-                                                const now = new Date();
-                                                // Устанавливаем время для выбранной даты
-                                                newValue.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+                                    {priorities.map((priority) => (
+                                        <MenuItem
+                                            key={priority.id}
+                                            value={priority.id}
+                                            sx={{
+                                                backgroundColor: priority.color || '#ccc',
+                                                color: '#fff',
+                                                textShadow: '0px 0px 2px rgba(0, 0, 0, 0.7)',
+                                                '&:hover': {
+                                                    backgroundColor: priority.color || '#ccc',
+                                                    opacity: 0.9
+                                                },
+                                                '&.Mui-selected': {
+                                                    backgroundColor: priority.color || '#ccc',
+                                                    border: '2px solid #fff',
+                                                    boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)',
+                                                    fontWeight: 'bold'
+                                                },
+                                                '&.Mui-selected:hover': {
+                                                    backgroundColor: priority.color || '#ccc',
+                                                    opacity: 0.9,
+                                                    border: '2px solid #fff',
+                                                    boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)'
+                                                }
+                                            }}
+                                        >
+                                            {priority.name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <InputLabel id="type-label">{t('tasks.type')}</InputLabel>
+                                <Select
+                                    labelId="type-label"
+                                    name="type_id"
+                                    value={formData.type_id}
+                                    label={t('tasks.type')}
+                                    onChange={(e) => handleSelectChange(e, 'type_id')}
+                                >
+                                    <MenuItem 
+                                        value="" 
+                                        sx={{
+                                            '&.Mui-selected': {
+                                                backgroundColor: '#f5f5f5',
+                                                fontWeight: 'bold'
+                                            },
+                                            '&.Mui-selected:hover': {
+                                                backgroundColor: '#e0e0e0'
                                             }
-                                            setFormData({ ...formData, deadline: newValue });
                                         }}
-                                        slotProps={{ 
-                                            textField: { 
-                                                fullWidth: true,
-                                                variant: 'outlined',
-                                                helperText: "Дата и время выполнения задачи"
-                                            } 
-                                        }}
-                                        sx={{ flex: 1 }}
-                                    />
-                                    <Button 
-                                        onClick={() => setFormData({ ...formData, deadline: null })}
-                                        variant="outlined"
-                                        color="secondary"
-                                        sx={{ minWidth: '120px', height: '40px', mt: 1 }}
                                     >
-                                        Очистить
-                                    </Button>
-                                </Box>
+                                        Не выбран
+                                    </MenuItem>
+                                    {taskTypes.map((type) => (
+                                        <MenuItem 
+                                            key={type.id} 
+                                            value={type.id.toString()}
+                                            sx={{
+                                                backgroundColor: type.color || '#f0f0f0',
+                                                '&:hover': {
+                                                    backgroundColor: type.color || '#e0e0e0',
+                                                    opacity: 0.9
+                                                },
+                                                '&.Mui-selected': {
+                                                    backgroundColor: '#e3f2fd',
+                                                    fontWeight: 'bold',
+                                                    border: '2px solid #1976d2'
+                                                },
+                                                '&.Mui-selected:hover': {
+                                                    backgroundColor: '#bbdefb',
+                                                    opacity: 0.9
+                                                }
+                                            }}
+                                        >
+                                            {type.name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth margin="normal">
+                                <InputLabel id="duration-label">{t('tasks.duration')}</InputLabel>
+                                <Select
+                                    labelId="duration-label"
+                                    name="duration_id"
+                                    value={formData.duration_id || ''}
+                                    label={t('tasks.duration')}
+                                    onChange={(e) => handleSelectChange(e, 'duration_id')}
+                                    endAdornment={calculatingDeadline && <CircularProgress size={20} />}
+                                >
+                                    <MenuItem value="">{t('tasks.no_duration')}</MenuItem>
+                                    {durations.map((duration) => (
+                                        <MenuItem 
+                                            key={duration.id} 
+                                            value={duration.id}
+                                            sx={{
+                                                '&.Mui-selected': {
+                                                    backgroundColor: '#e3f2fd',
+                                                    fontWeight: 'bold'
+                                                },
+                                                '&.Mui-selected:hover': {
+                                                    backgroundColor: '#bbdefb'
+                                                }
+                                            }}
+                                        >
+                                            {duration.name} ({duration.value} {getDurationTypeLabel(duration.type || duration.duration_type || '')})
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        
+                        <Grid item xs={12} sm={6}>
+                            <LocalizationProvider 
+                                dateAdapter={AdapterDateFns} 
+                                adapterLocale={i18n.language === 'ru' ? ru : undefined}
+                            >
+                                <DatePicker
+                                    label={t('tasks.deadline')}
+                                    value={selectedDate}
+                                    onChange={handleDateChange}
+                                    slotProps={{
+                                        textField: {
+                                            fullWidth: true,
+                                            margin: 'normal',
+                                            error: !!error,
+                                            helperText: error
+                                        }
+                                    }}
+                                />
                             </LocalizationProvider>
-                        </Box>
-                    </Box>
+                        </Grid>
+                        
+                        <Grid item xs={12} sm={6}>
+                            <Box sx={{ pt: 2 }}>
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            name="completed"
+                                            checked={!!formData.completed}
+                                            onChange={(e) => {
+                                                const target = e.target as HTMLInputElement;
+                                                setFormData({
+                                                    ...formData,
+                                                    completed: target.checked,
+                                                    completed_at: target.checked ? new Date().toISOString() : null
+                                                });
+                                            }}
+                                        />
+                                    }
+                                    label={t('tasks.completed')}
+                                />
+                            </Box>
+                        </Grid>
+                    </Grid>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={onClose}>Отмена</Button>
+                    <Button onClick={onClose}>{t('common.cancel')}</Button>
                     <Button type="submit" variant="contained" color="primary">
-                        {task ? 'Сохранить' : 'Создать'}
+                        {isEditing ? t('common.save') : t('common.create')}
                     </Button>
                 </DialogActions>
             </form>
