@@ -32,6 +32,7 @@ export interface Duration {
     value: number;
     is_active: boolean;
     is_default: boolean;
+    duration_type?: string;
 }
 
 export interface TaskType {

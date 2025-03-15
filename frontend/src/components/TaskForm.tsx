@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Task, Status, Priority, Duration, TaskType } from '../types/task';
+import { Task, Status, Priority, Duration, TaskType, DurationType } from '../types/task';
 import { TasksAPI, CreateTaskDto, UpdateTaskDto } from '../api/tasks';
 import {
     Box,
@@ -198,6 +198,30 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         
         console.log('Submitting task data:', submitData);
         onSubmit(submitData);
+    };
+
+    // Функция для получения человекочитаемого названия типа длительности
+    const getDurationTypeLabel = (type: DurationType | string): string => {
+        switch (type) {
+            case DurationType.DAYS:
+            case "DAYS":
+            case "days":
+                return 'дней';
+            case DurationType.WEEKS:
+            case "WEEKS":
+            case "weeks":
+                return 'недель';
+            case DurationType.MONTHS:
+            case "MONTHS":
+            case "months":
+                return 'месяцев';
+            case DurationType.YEARS:
+            case "YEARS":
+            case "years":
+                return 'лет';
+            default:
+                return String(type);
+        }
     };
 
     if (loading) {
@@ -417,7 +441,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                                             }
                                         }}
                                     >
-                                        {duration.name}
+                                        {duration.name} ({duration.value} {getDurationTypeLabel(duration.type || duration.duration_type || '')})
                                     </MenuItem>
                                 ))}
                             </Select>
