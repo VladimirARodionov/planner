@@ -53,6 +53,7 @@ export interface Task {
     priority?: Priority;
     duration?: Duration;
     deadline?: string;
+    deadline_iso?: string;
     created_at: string;
     completed_at?: string;
     is_overdue: boolean;

@@ -32,11 +32,16 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask }) 
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('ru-RU', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
+        // Проверяем, в ISO формате ли строка (содержит T и, возможно, символ Z)
+        if (dateString.includes('T')) {
+            return new Date(dateString).toLocaleDateString('ru-RU', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+        // Если строка уже в отформатированном виде, просто возвращаем её
+        return dateString;
     };
 
     return (

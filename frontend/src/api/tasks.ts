@@ -64,6 +64,7 @@ export interface CreateTaskDto {
     status_id?: number;
     priority_id?: number;
     duration_id?: number;
+    deadline?: string;
 }
 
 export interface UpdateTaskDto {
@@ -73,6 +74,7 @@ export interface UpdateTaskDto {
     status_id?: number;
     priority_id?: number;
     duration_id?: number;
+    deadline?: string;
 }
 
 export interface TaskFilters {
@@ -266,5 +268,18 @@ export const TasksAPI = {
 
     deleteTaskType: async (taskTypeId: number) => {
         await api.delete(`/settings/task-types/${taskTypeId}`);
+    },
+
+    // Рассчитать дедлайн на основе длительности
+    calculateDeadline: async (durationId: number, fromDate?: Date) => {
+        let url = `/settings/duration/${durationId}/calculate-deadline`;
+        
+        // Если передана начальная дата, добавляем ее в запрос
+        if (fromDate) {
+            url += `?from_date=${fromDate.toISOString()}`;
+        }
+        
+        const response = await api.get<{ deadline: string }>(url);
+        return response.data.deadline ? new Date(response.data.deadline) : null;
     }
 }

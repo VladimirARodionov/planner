@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
@@ -8,9 +9,21 @@ from backend.blueprints.wrapper import async_route
 from backend.database import get_session
 from backend.services.task_service import TaskService
 from backend.services.settings_service import SettingsService
+from backend.db.models import DurationSetting
 
 bp = Blueprint("planner", __name__)
 logger = logging.getLogger(__name__)
+
+def process_deadline_filter(deadline_str, is_from=True):
+    """Преобразуем строку даты в формат ISO для фильтрации задач по дедлайну"""
+    try:
+        # Преобразуем строку в дату, если она не в формате YYYY-MM-DD
+        if 'T' in deadline_str:
+            deadline_str = datetime.fromisoformat(deadline_str.replace('Z', '+00:00')).date().isoformat()
+        return deadline_str
+    except (ValueError, TypeError) as e:
+        logger.error(f"Error converting deadline_{'from' if is_from else 'to'}: {e}")
+        return deadline_str
 
 # Маршруты для работы с задачами
 @bp.route('/api/tasks/<int:task_id>', methods=['GET', 'OPTIONS'])
@@ -67,9 +80,12 @@ async def get_tasks():
         
         # Добавляем фильтрацию по дедлайну
         if request.args.get('deadline_from'):
-            filters['deadline_from'] = request.args.get('deadline_from')
+            deadline_from = request.args.get('deadline_from')
+            filters['deadline_from'] = process_deadline_filter(deadline_from)
+        
         if request.args.get('deadline_to'):
-            filters['deadline_to'] = request.args.get('deadline_to')
+            deadline_to = request.args.get('deadline_to')
+            filters['deadline_to'] = process_deadline_filter(deadline_to, False)
 
         async with get_session() as session:
             task_service = TaskService(session)
@@ -118,9 +134,12 @@ async def get_tasks_paginated():
     
     # Добавляем фильтрацию по дедлайну
     if request.args.get('deadline_from'):
-        filters['deadline_from'] = request.args.get('deadline_from')
+        deadline_from = request.args.get('deadline_from')
+        filters['deadline_from'] = process_deadline_filter(deadline_from)
+        
     if request.args.get('deadline_to'):
-        filters['deadline_to'] = request.args.get('deadline_to')
+        deadline_to = request.args.get('deadline_to')
+        filters['deadline_to'] = process_deadline_filter(deadline_to, False)
 
     async with get_session() as session:
         task_service = TaskService(session)
@@ -179,9 +198,12 @@ async def search_tasks():
     
     # Добавляем фильтрацию по дедлайну
     if request.args.get('deadline_from'):
-        filters['deadline_from'] = request.args.get('deadline_from')
+        deadline_from = request.args.get('deadline_from')
+        filters['deadline_from'] = process_deadline_filter(deadline_from)
+        
     if request.args.get('deadline_to'):
-        filters['deadline_to'] = request.args.get('deadline_to')
+        deadline_to = request.args.get('deadline_to')
+        filters['deadline_to'] = process_deadline_filter(deadline_to, False)
 
     async with get_session() as session:
         task_service = TaskService(session)
@@ -219,9 +241,12 @@ async def get_task_count():
     
     # Добавляем фильтрацию по дедлайну
     if request.args.get('deadline_from'):
-        filters['deadline_from'] = request.args.get('deadline_from')
+        deadline_from = request.args.get('deadline_from')
+        filters['deadline_from'] = process_deadline_filter(deadline_from)
+        
     if request.args.get('deadline_to'):
-        filters['deadline_to'] = request.args.get('deadline_to')
+        deadline_to = request.args.get('deadline_to')
+        filters['deadline_to'] = process_deadline_filter(deadline_to, False)
 
     async with get_session() as session:
         task_service = TaskService(session)
@@ -437,3 +462,43 @@ async def delete_task_type(task_type_id):
         if not success:
             return jsonify({'error': 'Task type not found'}), 404
         return '', 204
+
+@bp.route('/api/settings/duration/<int:duration_id>/calculate-deadline', methods=['GET', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+@async_route
+async def calculate_deadline(duration_id):
+    """Рассчитать дедлайн на основе длительности"""
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    current_user = get_jwt_identity()
+    
+    async with get_session() as session:
+        try:
+            duration = await session.get(DurationSetting, duration_id)
+            
+            # Проверяем, принадлежит ли длительность пользователю
+            if not duration or str(duration.user_id) != current_user:
+                return jsonify({'error': 'Duration not found'}), 404
+                
+            # Получаем начальную дату из запроса или используем текущую дату и время
+            from_date = datetime.now()  # По умолчанию используем текущую дату и время
+            if request.args.get('from_date'):
+                try:
+                    from_date = datetime.fromisoformat(
+                        request.args.get('from_date').replace('Z', '+00:00')
+                    )
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Error parsing from_date: {e}")
+                    # Если не удалось распарсить дату из запроса, продолжаем использовать текущую дату и время
+            
+            # Расчитываем дедлайн
+            deadline = await duration.calculate_deadline_async(session, from_date)
+            
+            return jsonify({
+                'deadline': deadline.isoformat() if deadline else None
+            })
+        except Exception as e:
+            logger.error(f"Error calculating deadline: {e}")
+            return jsonify({'error': str(e)}), 500
