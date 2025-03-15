@@ -64,6 +64,7 @@ export interface CreateTaskDto {
     status_id?: number;
     priority_id?: number;
     duration_id?: number;
+    deadline?: string;
 }
 
 export interface UpdateTaskDto {
@@ -73,6 +74,7 @@ export interface UpdateTaskDto {
     status_id?: number;
     priority_id?: number;
     duration_id?: number;
+    deadline?: string;
 }
 
 export interface TaskFilters {

@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
@@ -11,6 +12,17 @@ from backend.services.settings_service import SettingsService
 
 bp = Blueprint("planner", __name__)
 logger = logging.getLogger(__name__)
+
+def process_deadline_filter(deadline_str, is_from=True):
+    """Преобразуем строку даты в формат ISO для фильтрации задач по дедлайну"""
+    try:
+        # Преобразуем строку в дату, если она не в формате YYYY-MM-DD
+        if 'T' in deadline_str:
+            deadline_str = datetime.fromisoformat(deadline_str.replace('Z', '+00:00')).date().isoformat()
+        return deadline_str
+    except (ValueError, TypeError) as e:
+        logger.error(f"Error converting deadline_{'from' if is_from else 'to'}: {e}")
+        return deadline_str
 
 # Маршруты для работы с задачами
 @bp.route('/api/tasks/<int:task_id>', methods=['GET', 'OPTIONS'])
@@ -67,9 +79,12 @@ async def get_tasks():
         
         # Добавляем фильтрацию по дедлайну
         if request.args.get('deadline_from'):
-            filters['deadline_from'] = request.args.get('deadline_from')
+            deadline_from = request.args.get('deadline_from')
+            filters['deadline_from'] = process_deadline_filter(deadline_from)
+        
         if request.args.get('deadline_to'):
-            filters['deadline_to'] = request.args.get('deadline_to')
+            deadline_to = request.args.get('deadline_to')
+            filters['deadline_to'] = process_deadline_filter(deadline_to, False)
 
         async with get_session() as session:
             task_service = TaskService(session)
@@ -118,9 +133,12 @@ async def get_tasks_paginated():
     
     # Добавляем фильтрацию по дедлайну
     if request.args.get('deadline_from'):
-        filters['deadline_from'] = request.args.get('deadline_from')
+        deadline_from = request.args.get('deadline_from')
+        filters['deadline_from'] = process_deadline_filter(deadline_from)
+        
     if request.args.get('deadline_to'):
-        filters['deadline_to'] = request.args.get('deadline_to')
+        deadline_to = request.args.get('deadline_to')
+        filters['deadline_to'] = process_deadline_filter(deadline_to, False)
 
     async with get_session() as session:
         task_service = TaskService(session)
@@ -179,9 +197,12 @@ async def search_tasks():
     
     # Добавляем фильтрацию по дедлайну
     if request.args.get('deadline_from'):
-        filters['deadline_from'] = request.args.get('deadline_from')
+        deadline_from = request.args.get('deadline_from')
+        filters['deadline_from'] = process_deadline_filter(deadline_from)
+        
     if request.args.get('deadline_to'):
-        filters['deadline_to'] = request.args.get('deadline_to')
+        deadline_to = request.args.get('deadline_to')
+        filters['deadline_to'] = process_deadline_filter(deadline_to, False)
 
     async with get_session() as session:
         task_service = TaskService(session)
@@ -219,9 +240,12 @@ async def get_task_count():
     
     # Добавляем фильтрацию по дедлайну
     if request.args.get('deadline_from'):
-        filters['deadline_from'] = request.args.get('deadline_from')
+        deadline_from = request.args.get('deadline_from')
+        filters['deadline_from'] = process_deadline_filter(deadline_from)
+        
     if request.args.get('deadline_to'):
-        filters['deadline_to'] = request.args.get('deadline_to')
+        deadline_to = request.args.get('deadline_to')
+        filters['deadline_to'] = process_deadline_filter(deadline_to, False)
 
     async with get_session() as session:
         task_service = TaskService(session)

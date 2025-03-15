@@ -339,6 +339,16 @@ class TaskService:
             if task_type:
                 task_data['type_id'] = task_type.id
 
+        # Обрабатываем deadline, если он пришел в строковом формате
+        deadline = task_data.get('deadline')
+        if isinstance(deadline, str):
+            try:
+                deadline = datetime.fromisoformat(deadline.replace('Z', '+00:00'))
+                logger.debug(f"Converted deadline string to datetime: {deadline}")
+                task_data['deadline'] = deadline
+            except (ValueError, TypeError) as e:
+                logger.error(f"Error converting deadline: {e}")
+
         task = Task(
             user_id=user.telegram_id,
             title=task_data['title'],
@@ -429,7 +439,15 @@ class TaskService:
         if 'completed_at' in task_data:
             task.completed_at = task_data['completed_at']
         if 'deadline' in task_data:
-            task.deadline = task_data['deadline']
+            # Преобразуем строковое значение deadline в datetime
+            deadline_value = task_data['deadline']
+            if isinstance(deadline_value, str):
+                try:
+                    deadline_value = datetime.fromisoformat(deadline_value.replace('Z', '+00:00'))
+                    logger.debug(f"Converted deadline string to datetime: {deadline_value}")
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Error converting deadline: {e}")
+            task.deadline = deadline_value
             logger.debug(f"Manually updating deadline to: {task.deadline}")
         if 'duration_id' in task_data:
             task.duration_id = task_data['duration_id']

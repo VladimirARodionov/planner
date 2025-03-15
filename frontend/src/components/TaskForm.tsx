@@ -16,6 +16,10 @@ import {
     Typography,
     SelectChangeEvent
 } from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import ruLocale from 'date-fns/locale/ru';
 
 interface TaskFormProps {
     open: boolean;
@@ -31,6 +35,7 @@ type FormData = {
     status_id: number | '';
     priority_id: number | '';
     duration_id: number | '';
+    deadline: Date | null;
 };
 
 export const TaskForm: React.FC<TaskFormProps> = ({
@@ -45,7 +50,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         type_id: '',
         status_id: '',
         priority_id: '',
-        duration_id: ''
+        duration_id: '',
+        deadline: null
     });
     const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
     const [statuses, setStatuses] = useState<Status[]>([]);
@@ -72,7 +78,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                     type_id: typeId,
                     status_id: statusId,
                     priority_id: priorityId,
-                    duration_id: durationId
+                    duration_id: durationId,
+                    deadline: task.deadline ? new Date(task.deadline) : null
                 });
                 
                 console.log('Form data after set:', {
@@ -81,7 +88,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                     type_id: typeId,
                     status_id: statusId,
                     priority_id: priorityId,
-                    duration_id: durationId
+                    duration_id: durationId,
+                    deadline: task.deadline ? new Date(task.deadline) : null
                 });
             } else {
                 setFormData({
@@ -90,7 +98,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                     type_id: '',
                     status_id: '',
                     priority_id: '',
-                    duration_id: ''
+                    duration_id: '',
+                    deadline: null
                 });
             }
         }
@@ -146,7 +155,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({
             type_id: formData.type_id ? parseInt(formData.type_id) : undefined,
             status_id: formData.status_id !== '' ? Number(formData.status_id) : undefined,
             priority_id: formData.priority_id !== '' ? Number(formData.priority_id) : undefined,
-            duration_id: formData.duration_id !== '' ? Number(formData.duration_id) : undefined
+            duration_id: formData.duration_id !== '' ? Number(formData.duration_id) : undefined,
+            deadline: formData.deadline ? formData.deadline.toISOString() : undefined
         };
         
         console.log('Submitting task data:', submitData);
@@ -375,6 +385,38 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                                 ))}
                             </Select>
                         </FormControl>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                            {formData.deadline && (
+                                <Typography variant="body2" color="primary" sx={{ mb: 1 }}>
+                                    Текущий дедлайн: {formData.deadline.toLocaleDateString('ru-RU')}
+                                </Typography>
+                            )}
+                            <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ruLocale}>
+                                <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 1 }}>
+                                    <DatePicker
+                                        label="Дедлайн"
+                                        value={formData.deadline}
+                                        onChange={(newValue) => setFormData({ ...formData, deadline: newValue })}
+                                        slotProps={{ 
+                                            textField: { 
+                                                fullWidth: true,
+                                                variant: 'outlined',
+                                                helperText: "Дата выполнения задачи"
+                                            } 
+                                        }}
+                                        sx={{ flex: 1 }}
+                                    />
+                                    <Button 
+                                        onClick={() => setFormData({ ...formData, deadline: null })}
+                                        variant="outlined"
+                                        color="secondary"
+                                        sx={{ minWidth: '120px', height: '40px', mt: 1 }}
+                                    >
+                                        Очистить
+                                    </Button>
+                                </Box>
+                            </LocalizationProvider>
+                        </Box>
                     </Box>
                 </DialogContent>
                 <DialogActions>
