@@ -1,5 +1,5 @@
 import React from 'react';
-import { Task } from '../types/task';
+import { Task, DurationType } from '../types/task';
 import { TasksAPI } from '../api/tasks';
 import { Box, Typography, Chip, IconButton, Card, CardContent, CardActions } from '@mui/material';
 import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
@@ -14,7 +14,15 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask }) 
         if (window.confirm(`Вы уверены, что хотите удалить задачу "${task.title}"?`)) {
             try {
                 await TasksAPI.deleteTask(task.id);
-                onTaskUpdated();
+                
+                // Вызываем сначала onTaskUpdated, если он передан
+                if (onTaskUpdated) {
+                    onTaskUpdated();
+                }
+                
+                // И только потом генерируем глобальное событие
+                console.log('Dispatching refresh-tasks event after delete');
+                window.dispatchEvent(new Event('refresh-tasks'));
             } catch (error) {
                 console.error('Error deleting task:', error);
                 alert('Не удалось удалить задачу. Пожалуйста, попробуйте позже.');
@@ -23,11 +31,16 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask }) 
     };
 
     const handleEdit = () => {
-        console.log('Edit button clicked');
-        console.log('onEditTask exists:', !!onEditTask);
-        console.log('Task data:', task);
+        console.log('Edit button clicked for task:', task.id);
+        
         if (onEditTask) {
+            console.log('Using direct callback for editing');
             onEditTask(task);
+        } else {
+            // Создаем пользовательское событие для редактирования задачи
+            console.log('Dispatching edit-task event');
+            const event = new CustomEvent('edit-task', { detail: task });
+            window.dispatchEvent(event);
         }
     };
 
@@ -35,13 +48,36 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask }) 
         // Проверяем, в ISO формате ли строка (содержит T и, возможно, символ Z)
         if (dateString.includes('T')) {
             return new Date(dateString).toLocaleDateString('ru-RU', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
             });
         }
-        // Если строка уже в отформатированном виде, просто возвращаем её
         return dateString;
+    };
+    
+    // Функция для получения человекочитаемого названия типа длительности
+    const getDurationTypeLabel = (type: DurationType | string): string => {
+        switch (type) {
+            case DurationType.DAYS:
+            case "DAYS":
+            case "days":
+                return 'дней';
+            case DurationType.WEEKS:
+            case "WEEKS":
+            case "weeks":
+                return 'недель';
+            case DurationType.MONTHS:
+            case "MONTHS":
+            case "months":
+                return 'месяцев';
+            case DurationType.YEARS:
+            case "YEARS":
+            case "years":
+                return 'лет';
+            default:
+                return String(type);
+        }
     };
 
     return (
@@ -101,7 +137,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask }) 
                     
                     {task.duration && (
                         <Typography variant="body2" color="text.secondary">
-                            Длительность: {task.duration.name} ({task.duration.value} {task.duration.type})
+                            Длительность: {task.duration.name} ({task.duration.value} {getDurationTypeLabel(task.duration.type || task.duration.duration_type || '')})
                         </Typography>
                     )}
                     

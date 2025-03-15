@@ -1,5 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { Task, Settings, Status, Priority, Duration, TaskType } from '../types/task';
+import { Task, Settings, Status, Priority, Duration, TaskType, DurationType } from '../types/task';
 import { AuthAPI } from './auth';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -180,6 +180,22 @@ export const TasksAPI = {
     // Настройки
     getSettings: async () => {
         const response = await api.get<Settings>('/settings/');
+        // Преобразуем duration_type в type, если нужно
+        if (response.data.durations) {
+            console.log('Raw durations from API:', response.data.durations);
+            response.data.durations = response.data.durations.map(duration => {
+                // Если тип не определен, но есть duration_type
+                if ((!duration.type || typeof duration.type === 'undefined') && duration.duration_type) {
+                    console.log(`Converting duration ${duration.name}: duration_type=${duration.duration_type} to type`);
+                    return {
+                        ...duration,
+                        type: duration.duration_type as unknown as DurationType
+                    };
+                }
+                return duration;
+            });
+            console.log('Processed durations:', response.data.durations);
+        }
         return response.data;
     },
 

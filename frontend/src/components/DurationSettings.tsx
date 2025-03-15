@@ -36,13 +36,53 @@ export const DurationSettings: React.FC = () => {
         is_active: true,
     });
 
+    // Функция для получения человекочитаемого названия типа длительности
+    const getDurationTypeLabel = (type: DurationType | string): string => {
+        switch (type) {
+            case DurationType.DAYS:
+            case "DAYS":
+            case "days":
+                return 'дней';
+            case DurationType.WEEKS:
+            case "WEEKS":
+            case "weeks":
+                return 'недель';
+            case DurationType.MONTHS:
+            case "MONTHS":
+            case "months":
+                return 'месяцев';
+            case DurationType.YEARS:
+            case "YEARS":
+            case "years":
+                return 'лет';
+            default:
+                return String(type);
+        }
+    };
+
     useEffect(() => {
         loadDurations();
     }, []);
 
+    useEffect(() => {
+        if (durations.length > 0) {
+            console.log('DurationSettings - loaded durations:', durations);
+            durations.forEach((duration, index) => {
+                console.log(`Duration ${index + 1}:`, {
+                    id: duration.id,
+                    name: duration.name,
+                    type: duration.type,
+                    duration_type: duration.duration_type,
+                    value: duration.value
+                });
+            });
+        }
+    }, [durations]);
+
     const loadDurations = async () => {
         try {
             const settings = await TasksAPI.getSettings();
+            console.log('Loaded durations in DurationSettings:', settings.durations);
             setDurations(settings.durations);
         } catch (error) {
             console.error('Error loading durations:', error);
@@ -51,14 +91,44 @@ export const DurationSettings: React.FC = () => {
 
     const handleOpen = (duration?: Duration) => {
         if (duration) {
-            setEditingDuration(duration);
-            setFormData({
+            console.log('Opening for edit duration:', duration);
+            console.log('DurationType enum values:', Object.values(DurationType));
+            
+            // Определяем тип напрямую из строкового значения
+            let durationType: DurationType = DurationType.DAYS; // По умолчанию дни
+            
+            // Получаем строковое значение типа (из type или duration_type)
+            const typeValue = duration.type || duration.duration_type;
+            console.log('Type value from API:', typeValue);
+            
+            // Проверяем каждое возможное значение DurationType и ищем соответствие
+            // Используем строковое сравнение для предотвращения проблем с типами
+            const typeValueStr = String(typeValue).toLowerCase();
+            
+            if (typeValueStr === 'days') {
+                durationType = DurationType.DAYS;
+            } else if (typeValueStr === 'weeks') {
+                durationType = DurationType.WEEKS;
+            } else if (typeValueStr === 'months') {
+                durationType = DurationType.MONTHS;
+            } else if (typeValueStr === 'years') {
+                durationType = DurationType.YEARS;
+            }
+            
+            console.log('Selected durationType:', durationType);
+            
+            const newFormData = {
                 name: duration.name,
-                type: duration.type,
+                type: durationType,
                 value: duration.value,
                 is_default: duration.is_default,
                 is_active: duration.is_active,
-            });
+            };
+            
+            console.log('New form data:', newFormData);
+            
+            setEditingDuration(duration);
+            setFormData(newFormData);
         } else {
             setEditingDuration(null);
             setFormData({
@@ -79,10 +149,23 @@ export const DurationSettings: React.FC = () => {
 
     const handleSubmit = async () => {
         try {
+            // Логируем данные перед отправкой на сервер
+            console.log('Form data before submit:', formData);
+            console.log('Type value from formData:', formData.type);
+            
+            // Убедимся, что тип отправляется в правильном формате
+            const submittingData = {
+                ...formData,
+                // При необходимости преобразуем тип в строковое значение
+                // type: formData.type
+            };
+            
+            console.log('Data to submit:', submittingData);
+            
             if (editingDuration) {
-                await TasksAPI.updateDuration(editingDuration.id, formData);
+                await TasksAPI.updateDuration(editingDuration.id, submittingData);
             } else {
-                await TasksAPI.createDuration(formData);
+                await TasksAPI.createDuration(submittingData);
             }
             handleClose();
             loadDurations();
@@ -128,7 +211,7 @@ export const DurationSettings: React.FC = () => {
                     >
                         <ListItemText
                             primary={duration.name}
-                            secondary={`${duration.value} ${duration.type}`}
+                            secondary={`${duration.value} ${getDurationTypeLabel(duration.type || duration.duration_type || '')}`}
                         />
                         <ListItemSecondaryAction>
                             <IconButton
@@ -166,14 +249,24 @@ export const DurationSettings: React.FC = () => {
                             <InputLabel>Тип</InputLabel>
                             <Select
                                 value={formData.type}
-                                onChange={(e) => setFormData({ ...formData, type: e.target.value as DurationType })}
+                                onChange={(e) => {
+                                    console.log('Selected type:', e.target.value);
+                                    setFormData({ ...formData, type: e.target.value as DurationType });
+                                }}
                                 label="Тип"
                             >
-                                {Object.values(DurationType).map((type) => (
-                                    <MenuItem key={type} value={type}>
-                                        {type}
-                                    </MenuItem>
-                                ))}
+                                <MenuItem key={DurationType.DAYS} value={DurationType.DAYS}>
+                                    {getDurationTypeLabel(DurationType.DAYS)} ({DurationType.DAYS})
+                                </MenuItem>
+                                <MenuItem key={DurationType.WEEKS} value={DurationType.WEEKS}>
+                                    {getDurationTypeLabel(DurationType.WEEKS)} ({DurationType.WEEKS})
+                                </MenuItem>
+                                <MenuItem key={DurationType.MONTHS} value={DurationType.MONTHS}>
+                                    {getDurationTypeLabel(DurationType.MONTHS)} ({DurationType.MONTHS})
+                                </MenuItem>
+                                <MenuItem key={DurationType.YEARS} value={DurationType.YEARS}>
+                                    {getDurationTypeLabel(DurationType.YEARS)} ({DurationType.YEARS})
+                                </MenuItem>
                             </Select>
                         </FormControl>
                         <TextField

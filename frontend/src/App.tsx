@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { TaskList } from './components/TaskList';
 import { TaskForm } from './components/TaskForm';
 import { LoginForm } from './components/LoginForm';
+import { Sidebar } from './components/Sidebar';
+import { SettingsPage } from './pages/SettingsPage';
+import { AboutPage } from './pages/AboutPage';
 import TelegramCallback from './components/TelegramCallback';
 import { Task } from './types/task';
 import { TasksAPI, CreateTaskDto, UpdateTaskDto } from './api/tasks';
@@ -16,7 +19,9 @@ import {
     Snackbar,
     Alert,
     AlertProps,
-    Button
+    Button,
+    useMediaQuery,
+    useTheme
 } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 
@@ -26,11 +31,13 @@ const ProtectedRoute: React.FC<{ element: React.ReactNode }> = ({ element }) => 
     return isAuthenticated ? <>{element}</> : <Navigate to="/login" />;
 };
 
-// Основной компонент приложения
-const MainApp: React.FC = () => {
+// Компонент макета для авторизованного пользователя
+const AppLayout: React.FC = () => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    const [isMenuOpen, setIsMenuOpen] = useState(!isMobile);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState<Task | undefined>();
-    const [refreshTrigger, setRefreshTrigger] = useState(0);
     const [notification, setNotification] = useState<{
         message: string;
         type: AlertProps['severity'];
@@ -45,11 +52,6 @@ const MainApp: React.FC = () => {
 
     const handleCreateTask = () => {
         setSelectedTask(undefined);
-        setIsFormOpen(true);
-    };
-
-    const handleEditTask = (task: Task) => {
-        setSelectedTask(task);
         setIsFormOpen(true);
     };
 
@@ -74,7 +76,9 @@ const MainApp: React.FC = () => {
                 });
             }
             handleCloseForm();
-            setRefreshTrigger(prev => prev + 1);
+            
+            // Генерируем событие для обновления списка задач
+            window.dispatchEvent(new Event('refresh-tasks'));
         } catch (err) {
             setNotification({
                 message: 'Произошла ошибка при сохранении задачи',
@@ -84,31 +88,82 @@ const MainApp: React.FC = () => {
         }
     };
 
-    const handleDeleteTask = async (taskId: number) => {
-        try {
-            await TasksAPI.deleteTask(taskId);
-            setNotification({
-                message: 'Задача успешно удалена',
-                type: 'success'
-            });
-            setRefreshTrigger(prev => prev + 1);
-        } catch (err) {
-            setNotification({
-                message: 'Произошла ошибка при удалении задачи',
-                type: 'error'
-            });
-            console.error(err);
-        }
+    const handleToggleMenu = () => {
+        setIsMenuOpen(!isMenuOpen);
     };
 
     const handleCloseNotification = () => {
         setNotification(null);
     };
 
+    // Рассчитываем смещение контента при открытом меню
+    const contentMargin = isMenuOpen ? '240px' : 0;
+
+    // Обработка пользовательских событий
+    useEffect(() => {
+        // Обработчик события редактирования задачи
+        const handleEditTaskEvent = (event: CustomEvent<Task>) => {
+            if (event.detail) {
+                setSelectedTask(event.detail);
+                setIsFormOpen(true);
+            }
+        };
+
+        // Добавляем слушатели событий
+        window.addEventListener('edit-task', handleEditTaskEvent as EventListener);
+
+        // Отписываемся при размонтировании
+        return () => {
+            window.removeEventListener('edit-task', handleEditTaskEvent as EventListener);
+        };
+    }, []);
+
+    // Добавляем useEffect для адаптации меню к размеру экрана
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth < 600) {
+                setIsMenuOpen(false);
+            } else {
+                setIsMenuOpen(true);
+            }
+        };
+
+        // Вызываем один раз при монтировании
+        handleResize();
+
+        // Слушаем изменение размера окна
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+        };
+    }, []);
+
     return (
-        <Box sx={{ flexGrow: 1 }}>
-            <AppBar position="static">
+        <Box sx={{ display: 'flex' }}>
+            <AppBar 
+                position="fixed" 
+                sx={{ 
+                    zIndex: (theme) => theme.zIndex.drawer + 1,
+                    transition: theme.transitions.create(['width', 'margin'], {
+                        easing: theme.transitions.easing.sharp,
+                        duration: theme.transitions.duration.leavingScreen,
+                    }),
+                    ...(isMenuOpen && {
+                        marginLeft: contentMargin,
+                        width: `calc(100% - ${contentMargin})`,
+                        transition: theme.transitions.create(['width', 'margin'], {
+                            easing: theme.transitions.easing.sharp,
+                            duration: theme.transitions.duration.enteringScreen,
+                        }),
+                    })
+                }}
+            >
                 <Toolbar>
+                    <Sidebar 
+                        open={isMenuOpen} 
+                        onClose={handleToggleMenu} 
+                        onOpen={handleToggleMenu} 
+                    />
                     <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
                         Планировщик задач
                     </Typography>
@@ -126,13 +181,22 @@ const MainApp: React.FC = () => {
                 </Toolbar>
             </AppBar>
 
-            <Container sx={{ mt: 3 }}>
-                <TaskList
-                    onEditTask={handleEditTask}
-                    onDeleteTask={handleDeleteTask}
-                    refreshTrigger={refreshTrigger}
-                />
-            </Container>
+            <Box
+                component="main"
+                sx={{
+                    flexGrow: 1,
+                    pt: 10,
+                    pl: 2,
+                    pr: 2,
+                    ml: isMenuOpen ? contentMargin : 0,
+                    transition: theme.transitions.create('margin', {
+                        easing: theme.transitions.easing.sharp,
+                        duration: theme.transitions.duration.leavingScreen,
+                    })
+                }}
+            >
+                <Outlet />
+            </Box>
 
             <TaskForm
                 open={isFormOpen}
@@ -185,7 +249,22 @@ export const App: React.FC = () => {
             <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/auth/callback" element={<TelegramCallback />} />
-                <Route path="/" element={<ProtectedRoute element={<MainApp />} />} />
+                <Route path="/" element={<ProtectedRoute element={<AppLayout />} />}>
+                    <Route index element={
+                        <Container>
+                            <TaskList
+                                onEditTask={(task) => {
+                                    // Показываем форму редактирования задачи
+                                    const event = new CustomEvent('edit-task', { detail: task });
+                                    window.dispatchEvent(event);
+                                }}
+                                refreshTrigger={0}
+                            />
+                        </Container>
+                    } />
+                    <Route path="settings" element={<SettingsPage />} />
+                    <Route path="about" element={<AboutPage />} />
+                </Route>
             </Routes>
         </Router>
     );

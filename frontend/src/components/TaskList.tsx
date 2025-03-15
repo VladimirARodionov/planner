@@ -77,21 +77,20 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
             console.error('Error fetching settings:', err);
         }
     }, []);
-    
-    useEffect(() => {
-        fetchSettings();
-    }, [fetchSettings]);
 
-    const fetchTasks = useCallback(async () => {
+    // Функция загрузки задач, но без зависимости от pagination/filters и т.д.
+    // это поможет избежать цикла обновлений
+    const fetchTasksStable = useCallback(async () => {
         try {
-            console.log('Fetching tasks...');
+            console.log('Fetching tasks with current state...');
             setLoading(true);
-            const paginationParams: PaginationParams = {
+            
+            // Получаем значения напрямую из текущего состояния
+            const paginationParams = {
                 ...pagination,
                 search: searchQuery
             };
             
-            // Добавляем параметры сортировки
             if (sortField) {
                 paginationParams.sort_by = sortField;
                 paginationParams.sort_order = sortDirection;
@@ -99,8 +98,8 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
             
             console.log('Pagination params:', paginationParams);
             console.log('Filters:', filters);
+            
             const data = await TasksAPI.getTasksPaginated(paginationParams, filters);
-            console.log('Fetched tasks:', data);
             setTaskData(data);
             setError(null);
         } catch (err) {
@@ -109,11 +108,39 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
         } finally {
             setLoading(false);
         }
-    }, [pagination, searchQuery, filters, sortField, sortDirection]);
-
+    }, [pagination, searchQuery, sortField, sortDirection, filters]);
+    
+    // Единый useEffect для инициализации и обработки событий
     useEffect(() => {
-        fetchTasks();
-    }, [pagination.page, filters, refreshTrigger, fetchTasks]);
+        console.log('TaskList mounted - initializing...');
+        
+        // Загружаем настройки
+        fetchSettings();
+        
+        // Загружаем начальные данные
+        fetchTasksStable();
+        
+        // Создаем стабильный обработчик событий
+        const handleRefreshEvent = () => {
+            console.log('Refresh event called - updating tasks');
+            fetchTasksStable();
+        };
+        
+        // Подписываемся на событие
+        window.addEventListener('refresh-tasks', handleRefreshEvent);
+        
+        // Очистка при размонтировании
+        return () => {
+            console.log('TaskList unmounted - cleaning up');
+            window.removeEventListener('refresh-tasks', handleRefreshEvent);
+        };
+    }, [fetchSettings, fetchTasksStable]);
+    
+    // Реагируем на изменения состояния фильтров, сортировки и т.д.
+    useEffect(() => {
+        console.log('Filters, sort or pagination changed - fetching tasks');
+        fetchTasksStable();
+    }, [pagination.page, filters, sortField, sortDirection, refreshTrigger, searchQuery, fetchTasksStable]);
 
     const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
         setPagination(prev => ({ ...prev, page: value }));
@@ -121,7 +148,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
 
     const handleSearch = () => {
         setPagination(prev => ({ ...prev, page: 1 }));
-        fetchTasks();
+        fetchTasksStable();
     };
 
     const handleClearFilters = () => {
@@ -139,6 +166,9 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
             page: 1,
             page_size: 10
         });
+        
+        // Запускаем запрос с очищенными фильтрами
+        setTimeout(() => fetchTasksStable(), 0);
     };
     
     const applyFilters = () => {
@@ -524,7 +554,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
                             <TaskItem 
                                 key={task.id} 
                                 task={task} 
-                                onTaskUpdated={fetchTasks}
+                                onTaskUpdated={fetchTasksStable}
                                 onEditTask={onEditTask}
                             />
                         ))}
@@ -544,6 +574,4 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
             )}
         </Box>
     );
-};
-
-export default TaskList; 
+}; 
