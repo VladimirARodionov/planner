@@ -65,6 +65,7 @@ export interface CreateTaskDto {
     priority_id?: number;
     duration_id?: number;
     deadline?: string;
+    completed?: boolean;
 }
 
 export interface UpdateTaskDto {
@@ -75,6 +76,7 @@ export interface UpdateTaskDto {
     priority_id?: number;
     duration_id?: number;
     deadline?: string;
+    completed?: boolean;
 }
 
 export interface TaskFilters {
@@ -218,15 +220,24 @@ export const TasksAPI = {
         return response.data;
     },
 
-    createPriority: async (priority: {
-        name: string;
-        color?: string;
-        order?: number;
-        is_active?: boolean;
-        is_default?: boolean;
-    }) => {
-        const response = await api.post<Priority>('/settings/priority/', priority);
+    // Приоритеты
+    getPriorities: async () => {
+        const response = await api.get<Priority[]>('/settings/priorities');
         return response.data;
+    },
+
+    createPriority: async (priority: { name: string; color: string; position?: number; is_active?: boolean; is_default?: boolean }) => {
+        const response = await api.post<Priority>('/settings/priorities', priority);
+        return response.data;
+    },
+
+    updatePriority: async (id: number, priority: { name?: string; color?: string; position?: number; is_active?: boolean; is_default?: boolean }) => {
+        const response = await api.put<Priority>(`/settings/priorities/${id}`, priority);
+        return response.data;
+    },
+
+    deletePriority: async (id: number) => {
+        await api.delete(`/settings/priorities/${id}`);
     },
 
     createDuration: async (duration: {
@@ -247,15 +258,6 @@ export const TasksAPI = {
 
     deleteStatus: async (statusId: number) => {
         await api.delete(`/settings/status/${statusId}`);
-    },
-
-    updatePriority: async (priorityId: number, priority: Partial<Priority>) => {
-        const response = await api.put<Priority>(`/settings/priority/${priorityId}`, priority);
-        return response.data;
-    },
-
-    deletePriority: async (priorityId: number) => {
-        await api.delete(`/settings/priority/${priorityId}`);
     },
 
     updateDuration: async (durationId: number, duration: Partial<Duration>) => {
@@ -290,12 +292,23 @@ export const TasksAPI = {
     calculateDeadline: async (durationId: number, fromDate?: Date) => {
         let url = `/settings/duration/${durationId}/calculate-deadline`;
         
+        console.log(`Calculating deadline for duration ID: ${durationId}`);
+        
         // Если передана начальная дата, добавляем ее в запрос
         if (fromDate) {
             url += `?from_date=${fromDate.toISOString()}`;
+            console.log(`Using custom from_date: ${fromDate.toISOString()}`);
         }
         
-        const response = await api.get<{ deadline: string }>(url);
-        return response.data.deadline ? new Date(response.data.deadline) : null;
+        console.log(`Making API request to: ${url}`);
+        
+        try {
+            const response = await api.get<{ deadline: string }>(url);
+            console.log('API response for deadline calculation:', response.data);
+            return response.data.deadline ? new Date(response.data.deadline) : null;
+        } catch (error) {
+            console.error('Error calculating deadline:', error);
+            throw error;
+        }
     }
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { TaskType } from '../types/task';
 import { TasksAPI } from '../api/tasks';
 import {
@@ -17,10 +18,14 @@ import {
     Typography,
     Switch,
     FormControlLabel,
+    Card,
+    CardHeader,
+    Divider
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 
 export const TaskTypeSettings: React.FC = () => {
+    const { t } = useTranslation();
     const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
     const [open, setOpen] = useState(false);
     const [editingType, setEditingType] = useState<TaskType | null>(null);
@@ -87,33 +92,37 @@ export const TaskTypeSettings: React.FC = () => {
             loadTaskTypes();
         } catch (error) {
             console.error('Error saving task type:', error);
+            alert(t('settings.error_saving_type'));
         }
     };
 
     const handleDelete = async (id: number) => {
-        if (window.confirm('Вы уверены, что хотите удалить этот тип задачи?')) {
+        if (window.confirm(t('settings.delete_type_confirmation'))) {
             try {
                 await TasksAPI.deleteTaskType(id);
                 loadTaskTypes();
             } catch (error) {
                 console.error('Error deleting task type:', error);
+                alert(t('settings.error_deleting_type'));
             }
         }
     };
 
     return (
-        <Box>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">Типы задач</Typography>
-                <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<AddIcon />}
-                    onClick={() => handleOpen()}
-                >
-                    Добавить тип
-                </Button>
-            </Box>
+        <Card variant="outlined">
+            <CardHeader 
+                title={t('settings.task_types')}
+                action={
+                    <Button
+                        color="primary"
+                        startIcon={<AddIcon />}
+                        onClick={() => handleOpen()}
+                    >
+                        {t('settings.add_task_type')}
+                    </Button>
+                }
+            />
+            <Divider />
 
             <List>
                 {taskTypes.map((type) => (
@@ -141,6 +150,7 @@ export const TaskTypeSettings: React.FC = () => {
                                 edge="end"
                                 aria-label="edit"
                                 onClick={() => handleOpen(type)}
+                                title={t('common.edit')}
                             >
                                 <EditIcon />
                             </IconButton>
@@ -148,6 +158,7 @@ export const TaskTypeSettings: React.FC = () => {
                                 edge="end"
                                 aria-label="delete"
                                 onClick={() => handleDelete(type.id)}
+                                title={t('common.delete')}
                             >
                                 <DeleteIcon />
                             </IconButton>
@@ -158,18 +169,18 @@ export const TaskTypeSettings: React.FC = () => {
 
             <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
                 <DialogTitle>
-                    {editingType ? 'Редактировать тип задачи' : 'Новый тип задачи'}
+                    {editingType ? t('settings.edit_task_type') : t('settings.add_task_type')}
                 </DialogTitle>
                 <DialogContent>
                     <Box display="flex" flexDirection="column" gap={2} mt={2}>
                         <TextField
-                            label="Название"
+                            label={t('settings.name')}
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             fullWidth
                         />
                         <TextField
-                            label="Описание"
+                            label={t('tasks.description')}
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             fullWidth
@@ -177,14 +188,14 @@ export const TaskTypeSettings: React.FC = () => {
                             rows={2}
                         />
                         <TextField
-                            label="Цвет"
+                            label={t('settings.color')}
                             type="color"
                             value={formData.color}
                             onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                             fullWidth
                         />
                         <TextField
-                            label="Порядок"
+                            label={t('settings.position_number')}
                             type="number"
                             value={formData.order}
                             onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) })}
@@ -197,7 +208,7 @@ export const TaskTypeSettings: React.FC = () => {
                                     onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })}
                                 />
                             }
-                            label="По умолчанию"
+                            label={t('common.default')}
                         />
                         <FormControlLabel
                             control={
@@ -206,17 +217,17 @@ export const TaskTypeSettings: React.FC = () => {
                                     onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                                 />
                             }
-                            label="Активен"
+                            label={t('common.active')}
                         />
                     </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleClose}>Отмена</Button>
+                    <Button onClick={handleClose}>{t('common.cancel')}</Button>
                     <Button onClick={handleSubmit} variant="contained" color="primary">
-                        {editingType ? 'Сохранить' : 'Создать'}
+                        {editingType ? t('common.save') : t('common.create')}
                     </Button>
                 </DialogActions>
             </Dialog>
-        </Box>
+        </Card>
     );
 }; 

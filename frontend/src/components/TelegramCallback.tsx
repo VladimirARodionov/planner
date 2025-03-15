@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Box, CircularProgress, Typography } from '@mui/material';
 
 const TelegramCallback: React.FC = () => {
+    const { t } = useTranslation();
     const location = useLocation();
     const navigate = useNavigate();
     const [error, setError] = useState<string | null>(null);
@@ -22,7 +24,7 @@ const TelegramCallback: React.FC = () => {
                 const userId = queryParams.get('user_id');
                 
                 if (!accessToken || !refreshToken || !userId) {
-                    throw new Error('Отсутствуют необходимые параметры авторизации');
+                    throw new Error(t('login.missing_auth_params'));
                 }
                 
                 console.log('Auth params:', { accessToken, refreshToken, userId });
@@ -36,12 +38,12 @@ const TelegramCallback: React.FC = () => {
                 navigate('/');
             } catch (err) {
                 console.error('Error handling Telegram callback:', err);
-                setError('Ошибка при обработке авторизации через Telegram');
+                setError(t('login.telegram_auth_error'));
             }
         };
 
         handleCallback();
-    }, [location, navigate]);
+    }, [location, navigate, t]);
 
     return (
         <Box
@@ -61,7 +63,7 @@ const TelegramCallback: React.FC = () => {
                 <>
                     <CircularProgress size={60} />
                     <Typography variant="h6" sx={{ mt: 2 }}>
-                        Выполняется вход через Telegram...
+                        {t('login.telegram_login_process')}
                     </Typography>
                 </>
             )}

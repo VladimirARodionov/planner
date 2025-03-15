@@ -21,6 +21,7 @@ export interface Priority {
     name: string;
     color: string;
     order: number;
+    position?: number;
     is_active: boolean;
     is_default: boolean;
 }
@@ -57,6 +58,7 @@ export interface Task {
     deadline_iso?: string;
     created_at: string;
     completed_at?: string;
+    completed?: boolean;
     is_overdue: boolean;
     reminders: string[];
     tags: string[];
@@ -67,4 +69,26 @@ export interface Settings {
     statuses: Status[];
     priorities: Priority[];
     durations: Duration[];
+}
+
+export interface CreateTaskDto {
+    title: string;
+    description?: string | null;
+    type_id?: number;
+    status_id?: number;
+    priority_id?: number;
+    duration_id?: number;
+    deadline?: string;
+    completed?: boolean;
+}
+
+export interface UpdateTaskDto {
+    title?: string;
+    description?: string | null;
+    type_id?: number;
+    status_id?: number;
+    priority_id?: number;
+    duration_id?: number;
+    deadline?: string;
+    completed?: boolean;
 } 

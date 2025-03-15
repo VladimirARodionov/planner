@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Status } from '../types/task';
 import { TasksAPI } from '../api/tasks';
 import {
@@ -17,10 +18,14 @@ import {
     Typography,
     Switch,
     FormControlLabel,
+    Card,
+    CardHeader,
+    Divider
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 
 export const StatusSettings: React.FC = () => {
+    const { t } = useTranslation();
     const [statuses, setStatuses] = useState<Status[]>([]);
     const [open, setOpen] = useState(false);
     const [editingStatus, setEditingStatus] = useState<Status | null>(null);
@@ -90,33 +95,37 @@ export const StatusSettings: React.FC = () => {
             loadStatuses();
         } catch (error) {
             console.error('Error saving status:', error);
+            alert(t('settings.error_saving_status'));
         }
     };
 
     const handleDelete = async (id: number) => {
-        if (window.confirm('Вы уверены, что хотите удалить этот статус?')) {
+        if (window.confirm(t('settings.delete_status_confirmation'))) {
             try {
                 await TasksAPI.deleteStatus(id);
                 loadStatuses();
             } catch (error) {
                 console.error('Error deleting status:', error);
+                alert(t('settings.error_deleting_status'));
             }
         }
     };
 
     return (
-        <Box>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">Статусы</Typography>
-                <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<AddIcon />}
-                    onClick={() => handleOpen()}
-                >
-                    Добавить статус
-                </Button>
-            </Box>
+        <Card variant="outlined">
+            <CardHeader 
+                title={t('settings.statuses')}
+                action={
+                    <Button
+                        color="primary"
+                        startIcon={<AddIcon />}
+                        onClick={() => handleOpen()}
+                    >
+                        {t('settings.add_status')}
+                    </Button>
+                }
+            />
+            <Divider />
 
             <List>
                 {statuses.map((status) => (
@@ -131,7 +140,7 @@ export const StatusSettings: React.FC = () => {
                     >
                         <ListItemText
                             primary={status.name}
-                            secondary={`Код: ${status.code}`}
+                            secondary={`${t('settings.code')}: ${status.code}`}
                             sx={{
                                 '& .MuiListItemText-primary': {
                                     color: status.color,
@@ -144,6 +153,7 @@ export const StatusSettings: React.FC = () => {
                                 edge="end"
                                 aria-label="edit"
                                 onClick={() => handleOpen(status)}
+                                title={t('common.edit')}
                             >
                                 <EditIcon />
                             </IconButton>
@@ -151,6 +161,7 @@ export const StatusSettings: React.FC = () => {
                                 edge="end"
                                 aria-label="delete"
                                 onClick={() => handleDelete(status.id)}
+                                title={t('common.delete')}
                             >
                                 <DeleteIcon />
                             </IconButton>
@@ -161,31 +172,31 @@ export const StatusSettings: React.FC = () => {
 
             <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
                 <DialogTitle>
-                    {editingStatus ? 'Редактировать статус' : 'Новый статус'}
+                    {editingStatus ? t('settings.edit_status') : t('settings.add_status')}
                 </DialogTitle>
                 <DialogContent>
                     <Box display="flex" flexDirection="column" gap={2} mt={2}>
                         <TextField
-                            label="Название"
+                            label={t('settings.name')}
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             fullWidth
                         />
                         <TextField
-                            label="Код"
+                            label={t('settings.code')}
                             value={formData.code}
                             onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                             fullWidth
                         />
                         <TextField
-                            label="Цвет"
+                            label={t('settings.color')}
                             type="color"
                             value={formData.color}
                             onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                             fullWidth
                         />
                         <TextField
-                            label="Порядок"
+                            label={t('settings.position_number')}
                             type="number"
                             value={formData.order}
                             onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) })}
@@ -198,7 +209,7 @@ export const StatusSettings: React.FC = () => {
                                     onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })}
                                 />
                             }
-                            label="По умолчанию"
+                            label={t('common.default')}
                         />
                         <FormControlLabel
                             control={
@@ -207,7 +218,7 @@ export const StatusSettings: React.FC = () => {
                                     onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                                 />
                             }
-                            label="Активен"
+                            label={t('common.active')}
                         />
                         <FormControlLabel
                             control={
@@ -216,17 +227,17 @@ export const StatusSettings: React.FC = () => {
                                     onChange={(e) => setFormData({ ...formData, is_final: e.target.checked })}
                                 />
                             }
-                            label="Финальный"
+                            label={t('settings.is_final')}
                         />
                     </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleClose}>Отмена</Button>
+                    <Button onClick={handleClose}>{t('common.cancel')}</Button>
                     <Button onClick={handleSubmit} variant="contained" color="primary">
-                        {editingStatus ? 'Сохранить' : 'Создать'}
+                        {editingStatus ? t('common.save') : t('common.create')}
                     </Button>
                 </DialogActions>
             </Dialog>
-        </Box>
+        </Card>
     );
 }; 

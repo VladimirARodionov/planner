@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Duration, DurationType } from '../types/task';
 import { Box, Typography, List, ListItem, ListItemText } from '@mui/material';
 
@@ -7,25 +8,27 @@ interface DurationListProps {
 }
 
 export const DurationList: React.FC<DurationListProps> = ({ durations }) => {
+    const { t } = useTranslation();
+    
     // Функция для получения человекочитаемого названия типа длительности
     const getDurationTypeLabel = (type: DurationType | string): string => {
         switch (type) {
             case DurationType.DAYS:
             case "DAYS":
             case "days":
-                return 'дней';
+                return t('duration_types.days');
             case DurationType.WEEKS:
             case "WEEKS":
             case "weeks":
-                return 'недель';
+                return t('duration_types.weeks');
             case DurationType.MONTHS:
             case "MONTHS":
             case "months":
-                return 'месяцев';
+                return t('duration_types.months');
             case DurationType.YEARS:
             case "YEARS":
             case "years":
-                return 'лет';
+                return t('duration_types.years');
             default:
                 return String(type);
         }
@@ -34,7 +37,7 @@ export const DurationList: React.FC<DurationListProps> = ({ durations }) => {
     return (
         <Box>
             <Typography variant="h6" gutterBottom>
-                Продолжительности
+                {t('settings.durations')}
             </Typography>
             <List>
                 {durations.map((duration) => (

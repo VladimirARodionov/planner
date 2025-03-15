@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Priority } from '../types/task';
 import { TasksAPI } from '../api/tasks';
 import {
@@ -17,19 +18,23 @@ import {
     Typography,
     Switch,
     FormControlLabel,
+    Card,
+    CardHeader,
+    Divider,
+    InputAdornment
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
+import { ColorPicker } from './ColorPicker';
 
 export const PrioritySettings: React.FC = () => {
+    const { t } = useTranslation();
     const [priorities, setPriorities] = useState<Priority[]>([]);
     const [open, setOpen] = useState(false);
     const [editingPriority, setEditingPriority] = useState<Priority | null>(null);
     const [formData, setFormData] = useState({
         name: '',
-        color: '#808080',
-        order: 0,
-        is_default: false,
-        is_active: true,
+        color: '#1976D2',
+        position: 0
     });
 
     useEffect(() => {
@@ -38,8 +43,9 @@ export const PrioritySettings: React.FC = () => {
 
     const loadPriorities = async () => {
         try {
-            const settings = await TasksAPI.getSettings();
-            setPriorities(settings.priorities);
+            const data = await TasksAPI.getPriorities();
+            console.log('Loaded priorities:', data);
+            setPriorities(data);
         } catch (error) {
             console.error('Error loading priorities:', error);
         }
@@ -50,19 +56,15 @@ export const PrioritySettings: React.FC = () => {
             setEditingPriority(priority);
             setFormData({
                 name: priority.name,
-                color: priority.color,
-                order: priority.order,
-                is_default: priority.is_default,
-                is_active: priority.is_active,
+                color: priority.color || '#1976D2',
+                position: priority.position || 0
             });
         } else {
             setEditingPriority(null);
             setFormData({
                 name: '',
-                color: '#808080',
-                order: 0,
-                is_default: false,
-                is_active: true,
+                color: '#1976D2',
+                position: priorities.length + 1
             });
         }
         setOpen(true);
@@ -70,7 +72,6 @@ export const PrioritySettings: React.FC = () => {
 
     const handleClose = () => {
         setOpen(false);
-        setEditingPriority(null);
     };
 
     const handleSubmit = async () => {
@@ -80,71 +81,77 @@ export const PrioritySettings: React.FC = () => {
             } else {
                 await TasksAPI.createPriority(formData);
             }
-            handleClose();
             loadPriorities();
+            handleClose();
         } catch (error) {
             console.error('Error saving priority:', error);
+            alert(t('settings.error_saving_priority'));
         }
     };
 
     const handleDelete = async (id: number) => {
-        if (window.confirm('Вы уверены, что хотите удалить этот приоритет?')) {
+        if (window.confirm(t('settings.delete_priority_confirmation'))) {
             try {
                 await TasksAPI.deletePriority(id);
                 loadPriorities();
             } catch (error) {
                 console.error('Error deleting priority:', error);
+                alert(t('settings.error_deleting_priority'));
             }
         }
     };
 
-    return (
-        <Box>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">Приоритеты</Typography>
-                <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<AddIcon />}
-                    onClick={() => handleOpen()}
-                >
-                    Добавить приоритет
-                </Button>
-            </Box>
+    const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = event.target;
+        setFormData({
+            ...formData,
+            [name]: value
+        });
+    };
 
-            <List>
-                {priorities.map((priority) => (
-                    <ListItem
-                        key={priority.id}
-                        sx={{
-                            border: '1px solid #ddd',
-                            borderRadius: 1,
-                            mb: 1,
-                            backgroundColor: priority.color + '20',
-                        }}
+    const handleColorChange = (color: string) => {
+        setFormData({
+            ...formData,
+            color
+        });
+    };
+
+    return (
+        <Card variant="outlined">
+            <CardHeader 
+                title={t('settings.priorities')}
+                action={
+                    <Button 
+                        startIcon={<AddIcon />} 
+                        onClick={() => handleOpen()}
+                        color="primary"
                     >
-                        <ListItemText
+                        {t('settings.add_priority')}
+                    </Button>
+                }
+            />
+            <Divider />
+            <List>
+                {priorities.map(priority => (
+                    <ListItem key={priority.id}>
+                        <Box 
+                            sx={{ 
+                                width: 16, 
+                                height: 16, 
+                                borderRadius: '50%', 
+                                backgroundColor: priority.color || '#ccc',
+                                mr: 2
+                            }} 
+                        />
+                        <ListItemText 
                             primary={priority.name}
-                            sx={{
-                                '& .MuiListItemText-primary': {
-                                    color: priority.color,
-                                    fontWeight: 'bold',
-                                },
-                            }}
+                            secondary={t('settings.position', { position: priority.position })}
                         />
                         <ListItemSecondaryAction>
-                            <IconButton
-                                edge="end"
-                                aria-label="edit"
-                                onClick={() => handleOpen(priority)}
-                            >
+                            <IconButton edge="end" onClick={() => handleOpen(priority)} title={t('common.edit')}>
                                 <EditIcon />
                             </IconButton>
-                            <IconButton
-                                edge="end"
-                                aria-label="delete"
-                                onClick={() => handleDelete(priority.id)}
-                            >
+                            <IconButton edge="end" onClick={() => handleDelete(priority.id)} title={t('common.delete')}>
                                 <DeleteIcon />
                             </IconButton>
                         </ListItemSecondaryAction>
@@ -152,59 +159,51 @@ export const PrioritySettings: React.FC = () => {
                 ))}
             </List>
 
-            <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+            <Dialog open={open} onClose={handleClose}>
                 <DialogTitle>
-                    {editingPriority ? 'Редактировать приоритет' : 'Новый приоритет'}
+                    {editingPriority 
+                        ? t('settings.edit_priority') 
+                        : t('settings.add_priority')
+                    }
                 </DialogTitle>
                 <DialogContent>
-                    <Box display="flex" flexDirection="column" gap={2} mt={2}>
-                        <TextField
-                            label="Название"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            fullWidth
-                        />
-                        <TextField
-                            label="Цвет"
-                            type="color"
-                            value={formData.color}
-                            onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                            fullWidth
-                        />
-                        <TextField
-                            label="Порядок"
-                            type="number"
-                            value={formData.order}
-                            onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) })}
-                            fullWidth
-                        />
-                        <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={formData.is_default}
-                                    onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })}
-                                />
-                            }
-                            label="По умолчанию"
-                        />
-                        <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={formData.is_active}
-                                    onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                                />
-                            }
-                            label="Активен"
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        name="name"
+                        label={t('settings.priority_name')}
+                        type="text"
+                        fullWidth
+                        value={formData.name}
+                        onChange={handleChange}
+                    />
+                    <Box sx={{ mt: 2, mb: 1 }}>
+                        <ColorPicker 
+                            color={formData.color} 
+                            onChange={handleColorChange}
+                            label={t('settings.color')}
                         />
                     </Box>
+                    <TextField
+                        margin="dense"
+                        name="position"
+                        label={t('settings.position_number')}
+                        type="number"
+                        fullWidth
+                        value={formData.position}
+                        onChange={handleChange}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">#</InputAdornment>
+                            ),
+                        }}
+                    />
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleClose}>Отмена</Button>
-                    <Button onClick={handleSubmit} variant="contained" color="primary">
-                        {editingPriority ? 'Сохранить' : 'Создать'}
-                    </Button>
+                    <Button onClick={handleClose}>{t('common.cancel')}</Button>
+                    <Button onClick={handleSubmit} color="primary">{t('common.save')}</Button>
                 </DialogActions>
             </Dialog>
-        </Box>
+        </Card>
     );
 }; 
