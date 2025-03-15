@@ -15,13 +15,15 @@ import {
     ListItemText,
     ListItemSecondaryAction,
     IconButton,
-    Typography,
-    Switch,
-    FormControlLabel,
-    FormControl,
-    InputLabel,
     Select,
     MenuItem,
+    FormControl,
+    InputLabel,
+    Card,
+    CardHeader,
+    Divider,
+    Switch,
+    FormControlLabel
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 
@@ -188,19 +190,20 @@ export const DurationSettings: React.FC = () => {
     };
 
     return (
-        <Box>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">{t('settings.durations')}</Typography>
-                <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<AddIcon />}
-                    onClick={() => handleOpen()}
-                >
-                    {t('settings.add_duration')}
-                </Button>
-            </Box>
-
+        <Card variant="outlined">
+            <CardHeader 
+                title={t('settings.durations')}
+                action={
+                    <Button 
+                        startIcon={<AddIcon />} 
+                        onClick={() => handleOpen()}
+                        color="primary"
+                    >
+                        {t('settings.add_duration')}
+                    </Button>
+                }
+            />
+            <Divider />
             <List>
                 {durations.map((duration) => (
                     <ListItem
@@ -305,6 +308,6 @@ export const DurationSettings: React.FC = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
-        </Box>
+        </Card>
     );
 }; 

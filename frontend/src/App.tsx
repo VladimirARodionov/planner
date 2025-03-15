@@ -208,6 +208,7 @@ const AppLayout: React.FC = () => {
                 onClose={handleCloseForm}
                 task={selectedTask}
                 onSubmit={handleSubmitTask}
+                isEditing={!!selectedTask}
             />
 
             <Snackbar
