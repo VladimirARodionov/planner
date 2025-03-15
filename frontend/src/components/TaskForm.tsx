@@ -58,6 +58,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
     const [priorities, setPriorities] = useState<Priority[]>([]);
     const [durations, setDurations] = useState<Duration[]>([]);
     const [loading, setLoading] = useState(false);
+    const [calculatingDeadline, setCalculatingDeadline] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -79,7 +80,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                     status_id: statusId,
                     priority_id: priorityId,
                     duration_id: durationId,
-                    deadline: task.deadline ? new Date(task.deadline) : null
+                    deadline: task.deadline_iso ? new Date(task.deadline_iso) : (task.deadline ? new Date(task.deadline) : null)
                 });
                 
                 console.log('Form data after set:', {
@@ -89,7 +90,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                     status_id: statusId,
                     priority_id: priorityId,
                     duration_id: durationId,
-                    deadline: task.deadline ? new Date(task.deadline) : null
+                    deadline: task.deadline_iso ? new Date(task.deadline_iso) : (task.deadline ? new Date(task.deadline) : null)
                 });
             } else {
                 setFormData({
@@ -135,14 +136,50 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         });
     };
 
-    const handleSelectChange = (
+    const handleSelectChange = async (
         event: SelectChangeEvent<number | ''>,
         field: 'status_id' | 'priority_id' | 'duration_id'
     ) => {
-        setFormData({
+        const newValue = event.target.value;
+        
+        // Обновляем форму с новым значением
+        const updatedFormData = {
             ...formData,
-            [field]: event.target.value
-        });
+            [field]: newValue
+        };
+        
+        // Сразу устанавливаем обновленные данные формы
+        setFormData(updatedFormData);
+
+        // Если выбрана длительность, автоматически рассчитываем дедлайн
+        if (field === 'duration_id' && newValue !== '') {
+            try {
+                // Показываем спиннер при расчете дедлайна
+                setCalculatingDeadline(true);
+                
+                // Рассчитываем дедлайн на основе выбранной длительности
+                const deadline = await TasksAPI.calculateDeadline(newValue as number);
+                
+                // Устанавливаем дедлайн в форму, сохраняя обновленное значение длительности
+                if (deadline) {
+                    // Получаем текущее время
+                    const now = new Date();
+                    // Устанавливаем время для дедлайна
+                    deadline.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+                    
+                    setFormData({
+                        ...updatedFormData, // Используем обновленные данные с новой длительностью
+                        deadline: deadline
+                    });
+                    console.log(`Deadline calculated: ${deadline.toLocaleString()}`);
+                }
+            } catch (err) {
+                console.error('Error calculating deadline:', err);
+                setError('Ошибка при расчете дедлайна');
+            } finally {
+                setCalculatingDeadline(false);
+            }
+        }
     };
 
     const handleSubmit = (event: React.FormEvent) => {
@@ -388,7 +425,12 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                         <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
                             {formData.deadline && (
                                 <Typography variant="body2" color="primary" sx={{ mb: 1 }}>
-                                    Текущий дедлайн: {formData.deadline.toLocaleDateString('ru-RU')}
+                                    Текущий дедлайн: {formData.deadline.toLocaleString('ru-RU')}
+                                </Typography>
+                            )}
+                            {calculatingDeadline && (
+                                <Typography variant="body2" color="secondary" sx={{ mb: 1 }}>
+                                    Расчёт дедлайна...
                                 </Typography>
                             )}
                             <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ruLocale}>
@@ -396,12 +438,20 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                                     <DatePicker
                                         label="Дедлайн"
                                         value={formData.deadline}
-                                        onChange={(newValue) => setFormData({ ...formData, deadline: newValue })}
+                                        onChange={(newValue) => {
+                                            if (newValue) {
+                                                // Получаем текущее время
+                                                const now = new Date();
+                                                // Устанавливаем время для выбранной даты
+                                                newValue.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+                                            }
+                                            setFormData({ ...formData, deadline: newValue });
+                                        }}
                                         slotProps={{ 
                                             textField: { 
                                                 fullWidth: true,
                                                 variant: 'outlined',
-                                                helperText: "Дата выполнения задачи"
+                                                helperText: "Дата и время выполнения задачи"
                                             } 
                                         }}
                                         sx={{ flex: 1 }}

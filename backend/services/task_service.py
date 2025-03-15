@@ -549,7 +549,8 @@ class TaskService:
                     'order': priority.order
                 } if priority else None,
                 'duration': duration_data,
-                'deadline': task.deadline.isoformat() if task.deadline else None,
+                'deadline': task.deadline.strftime('%d.%m.%Y %H:%M') if task.deadline else None,
+                'deadline_iso': task.deadline.isoformat() if task.deadline else None,
                 'created_at': task.created_at.isoformat(),
                 'completed_at': task.completed_at.isoformat() if task.completed_at else None,
                 'is_overdue': task.is_overdue()

@@ -9,6 +9,7 @@ from backend.blueprints.wrapper import async_route
 from backend.database import get_session
 from backend.services.task_service import TaskService
 from backend.services.settings_service import SettingsService
+from backend.db.models import DurationSetting
 
 bp = Blueprint("planner", __name__)
 logger = logging.getLogger(__name__)
@@ -461,3 +462,43 @@ async def delete_task_type(task_type_id):
         if not success:
             return jsonify({'error': 'Task type not found'}), 404
         return '', 204
+
+@bp.route('/api/settings/duration/<int:duration_id>/calculate-deadline', methods=['GET', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+@async_route
+async def calculate_deadline(duration_id):
+    """Рассчитать дедлайн на основе длительности"""
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    current_user = get_jwt_identity()
+    
+    async with get_session() as session:
+        try:
+            duration = await session.get(DurationSetting, duration_id)
+            
+            # Проверяем, принадлежит ли длительность пользователю
+            if not duration or str(duration.user_id) != current_user:
+                return jsonify({'error': 'Duration not found'}), 404
+                
+            # Получаем начальную дату из запроса или используем текущую дату и время
+            from_date = datetime.now()  # По умолчанию используем текущую дату и время
+            if request.args.get('from_date'):
+                try:
+                    from_date = datetime.fromisoformat(
+                        request.args.get('from_date').replace('Z', '+00:00')
+                    )
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Error parsing from_date: {e}")
+                    # Если не удалось распарсить дату из запроса, продолжаем использовать текущую дату и время
+            
+            # Расчитываем дедлайн
+            deadline = await duration.calculate_deadline_async(session, from_date)
+            
+            return jsonify({
+                'deadline': deadline.isoformat() if deadline else None
+            })
+        except Exception as e:
+            logger.error(f"Error calculating deadline: {e}")
+            return jsonify({'error': str(e)}), 500

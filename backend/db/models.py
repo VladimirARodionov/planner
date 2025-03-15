@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, Enum, JSON, Text, BigInteger
 from sqlalchemy.orm import relationship, declarative_base
@@ -131,7 +131,12 @@ class DurationSetting(Base):
     async def calculate_deadline_async(self, session, from_date=None):
         """Рассчитать дедлайн на основе продолжительности (асинхронный метод)"""
         if from_date is None:
+            # Используем текущую дату и время
             from_date = datetime.now()
+        elif isinstance(from_date, date) and not isinstance(from_date, datetime):
+            # Если передана только дата (без времени), добавляем текущее время
+            now = datetime.now()
+            from_date = datetime.combine(from_date, now.time())
 
         # Получаем актуальные значения из базы данных
         duration = await session.get(DurationSetting, self.id)

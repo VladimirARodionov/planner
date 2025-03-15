@@ -16,6 +16,7 @@ from backend.services.task_service import TaskService
 from backend.services.settings_service import SettingsService
 from backend.database import get_session
 from backend.utils import escape_html
+from backend.db.models import DurationSetting
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,10 @@ async def get_durations(dialog_manager: DialogManager, **kwargs):
     deadline_display = "Не установлен"
     if deadline is not None:
         if isinstance(deadline, (datetime, date)):
-            deadline_display = deadline.strftime("%d.%m.%Y")
+            if isinstance(deadline, datetime):
+                deadline_display = deadline.strftime("%d.%m.%Y %H:%M")
+            else:
+                deadline_display = deadline.strftime("%d.%m.%Y")
             logger.debug(f"Форматирую дедлайн: {deadline_display}")
         elif isinstance(deadline, str):
             deadline_display = deadline
@@ -124,6 +128,23 @@ async def on_duration_selected(callback: CallbackQuery, widget: Any, manager: Di
     logger.debug(f"on_duration_selected called with item_id: {item_id}, type: {type(item_id)}")
     manager.dialog_data["duration_id"] = str(item_id)
     logger.debug(f"Selected duration_id: {item_id}, dialog_data: {manager.dialog_data}")
+    
+    # Расчитываем и устанавливаем дедлайн на основе длительности
+    async with get_session() as session:
+        try:
+            duration = await session.get(DurationSetting, int(item_id))
+            if duration:
+                # Расчитываем дедлайн
+                # Используем datetime.now() чтобы сохранить текущее время
+                deadline = await duration.calculate_deadline_async(session, datetime.now())
+                logger.debug(f"Calculated deadline based on duration: {deadline}")
+                # Устанавливаем дедлайн в данные диалога
+                manager.dialog_data["deadline"] = deadline
+                logger.debug(f"Set deadline: {deadline} in dialog_data")
+        except Exception as e:
+            logger.error(f"Error calculating deadline: {e}")
+    
+    # Переходим к экрану подтверждения
     await manager.switch_to(TaskDialog.confirm)
 
 async def on_duration_next(callback: CallbackQuery, button: Button, manager: DialogManager):
@@ -140,8 +161,20 @@ async def on_skip_duration(event, widget, manager: DialogManager):
 async def on_deadline_selected(c: CallbackQuery, widget: Any, manager: DialogManager, date: datetime):
     """Обработчик выбора дедлайна"""
     logger.debug(f"on_deadline_selected called with date: {date}, type: {type(date)}")
-    manager.dialog_data["deadline"] = date
-    logger.debug(f"Установлен дедлайн: {date}, тип: {type(date)}, dialog_data: {manager.dialog_data}")
+    
+    # Сохраняем время в выбранной дате
+    # Проверяем, что date - это datetime, а не date
+    if isinstance(date, datetime):
+        # Дата уже содержит время
+        manager.dialog_data["deadline"] = date
+    else:
+        # Преобразуем date в datetime с текущим временем
+        now = datetime.now()
+        date_with_time = datetime.combine(date, now.time())
+        manager.dialog_data["deadline"] = date_with_time
+        logger.debug(f"Установлен дедлайн с текущим временем: {date_with_time}")
+    
+    logger.debug(f"Установлен дедлайн: {manager.dialog_data['deadline']}, тип: {type(manager.dialog_data['deadline'])}, dialog_data: {manager.dialog_data}")
     
     # Возвращаемся к экрану длительности после выбора дедлайна
     await manager.switch_to(TaskDialog.duration)
@@ -246,7 +279,10 @@ async def get_task_summary(dialog_manager: DialogManager, **kwargs):
         deadline_display = "Не установлен"
         if deadline is not None:
             if isinstance(deadline, (datetime, date)):
-                deadline_display = deadline.strftime("%d.%m.%Y")
+                if isinstance(deadline, datetime):
+                    deadline_display = deadline.strftime("%d.%m.%Y %H:%M")
+                else:
+                    deadline_display = deadline.strftime("%d.%m.%Y")
                 logger.debug(f"Форматирую дедлайн: {deadline_display}")
             elif isinstance(deadline, str):
                 deadline_display = deadline
@@ -312,7 +348,10 @@ async def main_process_result(start_data: Data, result: Any,
                     deadline_display = i18n.format_value("deadline-not-set")
                     if task['deadline']:
                         if isinstance(task['deadline'], (datetime, date)):
-                            deadline_display = task['deadline'].strftime("%d.%m.%Y")
+                            if isinstance(task['deadline'], datetime):
+                                deadline_display = task['deadline'].strftime("%d.%m.%Y %H:%M")
+                            else:
+                                deadline_display = task['deadline'].strftime("%d.%m.%Y")
                         elif isinstance(task['deadline'], str):
                             deadline_display = task['deadline']
                     
