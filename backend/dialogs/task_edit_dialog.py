@@ -44,6 +44,20 @@ async def get_task_data(dialog_manager: DialogManager, **kwargs):
     # Если данные задачи уже загружены, используем их
     if "task" in dialog_manager.dialog_data:
         task = dialog_manager.dialog_data["task"]
+        # Правильно форматируем completed_at, проверяя тип данных
+        completed_at_display = None
+        if task["completed_at"]:
+            if isinstance(task["completed_at"], datetime):
+                completed_at_display = task["completed_at"].strftime("%d.%m.%Y %H:%M")
+            elif isinstance(task["completed_at"], str):
+                try:
+                    # Пытаемся преобразовать строку в datetime
+                    completed_at_datetime = datetime.fromisoformat(task["completed_at"].replace('Z', '+00:00'))
+                    completed_at_display = completed_at_datetime.strftime("%d.%m.%Y %H:%M")
+                except (ValueError, TypeError):
+                    # Если не удалось преобразовать, используем как есть
+                    completed_at_display = task["completed_at"]
+        
         return {
             "task_id": task["id"],
             "title": escape_html(task["title"]),
@@ -59,7 +73,7 @@ async def get_task_data(dialog_manager: DialogManager, **kwargs):
             "deadline": task["deadline"] if task["deadline"] else None,
             "deadline_display": task["deadline"].strftime("%d.%m.%Y") if isinstance(task["deadline"], datetime) else task["deadline"] if task["deadline"] else "Не установлен",
             "completed": task["completed_at"] is not None,
-            "completed_at": task["completed_at"].strftime("%d.%m.%Y %H:%M") if task["completed_at"] else None
+            "completed_at": completed_at_display
         }
     
     # Загружаем данные задачи из БД
@@ -81,6 +95,20 @@ async def get_task_data(dialog_manager: DialogManager, **kwargs):
         dialog_manager.dialog_data["task"] = task
         dialog_manager.dialog_data["original_task"] = task.copy()  # Сохраняем оригинальные данные
         
+        # Правильно форматируем completed_at, проверяя тип данных
+        completed_at_display = None
+        if task["completed_at"]:
+            if isinstance(task["completed_at"], datetime):
+                completed_at_display = task["completed_at"].strftime("%d.%m.%Y %H:%M")
+            elif isinstance(task["completed_at"], str):
+                try:
+                    # Пытаемся преобразовать строку в datetime
+                    completed_at_datetime = datetime.fromisoformat(task["completed_at"].replace('Z', '+00:00'))
+                    completed_at_display = completed_at_datetime.strftime("%d.%m.%Y %H:%M")
+                except (ValueError, TypeError):
+                    # Если не удалось преобразовать, используем как есть
+                    completed_at_display = task["completed_at"]
+        
         return {
             "task_id": task["id"],
             "title": escape_html(task["title"]),
@@ -96,7 +124,7 @@ async def get_task_data(dialog_manager: DialogManager, **kwargs):
             "deadline": task["deadline"] if task["deadline"] else None,
             "deadline_display": task["deadline"].strftime("%d.%m.%Y") if isinstance(task["deadline"], datetime) else task["deadline"] if task["deadline"] else "Не установлен",
             "completed": task["completed_at"] is not None,
-            "completed_at": task["completed_at"] if task["completed_at"] else None
+            "completed_at": completed_at_display
         }
 
 async def get_task_types(dialog_manager: DialogManager, **kwargs):
