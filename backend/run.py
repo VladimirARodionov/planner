@@ -20,7 +20,8 @@ from backend.dialogs.task_edit_dialog import task_edit_dialog
 from backend.dialogs.task_list_dialog import task_list_dialog
 from backend.handlers import task_handlers
 from backend.load_env import env_config
-from backend.locale_config import i18n
+from backend.locale_config import i18n, t
+from backend.middleware.i18n_middleware import I18nMiddleware
 
 logging.config.fileConfig(fname=pathlib.Path(__file__).resolve().parent.parent / 'logging.ini',
                           disable_existing_loggers=False)
@@ -50,14 +51,14 @@ async def start_bot(bot: Bot):
 
 # Функция, которая настроит командное меню (дефолтное для всех пользователей)
 async def set_commands(bot: Bot):
-    commands = [BotCommand(command='start', description=i18n.format_value("start_menu")),
-                BotCommand(command='profile', description=i18n.format_value("my_profile_menu")),
-                BotCommand(command='tasks', description=i18n.format_value("tasks-menu")),
-                BotCommand(command='add_task', description=i18n.format_value("add-task-menu")),
-                BotCommand(command='settings', description=i18n.format_value("settings_menu")),
-                BotCommand(command='language', description=i18n.format_value("settings_language")),
-                BotCommand(command='help', description=i18n.format_value("help-menu")),
-                BotCommand(command='stop', description=i18n.format_value("stop_menu"))]
+    commands = [BotCommand(command='start', description=t("start_menu")),
+                BotCommand(command='profile', description=t("my_profile_menu")),
+                BotCommand(command='tasks', description=t("tasks-menu")),
+                BotCommand(command='add_task', description=t("add-task-menu")),
+                BotCommand(command='settings', description=t("settings_menu")),
+                BotCommand(command='language', description=t("settings_language")),
+                BotCommand(command='help', description=t("help-menu")),
+                BotCommand(command='stop', description=t("stop_menu"))]
     await bot.set_my_commands(commands, BotCommandScopeDefault())
 
 # Функция, которая выполнится когда бот завершит свою работу
@@ -128,6 +129,8 @@ def create_app():
     from backend.blueprints import auth_bp, planner_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(planner_bp)
+    # Регистрируем middleware для локализации
+    dp.update.middleware(I18nMiddleware())
 
     jwt = JWTManager(app)
     app.debug = True

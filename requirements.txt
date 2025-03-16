@@ -16,4 +16,5 @@ asyncpg
 aiogram-dialog
 pydantic
 contextvars
+python-i18n
 

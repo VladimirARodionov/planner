@@ -12,7 +12,7 @@ from aiogram_dialog import DialogManager, StartMode
 
 from backend.database import get_session, create_user_settings
 from backend.dialogs.task_list_dialog import TaskListStates
-from backend.locale_config import i18n, get_user_locale, AVAILABLE_LANGUAGES, set_user_locale, set_current_user_id
+from backend.locale_config import t, get_user_locale, AVAILABLE_LANGUAGES, set_user_locale, set_current_user_id
 from backend.services.task_service import TaskService
 from backend.services.auth_service import AuthService
 from backend.services.settings_service import SettingsService
@@ -228,14 +228,14 @@ async def start_command(message: Message):
             # Создаем клавиатуру с кнопкой для входа
             keyboard = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(
-                    text=i18n.format_value("login-to-web"),
+                    text=t("login-to-web"),
                     url=auth_url
                 )]
             ])
 
             # Отправляем сообщение с кнопкой для входа
             await message.answer(
-                i18n.format_value("web-auth-success"),
+                t("web-auth-success"),
                 reply_markup=keyboard
             )
 
@@ -243,24 +243,24 @@ async def start_command(message: Message):
                 # Создаем клавиатуру с кнопкой для входа через Mini App
                 mini_app_keyboard = InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(
-                        text=i18n.format_value("login-to-web-mini-app"),
+                        text=t("login-to-web-mini-app"),
                         web_app={"url": auth_url}
                     )]
                 ])
                 # Отправляем сообщение с кнопкой для входа через Mini App
                 await message.answer(
-                    i18n.format_value("web-auth-mini-app"),
+                    t("web-auth-mini-app"),
                     reply_markup=mini_app_keyboard
                 )
         else:
             logger.error(f"Не найдено состояние авторизации для {auth_state}")
-            await message.answer(i18n.format_value("web-auth-error"))
+            await message.answer(t("web-auth-error"))
     else:
         # Отправляем приветственное сообщение
         await message.answer(
-            i18n.format_value(
+            t(
                 "welcome-message",
-                {"name": first_name or username or ""}
+                name=first_name or username or ""
             )
         )
         # Отправляем сообщение с помощью
@@ -270,7 +270,7 @@ async def start_command(message: Message):
 async def stop_command(message: Message):
     # Устанавливаем пользователя в контекст
     set_current_user_id(str(message.from_user.id))
-    await message.answer(i18n.format_value("stopped"))
+    await message.answer(t("stopped"))
 
 # Функция для отображения справки
 async def show_help(message: Message):
@@ -278,21 +278,21 @@ async def show_help(message: Message):
     # Устанавливаем пользователя в контекст
     set_current_user_id(str(message.from_user.id))
     help_text = (
-            i18n.format_value("help-header") + "\n\n" +
-            i18n.format_value("help-tasks") + "\n" +
-            i18n.format_value("help-add-task") + "\n" +
-            i18n.format_value("help-delete-task") + "\n" +
+            t("help-header") + "\n\n" +
+            t("help-tasks") + "\n" +
+            t("help-add-task") + "\n" +
+            t("help-delete-task") + "\n" +
             "\n" +
-            i18n.format_value("settings_command_help") + "\n" +
-            i18n.format_value("settings_statuses_command_help") + "\n" +
-            i18n.format_value("settings_priorities_command_help") + "\n" +
-            i18n.format_value("settings_durations_command_help") + "\n" +
-            i18n.format_value("settings_task_types_command_help") + "\n" +
-            i18n.format_value("create_settings_command_help") + "\n" +
+            t("settings_command_help") + "\n" +
+            t("settings_statuses_command_help") + "\n" +
+            t("settings_priorities_command_help") + "\n" +
+            t("settings_durations_command_help") + "\n" +
+            t("settings_task_types_command_help") + "\n" +
+            t("create_settings_command_help") + "\n" +
             "\n" +
-            i18n.format_value("settings_language_help") + "\n" +
+            t("settings_language_help") + "\n" +
             "\n" +
-            i18n.format_value("help-help")
+            t("help-help")
     )
     await message.answer(help_text)
 
@@ -323,11 +323,11 @@ async def delete_task(message: Message):
             success = await task_service.delete_task(str(message.from_user.id), task_id)
 
             if success:
-                await message.answer(i18n.format_value("task-deleted", {"id": task_id}))
+                await message.answer(t("task-deleted", {"id": task_id}))
             else:
-                await message.answer(i18n.format_value("task-delete-error", {"id": task_id}))
+                await message.answer(t("task-delete-error", {"id": task_id}))
     except (IndexError, ValueError):
-        await message.answer(i18n.format_value("task-delete-usage"))
+        await message.answer(t("task-delete-usage"))
 
 @router.message(Command("settings"))
 async def show_settings(message: Message):
@@ -336,25 +336,25 @@ async def show_settings(message: Message):
     set_current_user_id(str(message.from_user.id))
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
-            text=i18n.format_value("settings_statuses"),
+            text=t("settings_statuses"),
             callback_data="settings_statuses"
         )],
         [InlineKeyboardButton(
-            text=i18n.format_value("settings_priorities"),
+            text=t("settings_priorities"),
             callback_data="settings_priorities"
         )],
         [InlineKeyboardButton(
-            text=i18n.format_value("settings_durations"),
+            text=t("settings_durations"),
             callback_data="settings_durations"
         )],
         [InlineKeyboardButton(
-            text=i18n.format_value("settings_task_types"),
+            text=t("settings_task_types"),
             callback_data="settings_task_types"
         )]
     ])
 
     await message.answer(
-        i18n.format_value("settings_header"),
+        t("settings_header"),
         reply_markup=keyboard
     )
 
@@ -377,10 +377,10 @@ async def on_settings_statuses_callback(callback_query: CallbackQuery):
 
         if not statuses:
             logger.warning(f"Статусы для пользователя {user_id} не найдены")
-            await callback_query.message.answer(i18n.format_value("settings_not_found"))
+            await callback_query.message.answer(t("settings_not_found"))
             return
 
-        response = i18n.format_value("settings_statuses") + "\n\n"
+        response = t("settings_statuses") + "\n\n"
         for status in statuses:
             logger.debug(f"Статус: {status}")
             response += f"• {status['name']} ({status['code']})\n"
@@ -406,10 +406,10 @@ async def on_settings_priorities_callback(callback_query: CallbackQuery):
         priorities = await settings_service.get_priorities(str(user_id))
 
         if not priorities:
-            await callback_query.message.answer(i18n.format_value("settings_not_found"))
+            await callback_query.message.answer(t("settings_not_found"))
             return
 
-        response = i18n.format_value("settings_priorities") + "\n\n"
+        response = t("settings_priorities") + "\n\n"
         for priority in priorities:
             response += f"• {priority['name']}\n"
             response += f"  Цвет: {priority['color']}\n"
@@ -433,10 +433,10 @@ async def on_settings_durations_callback(callback_query: CallbackQuery):
         durations = await settings_service.get_durations(str(user_id))
 
         if not durations:
-            await callback_query.message.answer(i18n.format_value("settings_not_found"))
+            await callback_query.message.answer(t("settings_not_found"))
             return
 
-        response = i18n.format_value("settings_durations") + "\n\n"
+        response = t("settings_durations") + "\n\n"
         for duration in durations:
             try:
                 response += f"• {duration['name']}\n"
@@ -468,10 +468,10 @@ async def on_settings_task_types_callback(callback_query: CallbackQuery):
         task_types = await settings_service.get_task_types(str(user_id))
 
         if not task_types:
-            await callback_query.message.answer(i18n.format_value("settings_not_found"))
+            await callback_query.message.answer(t("settings_not_found"))
             return
 
-        response = i18n.format_value("settings_task_types") + "\n\n"
+        response = t("settings_task_types") + "\n\n"
         for task_type in task_types:
             response += f"• {task_type['name']}\n"
             if task_type.get('description'):
@@ -492,16 +492,13 @@ async def list_tasks(message: Message, dialog_manager: DialogManager):
         await message.answer(f"Произошла ошибка при загрузке списка задач: {e}")
 
 @router.message(Command("language"))
-async def language_command(message: Message):
+async def cmd_language(message: Message):
     """Обработчик команды выбора языка"""
     user_id = str(message.from_user.id)
-    
-    # Устанавливаем пользователя в контекст
+
+    # Устанавливаем пользователя в контекст для локализации
     set_current_user_id(user_id)
-    
-    # Получаем локализацию пользователя
-    user_locale = get_user_locale(user_id)
-    
+
     # Создаем клавиатуру с кнопками выбора языка
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
@@ -515,41 +512,35 @@ async def language_command(message: Message):
     ])
 
     await message.answer(
-        user_locale.format_value("language_selection_header"),
+        t("language-selection-menu"),
         reply_markup=keyboard
     )
 
 @router.callback_query(F.data.startswith("language_"))
-async def language_callback(callback_query: CallbackQuery):
+async def on_language_callback(callback_query: CallbackQuery):
     """Обработчик выбора языка"""
     await callback_query.answer()
-    
+
     user_id = str(callback_query.from_user.id)
-    
-    # Устанавливаем пользователя в контекст
+
+    # Устанавливаем пользователя в контекст для локализации
     set_current_user_id(user_id)
-    
+
+    # Получаем выбранный язык из данных колбэка
     language = callback_query.data.split("_")[1]
-    
+
+    # Проверяем, поддерживается ли выбранный язык
     if language not in AVAILABLE_LANGUAGES:
-        await callback_query.message.answer(i18n.format_value("language_not_supported"))
+        await callback_query.message.answer(t("language-not-supported"))
         return
-    
-    # Обновляем язык пользователя в кеше
-    success = set_user_locale(user_id, language)
-    
-    # Получаем обновленную локализацию
-    user_locale = get_user_locale(user_id)
-    
-    if success:
-        # Сохраняем выбранный язык в базу данных
-        async with get_session() as session:
-            auth_service = AuthService(session)
-            await auth_service.set_user_language(user_id, language)
-        
-        # Обновляем команды бота для пользователя с новым языком
-        await set_user_commands(main_bot, user_id, user_locale)
-        
-        await callback_query.message.answer(user_locale.format_value("language_changed"))
-    else:
-        await callback_query.message.answer(user_locale.format_value("language_change_error"))
+
+    # Обновляем язык пользователя
+    set_user_locale(user_id, language)
+
+    # Сохраняем выбранный язык в базу данных
+    async with get_session() as session:
+        auth_service = AuthService(session)
+        await auth_service.set_user_language(user_id, language)
+
+    # Отправляем сообщение о смене языка
+    await callback_query.message.edit_text(t("language-changed-successfully"))

@@ -1,21 +1,28 @@
-from fluent.runtime import FluentLocalization, FluentResourceLoader
+import os
+
+import i18n
 import logging
 from typing import Dict
 import inspect
 import contextvars
 
+# Настройка логирования
 logger = logging.getLogger(__name__)
 
-loader = FluentResourceLoader("backend/locale_files/{locale}")
-
-# Значение по умолчанию для локализации
-default_i18n = FluentLocalization(["ru"], ["main.ftl"], loader)
-
-# Словарь для кеширования локализаций по пользователям
-user_locales: Dict[str, FluentLocalization] = {}
+# Настройка путей к файлам локализации
+locale_dir_path = os.path.dirname(__file__) + '/locale_files/'
+print(locale_dir_path)
+i18n.load_path.append(locale_dir_path)
+i18n.set('filename_format', '{locale}.json')
+i18n.set('file_format', 'json')
+i18n.set('enable_memoization', True)  # Кэширование для производительности
+i18n.set('fallback', 'ru')  # Язык по умолчанию
 
 # Доступные языки
 AVAILABLE_LANGUAGES = ["ru", "en"]
+
+# Словарь для кеширования локализаций по пользователям
+user_languages: Dict[str, str] = {}
 
 # Контекстная переменная для хранения ID текущего пользователя в запросе
 current_user_id = contextvars.ContextVar('current_user_id', default=None)
@@ -38,7 +45,7 @@ def get_current_user_id_from_stack():
     stack = inspect.stack()
     
     try:
-        # Пропускаем первые 3 фрейма (текущая функция, format_value, и вызов из обработчика)
+        # Пропускаем первые 3 фрейма (текущая функция, t, и вызов из обработчика)
         for frame_info in stack[2:]:
             frame = frame_info.frame
             # Извлекаем локальные переменные из фрейма
@@ -81,7 +88,7 @@ def get_current_user_id_from_stack():
     
     return None
 
-def get_locale(language: str) -> FluentLocalization:
+def get_locale(language: str) -> str:
     """
     Получить локализацию для указанного языка
     
@@ -89,18 +96,14 @@ def get_locale(language: str) -> FluentLocalization:
         language: Код языка (ru/en)
         
     Returns:
-        FluentLocalization для указанного языка
+        Код языка (ru/en)
     """
     if language not in AVAILABLE_LANGUAGES:
-        return default_i18n
+        return "ru"
     
-    try:
-        return FluentLocalization([language], ["main.ftl"], loader)
-    except Exception as e:
-        logger.error(f"Ошибка при создании локализации для языка {language}: {e}")
-        return default_i18n
+    return language
 
-def get_user_locale(user_id: str) -> FluentLocalization:
+def get_user_locale(user_id: str) -> str:
     """
     Получить локализацию для конкретного пользователя
     
@@ -108,18 +111,18 @@ def get_user_locale(user_id: str) -> FluentLocalization:
         user_id: ID пользователя в Telegram
         
     Returns:
-        FluentLocalization для пользователя или по умолчанию
+        Код языка (ru/en)
     """
     # Проверяем, есть ли локализация для пользователя в кеше
-    if user_id in user_locales:
+    if user_id in user_languages:
         # Устанавливаем текущего пользователя в контекстную переменную
         # только если она еще не установлена
         if current_user_id.get() is None:
             set_current_user_id(user_id)
             
-        return user_locales[user_id]
+        return user_languages[user_id]
     else:
-        return default_i18n
+        return "ru"
 
 def set_user_locale(user_id: str, language: str) -> bool:
     """
@@ -137,25 +140,25 @@ def set_user_locale(user_id: str, language: str) -> bool:
         return False
     
     try:
-        # Создаем новый экземпляр локализации для пользователя
-        user_locales[user_id] = FluentLocalization([language], ["main.ftl"], loader)
+        # Сохраняем язык пользователя в кеш
+        user_languages[user_id] = language
         logger.debug(f"Установлен язык {language} для пользователя {user_id}")
         return True
     except Exception as e:
         logger.error(f"Ошибка при установке языка для пользователя {user_id}: {e}")
         return False
 
-def set_user_locale_cache(user_id: str, locale: FluentLocalization) -> None:
+def set_user_locale_cache(user_id: str, locale: str) -> None:
     """
     Установить локализацию для пользователя напрямую в кеш
     
     Args:
         user_id: ID пользователя в Telegram
-        locale: Объект локализации
+        locale: Код языка (ru/en)
     """
-    user_locales[user_id] = locale
+    user_languages[user_id] = locale
 
-async def load_user_locale_from_db(user_id: str, auth_service) -> FluentLocalization:
+async def load_user_locale_from_db(user_id: str, auth_service) -> str:
     """
     Загрузить локализацию пользователя из базы данных
     
@@ -164,23 +167,23 @@ async def load_user_locale_from_db(user_id: str, auth_service) -> FluentLocaliza
         auth_service: Экземпляр AuthService для работы с базой данных
         
     Returns:
-        FluentLocalization для пользователя
+        Код языка (ru/en)
     """
     # Если локализация уже есть в кеше, возвращаем ее
-    if user_id in user_locales:
-        return user_locales[user_id]
+    if user_id in user_languages:
+        return user_languages[user_id]
     
     # Иначе получаем язык из базы данных
     try:
         language = await auth_service.get_user_language(user_id)
         if language in AVAILABLE_LANGUAGES:
-            user_locales[user_id] = FluentLocalization([language], ["main.ftl"], loader)
-            return user_locales[user_id]
+            user_languages[user_id] = language
+            return language
     except Exception as e:
         logger.error(f"Ошибка при загрузке языка пользователя {user_id} из БД: {e}")
     
     # В случае ошибки или отсутствия языка, возвращаем локализацию по умолчанию
-    return default_i18n
+    return "ru"
 
 async def save_user_locale_to_db(user_id: str, language: str, auth_service) -> bool:
     """
@@ -208,34 +211,40 @@ async def save_user_locale_to_db(user_id: str, language: str, auth_service) -> b
         logger.error(f"Ошибка при сохранении языка пользователя {user_id} в БД: {e}")
         return False
 
-# Создаем прокси для i18n, который будет автоматически использовать локализацию пользователя
-class I18nProxy:
-    @classmethod
-    def format_value(cls, id, args=None):
-        # Сначала пытаемся получить пользователя из контекстной переменной
-        user_id = current_user_id.get()
+def t(key: str, **kwargs):
+    """
+    Получение локализованного текста для текущего пользователя
+    
+    Args:
+        key: Ключ локализации
+        kwargs: Параметры для подстановки в строку
+        
+    Returns:
+        Локализованный текст
+    """
+    # Сначала пытаемся получить пользователя из контекстной переменной
+    user_id = current_user_id.get()
+    if user_id:
+        logger.debug(f"[t] Используем локализацию для пользователя из контекста: {user_id}")
+    
+    # Если не нашли, пытаемся извлечь ID пользователя из стека вызовов
+    if not user_id:
+        user_id = get_current_user_id_from_stack()
         if user_id:
-            logger.debug(f"[I18nProxy] Используем локализацию для пользователя из контекста: {user_id}")
-        
-        # Если не нашли, пытаемся извлечь ID пользователя из стека вызовов
-        if not user_id:
-            user_id = get_current_user_id_from_stack()
-            if user_id:
-                # Сохраняем найденного пользователя в контекст для будущих запросов
-                set_current_user_id(user_id)
-                logger.debug(f"[I18nProxy] Используем локализацию для пользователя из стека: {user_id}")
-        
-        # Проверяем кеш локализаций
-        if user_id and user_id in user_locales:
-            return user_locales[user_id].format_value(id, args)
-        
-        # Если не нашли пользователя или его нет в кеше, используем локализацию по умолчанию
-        if not user_id:
-            logger.debug(f"[I18nProxy] Не удалось определить пользователя, используем локализацию по умолчанию для ключа: {id}")
-        elif user_id not in user_locales:
-            logger.debug(f"[I18nProxy] Для пользователя {user_id} нет локализации в кеше, используем локализацию по умолчанию для ключа: {id}")
-            
-        return default_i18n.format_value(id, args)
-
-# Создаем глобальный объект i18n, который будет использоваться во всем приложении
-i18n = I18nProxy()
+            # Сохраняем найденного пользователя в контекст для будущих запросов
+            set_current_user_id(user_id)
+            logger.debug(f"[t] Используем локализацию для пользователя из стека: {user_id}")
+    
+    # Определяем язык пользователя
+    locale = "ru"  # Язык по умолчанию
+    if user_id and user_id in user_languages:
+        locale = user_languages[user_id]
+    i18n.set('locale', locale)
+    
+    # Возвращаем локализованный текст
+    try:
+        return i18n.t(key, **kwargs)
+    except Exception as e:
+        logger.error(f"Ошибка при получении локализации для ключа '{key}': {e}")
+        # В случае ошибки возвращаем ключ
+        return key
