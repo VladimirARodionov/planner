@@ -188,18 +188,16 @@ stop_menu = Остановить бота
 task-edit-title = 🔄 Редактирование задачи
 task-edit-error = Ошибка: {$error}
 task-edit-details = 
-    <b>Задача:</b> {$title}
-    <b>Описание:</b> {$description}
-    <b>Тип:</b> {$type_name}
-    <b>Статус:</b> {$status_name}
-    <b>Приоритет:</b> {$priority_name}
-    <b>Продолжительность:</b> {$duration_name}
-    <b>Дедлайн:</b> {$deadline_display}
-    <b>Завершена:</b> {$completed}
-    {$completed_at ->
-        [null] {}
-        *[other] <b>Дата завершения:</b> {$completed_at}
-    }
+    Задача: {$title}
+    Описание: {$description}
+    Тип: {$type_name}
+    Статус: {$status_name}
+    Приоритет: {$priority_name}
+    Продолжительность: {$duration_name}
+    Дедлайн: {$deadline_display}
+    Завершена: {$completed}
+    Дата завершения: {$completed_at}
+
 
 task-edit-button-title = ✏️ Заголовок
 task-edit-button-description = 📝 Описание
@@ -281,3 +279,6 @@ language_selection_header = 🌐 Выберите язык интерфейса:
 language_changed = ✅ Язык успешно изменен на русский.
 language_change_error = ❌ Не удалось изменить язык. Пожалуйста, попробуйте снова.
 language_not_supported = ❌ Выбранный язык не поддерживается.
+
+task_list_dialog_forward = Вперед ▶️
+task_list_dialog_back = ◀️ Назад

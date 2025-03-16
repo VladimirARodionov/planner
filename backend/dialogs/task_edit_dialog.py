@@ -3,7 +3,7 @@ from datetime import datetime
 
 from aiogram.fsm.state import State, StatesGroup
 from aiogram_dialog import Dialog, Window
-from aiogram_dialog.widgets.text import Format, Const
+from aiogram_dialog.widgets.text import Format
 from aiogram_dialog.widgets.kbd import Button, Select, Back, Next, Row, Group, Cancel, SwitchTo, Calendar
 from aiogram_dialog.widgets.input import TextInput
 from aiogram_dialog import DialogManager
@@ -11,6 +11,7 @@ from typing import Any
 from aiogram.types import Message, CallbackQuery
 from aiogram_dialog.widgets.widget_event import SimpleEventProcessor
 
+from backend.custom_widgets import I18NFormat
 from backend.locale_config import i18n
 from backend.services.task_service import TaskService
 from backend.services.settings_service import SettingsService
@@ -95,7 +96,7 @@ async def get_task_data(dialog_manager: DialogManager, **kwargs):
             "deadline": task["deadline"] if task["deadline"] else None,
             "deadline_display": task["deadline"].strftime("%d.%m.%Y") if isinstance(task["deadline"], datetime) else task["deadline"] if task["deadline"] else "Не установлен",
             "completed": task["completed_at"] is not None,
-            "completed_at": task["completed_at"].strftime("%d.%m.%Y %H:%M") if task["completed_at"] else None
+            "completed_at": task["completed_at"] if task["completed_at"] else None
         }
 
 async def get_task_types(dialog_manager: DialogManager, **kwargs):
@@ -303,10 +304,9 @@ def is_not_completed(data: dict, widget: Any, manager: DialogManager) -> bool:
 task_edit_dialog = Dialog(
     # Главный экран с информацией о задаче и кнопками для редактирования
     Window(
-        Const(i18n.format_value("task-edit-title")),
-        Format(i18n.format_value("task-edit-error", {"error": "{error}"}), when=has_error),
-        Format(
-            i18n.format_value("task-edit-details", {
+        I18NFormat("task-edit-title"),
+        I18NFormat("task-edit-error", {"error": "{error}"}, when=has_error),
+        I18NFormat("task-edit-details", {
                 "title": "{title}",
                 "description": "{description}",
                 "type_name": "{type_name}",
@@ -314,32 +314,32 @@ task_edit_dialog = Dialog(
                 "priority_name": "{priority_name}",
                 "duration_name": "{duration_name}",
                 "deadline_display": "{deadline_display}",
-                "completed": "{'Да' if completed else 'Нет'}",
+                "completed": "{completed}",
                 "completed_at": "{completed_at}"
-            })
+            }
         ),
         Row(
-            SwitchTo(Const(i18n.format_value("task-edit-button-title")), id="edit_title", state=TaskEditStates.title),
-            SwitchTo(Const(i18n.format_value("task-edit-button-description")), id="edit_description", state=TaskEditStates.description),
+            SwitchTo(I18NFormat("task-edit-button-title"), id="edit_title", state=TaskEditStates.title),
+            SwitchTo(I18NFormat("task-edit-button-description"), id="edit_description", state=TaskEditStates.description),
         ),
         Row(
-            SwitchTo(Const(i18n.format_value("task-edit-button-type")), id="edit_type", state=TaskEditStates.type),
-            SwitchTo(Const(i18n.format_value("task-edit-button-status")), id="edit_status", state=TaskEditStates.status),
+            SwitchTo(I18NFormat("task-edit-button-type"), id="edit_type", state=TaskEditStates.type),
+            SwitchTo(I18NFormat("task-edit-button-status"), id="edit_status", state=TaskEditStates.status),
         ),
         Row(
-            SwitchTo(Const(i18n.format_value("task-edit-button-priority")), id="edit_priority", state=TaskEditStates.priority),
-            SwitchTo(Const(i18n.format_value("task-edit-button-duration")), id="edit_duration", state=TaskEditStates.duration),
+            SwitchTo(I18NFormat("task-edit-button-priority"), id="edit_priority", state=TaskEditStates.priority),
+            SwitchTo(I18NFormat("task-edit-button-duration"), id="edit_duration", state=TaskEditStates.duration),
         ),
         Row(
-            SwitchTo(Const(i18n.format_value("task-edit-button-deadline")), id="edit_deadline", state=TaskEditStates.deadline),
+            SwitchTo(I18NFormat("task-edit-button-deadline"), id="edit_deadline", state=TaskEditStates.deadline),
         ),
         Row(
-            Button(Const(i18n.format_value("task-edit-button-mark-completed")), id="toggle_completed", on_click=on_toggle_completed, when=is_not_completed),
-            Button(Const(i18n.format_value("task-edit-button-mark-uncompleted")), id="toggle_completed", on_click=on_toggle_completed, when=is_completed),
+            Button(I18NFormat("task-edit-button-mark-completed"), id="toggle_completed", on_click=on_toggle_completed, when=is_not_completed),
+            Button(I18NFormat("task-edit-button-mark-uncompleted"), id="toggle_completed", on_click=on_toggle_completed, when=is_completed),
         ),
         Row(
-            Button(Const(i18n.format_value("task-edit-button-save")), id="save", on_click=on_save_changes),
-            Cancel(Const(i18n.format_value("task-edit-button-cancel"))),
+            Button(I18NFormat("task-edit-button-save"), id="save", on_click=on_save_changes),
+            Cancel(I18NFormat("task-edit-button-cancel")),
         ),
         state=TaskEditStates.main,
         getter=get_task_data,
@@ -347,28 +347,28 @@ task_edit_dialog = Dialog(
     
     # Экран редактирования заголовка
     Window(
-        Const(i18n.format_value("task-edit-title-prompt")),
+        I18NFormat("task-edit-title-prompt"),
         TextInput(id="title", on_success=SimpleEventProcessor(on_title_success)),
         Row(
-            SwitchTo(Const(i18n.format_value("task-edit-button-back")), id="back_to_main", state=TaskEditStates.main),
+            SwitchTo(I18NFormat("task-edit-button-back"), id="back_to_main", state=TaskEditStates.main),
         ),
         state=TaskEditStates.title,
     ),
     
     # Экран редактирования описания
     Window(
-        Const(i18n.format_value("task-edit-description-prompt")),
-        Const(i18n.format_value("task-edit-description-hint")),
+        I18NFormat("task-edit-description-prompt"),
+        I18NFormat("task-edit-description-hint"),
         TextInput(id="description", on_success=SimpleEventProcessor(on_description_success)),
         Row(
-            SwitchTo(Const(i18n.format_value("task-edit-button-back")), id="back_to_main", state=TaskEditStates.main),
+            SwitchTo(I18NFormat("task-edit-button-back"), id="back_to_main", state=TaskEditStates.main),
         ),
         state=TaskEditStates.description,
     ),
     
     # Экран выбора типа задачи
     Window(
-        Const(i18n.format_value("task-edit-type-prompt")),
+        I18NFormat("task-edit-type-prompt"),
         Group(
             Select(
                 Format("{item[name]}"),
@@ -380,10 +380,10 @@ task_edit_dialog = Dialog(
             width=2,
         ),
         Row(
-            Button(Const(i18n.format_value("task-edit-button-clear")), id="clear_type", on_click=lambda c, b, m: on_type_selected(c, b, m, "none")),
+            Button(I18NFormat("task-edit-button-clear"), id="clear_type", on_click=lambda c, b, m: on_type_selected(c, b, m, "none")),
         ),
         Row(
-            SwitchTo(Const(i18n.format_value("task-edit-button-back")), id="back_to_main", state=TaskEditStates.main),
+            SwitchTo(I18NFormat("task-edit-button-back"), id="back_to_main", state=TaskEditStates.main),
         ),
         state=TaskEditStates.type,
         getter=get_task_types,
@@ -391,7 +391,7 @@ task_edit_dialog = Dialog(
     
     # Экран выбора статуса
     Window(
-        Const(i18n.format_value("task-edit-status-prompt")),
+        I18NFormat("task-edit-status-prompt"),
         Group(
             Select(
                 Format("{item[name]}"),
@@ -403,10 +403,10 @@ task_edit_dialog = Dialog(
             width=2,
         ),
         Row(
-            Button(Const(i18n.format_value("task-edit-button-clear")), id="clear_status", on_click=lambda c, b, m: on_status_selected(c, b, m, "none")),
+            Button(I18NFormat("task-edit-button-clear"), id="clear_status", on_click=lambda c, b, m: on_status_selected(c, b, m, "none")),
         ),
         Row(
-            SwitchTo(Const(i18n.format_value("task-edit-button-back")), id="back_to_main", state=TaskEditStates.main),
+            SwitchTo(I18NFormat("task-edit-button-back"), id="back_to_main", state=TaskEditStates.main),
         ),
         state=TaskEditStates.status,
         getter=get_statuses,
@@ -414,7 +414,7 @@ task_edit_dialog = Dialog(
     
     # Экран выбора приоритета
     Window(
-        Const(i18n.format_value("task-edit-priority-prompt")),
+        I18NFormat("task-edit-priority-prompt"),
         Group(
             Select(
                 Format("{item[name]}"),
@@ -426,10 +426,10 @@ task_edit_dialog = Dialog(
             width=2,
         ),
         Row(
-            Button(Const(i18n.format_value("task-edit-button-clear")), id="clear_priority", on_click=lambda c, b, m: on_priority_selected(c, b, m, "none")),
+            Button(I18NFormat("task-edit-button-clear"), id="clear_priority", on_click=lambda c, b, m: on_priority_selected(c, b, m, "none")),
         ),
         Row(
-            SwitchTo(Const(i18n.format_value("task-edit-button-back")), id="back_to_main", state=TaskEditStates.main),
+            SwitchTo(I18NFormat("task-edit-button-back"), id="back_to_main", state=TaskEditStates.main),
         ),
         state=TaskEditStates.priority,
         getter=get_priorities,
@@ -437,7 +437,7 @@ task_edit_dialog = Dialog(
     
     # Экран выбора продолжительности
     Window(
-        Const(i18n.format_value("task-edit-duration-prompt")),
+        I18NFormat("task-edit-duration-prompt"),
         Group(
             Select(
                 Format("{item[name]}"),
@@ -449,10 +449,10 @@ task_edit_dialog = Dialog(
             width=2,
         ),
         Row(
-            Button(Const(i18n.format_value("task-edit-button-clear")), id="clear_duration", on_click=lambda c, b, m: on_duration_selected(c, b, m, "none")),
+            Button(I18NFormat("task-edit-button-clear"), id="clear_duration", on_click=lambda c, b, m: on_duration_selected(c, b, m, "none")),
         ),
         Row(
-            SwitchTo(Const(i18n.format_value("task-edit-button-back")), id="back_to_main", state=TaskEditStates.main),
+            SwitchTo(I18NFormat("task-edit-button-back"), id="back_to_main", state=TaskEditStates.main),
         ),
         state=TaskEditStates.duration,
         getter=get_durations,
@@ -460,16 +460,16 @@ task_edit_dialog = Dialog(
     
     # Экран выбора дедлайна
     Window(
-        Const(i18n.format_value("task-edit-deadline-prompt")),
+        I18NFormat("task-edit-deadline-prompt"),
         Calendar(
             id="deadline_calendar",
             on_click=on_deadline_selected
         ),
         Row(
-            Button(Const(i18n.format_value("task-edit-button-clear-deadline")), id="clear_deadline", on_click=on_deadline_clear),
+            Button(I18NFormat("task-edit-button-clear-deadline"), id="clear_deadline", on_click=on_deadline_clear),
         ),
         Row(
-            SwitchTo(Const(i18n.format_value("task-edit-button-back")), id="back_to_main", state=TaskEditStates.main),
+            SwitchTo(I18NFormat("task-edit-button-back"), id="back_to_main", state=TaskEditStates.main),
         ),
         state=TaskEditStates.deadline,
     ),

@@ -11,6 +11,7 @@ from typing import Any
 from aiogram.types import Message, CallbackQuery
 from aiogram_dialog.widgets.widget_event import SimpleEventProcessor
 
+from backend.custom_widgets import I18NFormat
 from backend.locale_config import i18n
 from backend.services.task_service import TaskService
 from backend.services.settings_service import SettingsService
@@ -380,22 +381,22 @@ async def on_confirm_back(c: CallbackQuery, button: Button, manager: DialogManag
 
 task_dialog = Dialog(
     Window(
-        Const(i18n.format_value("task-title")),
+        I18NFormat("task-title"),
         TextInput(id="title", on_success=SimpleEventProcessor(on_title_success)),
-        Next(Const(i18n.format_value("next"))),
+        Next(I18NFormat("next")),
         state=TaskDialog.title,
     ),
     Window(
-        Const(i18n.format_value("task-description")),
+        I18NFormat("task-description"),
         TextInput(id="description", on_success=SimpleEventProcessor(on_description_success)),
         Row(
-            Back(Const(i18n.format_value("back"))),
-            Next(Const(i18n.format_value("next"))),
+            Back(I18NFormat("back")),
+            Next(I18NFormat("next")),
         ),
         state=TaskDialog.description,
     ),
     Window(
-        Format(i18n.format_value("task-type")),
+        I18NFormat("task-type"),
         Group(
             Select(
                 Format("{item[name]}"),
@@ -406,14 +407,14 @@ task_dialog = Dialog(
             ),
             width=2,),
         Row(
-            Back(Const(i18n.format_value("back"))),
-            Next(Const(i18n.format_value("next"))),
+            Back(I18NFormat("back")),
+            Next(I18NFormat("next")),
         ),
         state=TaskDialog.type,
         getter=get_task_types,
     ),
     Window(
-        Format(i18n.format_value("task-status")),
+        I18NFormat("task-status"),
         Group(
             Select(
                 Format("{item[name]}"),
@@ -424,14 +425,14 @@ task_dialog = Dialog(
             ),
             width=2,),
         Row(
-            Back(Const(i18n.format_value("back"))),
-            Next(Const(i18n.format_value("next"))),
+            Back(I18NFormat("back")),
+            Next(I18NFormat("next")),
         ),
         state=TaskDialog.status,
         getter=get_statuses,
     ),
     Window(
-        Format(i18n.format_value("task-priority")),
+        I18NFormat("task-priority"),
         Group(
             Select(
                 Format("{item[name]}"),
@@ -442,14 +443,14 @@ task_dialog = Dialog(
             ),
             width=2,),
         Row(
-            Back(Const(i18n.format_value("back"))),
-            Next(Const(i18n.format_value("next"))),
+            Back(I18NFormat("back")),
+            Next(I18NFormat("next")),
         ),
         state=TaskDialog.priority,
         getter=get_priorities,
     ),
     Window(
-        Format(i18n.format_value("task-duration")),
+        I18NFormat("task-duration"),
         Group(
             Select(
                 Format("{item[name]}"),
@@ -460,14 +461,14 @@ task_dialog = Dialog(
             ),
             width=2,),
         # Добавляем информацию о выбранном дедлайне и кнопку для его выбора
-        Format(i18n.format_value("task-deadline-line", {"deadline": "{deadline_display}"})),
+        I18NFormat("task-deadline-line", {"deadline": "{deadline_display}"}),
         Row(
             Button(Const("📅 Выбрать дедлайн"), id="show_deadline", on_click=on_show_deadline_calendar),
             Button(Const("❌ Сбросить дедлайн"), id="clear_deadline", on_click=on_skip_deadline),
         ),
         Row(
-            Back(Const(i18n.format_value("back"))),
-            Button(Const(i18n.format_value("next")), id="duration_next", on_click=on_duration_next),
+            Back(I18NFormat("back")),
+            Button(I18NFormat("next"), id="duration_next", on_click=on_duration_next),
         ),
         Row(
             Button(Const("Пропустить длительность"), id="skip_duration", on_click=on_skip_duration),
@@ -477,20 +478,20 @@ task_dialog = Dialog(
     ),
     # Окно календаря для выбора дедлайна
     Window(
-        Format(i18n.format_value("task-deadline")),
+        I18NFormat("task-deadline"),
         Calendar(
             id="deadline_calendar",
             on_click=on_deadline_selected
         ),
         Row(
-            Back(Const(i18n.format_value("back"))),
+            Back(I18NFormat("back")),
         ),
         state=TaskDialog.deadline,
         getter=get_durations,
     ),
     Window(
-        Format(i18n.format_value("task-confirm-header")),
-        Format(i18n.format_value("task-confirm-details", {
+        I18NFormat("task-confirm-header"),
+        I18NFormat("task-confirm-details", {
             "title": "{title}",
             "description": "{description}",
             "type": "{type_name}",
@@ -498,10 +499,10 @@ task_dialog = Dialog(
             "priority": "{priority_name}",
             "duration": "{duration_name}",
             "deadline": "{deadline_display}"
-        })),
+        }),
         Row(
-            Button(Const(i18n.format_value("back")), id="confirm_back", on_click=on_confirm_back),
-            Button(Const(i18n.format_value("create")), id="create", on_click=on_task_created),
+            Button(I18NFormat("back"), id="confirm_back", on_click=on_confirm_back),
+            Button(I18NFormat("create"), id="create", on_click=on_task_created),
         ),
         state=TaskDialog.confirm,
         getter=get_task_summary,

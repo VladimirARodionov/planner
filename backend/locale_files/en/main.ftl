@@ -188,18 +188,15 @@ stop_menu = Stop bot
 task-edit-title = 🔄 Task editing
 task-edit-error = Error: {$error}
 task-edit-details = 
-    <b>Task:</b> {$title}
-    <b>Description:</b> {$description}
-    <b>Type:</b> {$type_name}
-    <b>Status:</b> {$status_name}
-    <b>Priority:</b> {$priority_name}
-    <b>Duration:</b> {$duration_name}
-    <b>Deadline:</b> {$deadline_display}
-    <b>Completed:</b> {$completed}
-    {$completed_at ->
-        [null] {}
-        *[other] <b>Completion date:</b> {$completed_at}
-    }
+    Task: {$title}
+    Description: {$description}
+    Type: {$type_name}
+    Status: {$status_name}
+    Priority: {$priority_name}
+    Duration: {$duration_name}
+    Deadline: {$deadline_display}
+    Completed: {$completed}
+    Completion date: {$completed_at}
 
 task-edit-button-title = ✏️ Title
 task-edit-button-description = 📝 Description
@@ -283,4 +280,7 @@ language_change_error = ❌ Failed to change language. Please try again.
 language_not_supported = ❌ Selected language is not supported.
 
 # Add language to settings menu
-settings_language = 🌐 Change language 
+settings_language = 🌐 Change language
+
+task_list_dialog_forward = Forward ▶️
+task_list_dialog_back = ◀️ Back
