@@ -12,6 +12,7 @@ from flask_jwt_extended import JWTManager
 
 from flask_cors import CORS
 from fluent.runtime import FluentLocalization
+from fluentogram import TranslatorHub
 
 from backend.cache_config import cache
 from backend.create_bot import main_bot, dp
@@ -19,8 +20,10 @@ from backend.dialogs.task_dialogs import task_dialog
 from backend.dialogs.task_edit_dialog import task_edit_dialog
 from backend.dialogs.task_list_dialog import task_list_dialog
 from backend.handlers import task_handlers
+from backend.i18n_factory import create_translator_hub
 from backend.load_env import env_config
 from backend.locale_config import i18n
+from backend.middleware import TranslatorRunnerMiddleware
 
 logging.config.fileConfig(fname=pathlib.Path(__file__).resolve().parent.parent / 'logging.ini',
                           disable_existing_loggers=False)
@@ -71,6 +74,9 @@ async def main():
     
     # Регистрируем роутеры
     dp.include_router(task_handlers.router)
+    translator_hub: TranslatorHub = create_translator_hub()
+    dp.update.middleware(TranslatorRunnerMiddleware(translator_hub))
+
     dp.include_router(task_dialog)
     dp.include_router(task_list_dialog)
     dp.include_router(task_edit_dialog)
