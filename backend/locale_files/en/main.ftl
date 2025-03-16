@@ -240,4 +240,47 @@ task-delete-confirm-yes = ✅ Yes, delete
 task-delete-confirm-no = ❌ No, cancel
 task-delete-success = ✅ Task #{$id} successfully deleted
 task-delete-error = ❌ Failed to delete task #{$id}
-task-delete-error-no-id = ❌ No task ID specified for deletion 
+task-delete-error-no-id = ❌ No task ID specified for deletion
+
+# Language settings
+language-settings-menu = 🌐 Language selection
+language-current = Current language: {$language}
+language-select = Select language:
+language-ru = 🇷🇺 Русский
+language-en = 🇬🇧 English
+language-changed = ✅ Language changed to English
+
+# Language notifications
+language-not-supported = ❌ Selected language is not supported
+language-change-error = ❌ Error changing language. Please try again later
+
+# Add language to settings menu
+settings_language = 🌐 Change language
+settings_language_help = Change language
+
+# Common messages for command outputs
+common-default = Default
+common-description = Description
+common-color = Color
+common-type = Type
+common-value = Value
+common-error-user-not-found = User not found. Please run the /start command first
+
+# Additional settings strings
+settings-is-final = Final status
+settings-color = Color
+settings-value = Value
+settings-position = Position
+
+# Task list messages
+task-list-loading = Loading task list...
+task-list-error-loading = Error loading task list: {$error}
+
+# Language selection strings
+language_selection_header = 🌐 Choose interface language:
+language_changed = ✅ Language successfully changed to English.
+language_change_error = ❌ Failed to change language. Please try again.
+language_not_supported = ❌ Selected language is not supported.
+
+# Add language to settings menu
+settings_language = 🌐 Change language 

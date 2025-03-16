@@ -15,4 +15,5 @@ aiosqlite
 asyncpg
 aiogram-dialog
 pydantic
+contextvars
 

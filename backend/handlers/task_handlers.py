@@ -12,12 +12,13 @@ from aiogram_dialog import DialogManager, StartMode
 
 from backend.database import get_session, create_user_settings
 from backend.dialogs.task_list_dialog import TaskListStates
-from backend.locale_config import i18n
+from backend.locale_config import i18n, get_user_locale, AVAILABLE_LANGUAGES, set_user_locale, set_current_user_id
 from backend.services.task_service import TaskService
 from backend.services.auth_service import AuthService
 from backend.services.settings_service import SettingsService
 from backend.dialogs.task_dialogs import TaskDialog
 from backend.load_env import env_config
+from backend.run import main_bot, set_user_commands
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +140,9 @@ async def start_command(message: Message):
     cleanup_auth_states()
     
     user_id = message.from_user.id
+    # Устанавливаем пользователя в контекст
+    set_current_user_id(str(user_id))
+    
     username = message.from_user.username
     first_name = message.from_user.first_name
     last_name = message.from_user.last_name
@@ -264,11 +268,15 @@ async def start_command(message: Message):
 
 @router.message(Command("stop"))
 async def stop_command(message: Message):
+    # Устанавливаем пользователя в контекст
+    set_current_user_id(str(message.from_user.id))
     await message.answer(i18n.format_value("stopped"))
 
 # Функция для отображения справки
 async def show_help(message: Message):
     """Показать справку по командам"""
+    # Устанавливаем пользователя в контекст
+    set_current_user_id(str(message.from_user.id))
     help_text = (
             i18n.format_value("help-header") + "\n\n" +
             i18n.format_value("help-tasks") + "\n" +
@@ -281,6 +289,8 @@ async def show_help(message: Message):
             i18n.format_value("settings_durations_command_help") + "\n" +
             i18n.format_value("settings_task_types_command_help") + "\n" +
             i18n.format_value("create_settings_command_help") + "\n" +
+            "\n" +
+            i18n.format_value("settings_language_help") + "\n" +
             "\n" +
             i18n.format_value("help-help")
     )
@@ -322,6 +332,8 @@ async def delete_task(message: Message):
 @router.message(Command("settings"))
 async def show_settings(message: Message):
     """Показать меню настроек пользователя"""
+    # Устанавливаем пользователя в контекст
+    set_current_user_id(str(message.from_user.id))
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
             text=i18n.format_value("settings_statuses"),
@@ -352,6 +364,9 @@ async def on_settings_statuses_callback(callback_query: CallbackQuery):
     await callback_query.answer()
 
     user_id = callback_query.from_user.id
+    # Устанавливаем пользователя в контекст
+    set_current_user_id(str(user_id))
+    
     logger.debug(f"Обработка колбэка settings_statuses от пользователя {user_id}")
 
     async with get_session() as session:
@@ -381,6 +396,9 @@ async def on_settings_priorities_callback(callback_query: CallbackQuery):
     await callback_query.answer()
 
     user_id = callback_query.from_user.id
+    # Устанавливаем пользователя в контекст
+    set_current_user_id(str(user_id))
+    
     logger.debug(f"Обработка колбэка settings_priorities от пользователя {user_id}")
 
     async with get_session() as session:
@@ -405,6 +423,9 @@ async def on_settings_durations_callback(callback_query: CallbackQuery):
     await callback_query.answer()
 
     user_id = callback_query.from_user.id
+    # Устанавливаем пользователя в контекст
+    set_current_user_id(str(user_id))
+    
     logger.debug(f"Обработка колбэка settings_durations от пользователя {user_id}")
 
     async with get_session() as session:
@@ -437,6 +458,9 @@ async def on_settings_task_types_callback(callback_query: CallbackQuery):
     await callback_query.answer()
 
     user_id = callback_query.from_user.id
+    # Устанавливаем пользователя в контекст
+    set_current_user_id(str(user_id))
+    
     logger.debug(f"Обработка колбэка settings_task_types от пользователя {user_id}")
 
     async with get_session() as session:
@@ -466,3 +490,66 @@ async def list_tasks(message: Message, dialog_manager: DialogManager):
     except Exception as e:
         logger.exception(f"Ошибка при запуске диалога списка задач: {e}")
         await message.answer(f"Произошла ошибка при загрузке списка задач: {e}")
+
+@router.message(Command("language"))
+async def language_command(message: Message):
+    """Обработчик команды выбора языка"""
+    user_id = str(message.from_user.id)
+    
+    # Устанавливаем пользователя в контекст
+    set_current_user_id(user_id)
+    
+    # Получаем локализацию пользователя
+    user_locale = get_user_locale(user_id)
+    
+    # Создаем клавиатуру с кнопками выбора языка
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="🇷🇺 Русский",
+            callback_data="language_ru"
+        )],
+        [InlineKeyboardButton(
+            text="🇬🇧 English",
+            callback_data="language_en"
+        )]
+    ])
+
+    await message.answer(
+        user_locale.format_value("language_selection_header"),
+        reply_markup=keyboard
+    )
+
+@router.callback_query(F.data.startswith("language_"))
+async def language_callback(callback_query: CallbackQuery):
+    """Обработчик выбора языка"""
+    await callback_query.answer()
+    
+    user_id = str(callback_query.from_user.id)
+    
+    # Устанавливаем пользователя в контекст
+    set_current_user_id(user_id)
+    
+    language = callback_query.data.split("_")[1]
+    
+    if language not in AVAILABLE_LANGUAGES:
+        await callback_query.message.answer(i18n.format_value("language_not_supported"))
+        return
+    
+    # Обновляем язык пользователя в кеше
+    success = set_user_locale(user_id, language)
+    
+    # Получаем обновленную локализацию
+    user_locale = get_user_locale(user_id)
+    
+    if success:
+        # Сохраняем выбранный язык в базу данных
+        async with get_session() as session:
+            auth_service = AuthService(session)
+            await auth_service.set_user_language(user_id, language)
+        
+        # Обновляем команды бота для пользователя с новым языком
+        await set_user_commands(main_bot, user_id, user_locale)
+        
+        await callback_query.message.answer(user_locale.format_value("language_changed"))
+    else:
+        await callback_query.message.answer(user_locale.format_value("language_change_error"))

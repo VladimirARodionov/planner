@@ -1,5 +1,5 @@
 from typing import Optional
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
@@ -29,8 +29,6 @@ class AuthService:
 
     async def create_user(self, telegram_id: int, username: str = None, first_name: str = None, last_name: str = None) -> User:
         """Создать нового пользователя"""
-        logger.debug(f"Создание нового пользователя с telegram_id={telegram_id}, username={username}")
-        
         user = User(
             telegram_id=telegram_id,
             username=username,
@@ -38,16 +36,8 @@ class AuthService:
             last_name=last_name
         )
         self.session.add(user)
-        
-        try:
-            await self.session.commit()
-            await self.session.refresh(user)
-            logger.debug(f"Пользователь с telegram_id={telegram_id} успешно создан")
-        except Exception as e:
-            logger.error(f"Ошибка при создании пользователя с telegram_id={telegram_id}: {e}")
-            await self.session.rollback()
-            raise
-        
+        await self.session.commit()
+        await self.session.refresh(user)
         return user
 
     async def authenticate_user(self, username: str, password: str) -> Optional[User]:
@@ -56,4 +46,22 @@ class AuthService:
         result = await self.session.execute(
             select(User).where(User.telegram_id == username)
         )
-        return result.scalar_one_or_none() 
+        return result.scalar_one_or_none()
+
+    async def get_user_language(self, user_id: str) -> str:
+        """Получить предпочитаемый язык пользователя"""
+        user = await self.get_user_by_id(user_id)
+        if not user:
+            return 'ru'  # По умолчанию русский, если пользователь не найден
+        return user.language
+
+    async def set_user_language(self, user_id: str, language: str) -> bool:
+        """Установить предпочитаемый язык пользователя"""
+        user = await self.get_user_by_id(user_id)
+        if not user:
+            return False
+            
+        stmt = update(User).where(User.telegram_id == user_id).values(language=language)
+        await self.session.execute(stmt)
+        await self.session.commit()
+        return True 

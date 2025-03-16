@@ -62,6 +62,7 @@ class User(Base):
     username = Column(String(100))
     first_name = Column(String(100))
     last_name = Column(String(100))
+    language = Column(String(10), default='ru')  # Предпочитаемый язык пользователя
     created_at = Column(DateTime(timezone=True), default=func.now())
     settings = Column(JSON, default=dict)  # Пользовательские настройки в JSON
 

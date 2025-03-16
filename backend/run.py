@@ -5,12 +5,13 @@ from asyncio import set_event_loop, new_event_loop
 from multiprocessing import Process
 
 from aiogram import Bot
-from aiogram.types import BotCommand, BotCommandScopeDefault
+from aiogram.types import BotCommand, BotCommandScopeDefault, BotCommandScopeChat
 from aiogram_dialog import setup_dialogs
 from flask import Flask
 from flask_jwt_extended import JWTManager
 
 from flask_cors import CORS
+from fluent.runtime import FluentLocalization
 
 from backend.cache_config import cache
 from backend.create_bot import main_bot, dp
@@ -54,6 +55,7 @@ async def set_commands(bot: Bot):
                 BotCommand(command='tasks', description=i18n.format_value("tasks-menu")),
                 BotCommand(command='add_task', description=i18n.format_value("add-task-menu")),
                 BotCommand(command='settings', description=i18n.format_value("settings_menu")),
+                BotCommand(command='language', description=i18n.format_value("settings_language")),
                 BotCommand(command='help', description=i18n.format_value("help-menu")),
                 BotCommand(command='stop', description=i18n.format_value("stop_menu"))]
     await bot.set_my_commands(commands, BotCommandScopeDefault())
@@ -153,3 +155,17 @@ if __name__ == '__main__':
             bot_process.terminate()
             bot_process.join()
         logger.info('Приложение остановлено')
+
+async def set_user_commands(bot: Bot, user_id: str, user_locale: FluentLocalization):
+    """Устанавливает список команд бота для конкретного пользователя"""
+    commands = [
+        BotCommand(command='start', description=user_locale.format_value("start_menu")),
+        BotCommand(command='profile', description=user_locale.format_value("my_profile_menu")),
+        BotCommand(command='tasks', description=user_locale.format_value("tasks-menu")),
+        BotCommand(command='add_task', description=user_locale.format_value("add-task-menu")),
+        BotCommand(command='settings', description=user_locale.format_value("settings_menu")),
+        BotCommand(command='language', description=user_locale.format_value("settings_language")),
+        BotCommand(command='help', description=user_locale.format_value("help-menu")),
+        BotCommand(command='stop', description=user_locale.format_value("stop_menu"))
+    ]
+    await bot.set_my_commands(commands, BotCommandScopeChat(chat_id=user_id))
