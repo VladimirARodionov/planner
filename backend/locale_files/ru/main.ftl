@@ -181,6 +181,7 @@ priority-not-set = Не указан
 duration-not-set = Не указана
 deadline-not-set = Не указан
 type-not-set = Не указан
+description-not-set = Нет описания
 
 stop_menu = Остановить бота
 

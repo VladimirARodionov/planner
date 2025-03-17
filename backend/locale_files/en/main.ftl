@@ -181,6 +181,7 @@ priority-not-set = Not specified
 duration-not-set = Not specified
 deadline-not-set = Not specified
 type-not-set = Not specified
+description-not-set = No description
 
 stop_menu = Stop bot
 

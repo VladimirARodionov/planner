@@ -163,11 +163,11 @@ async def get_tasks_data(dialog_manager: DialogManager, **kwargs):
         # Форматируем задачи для отображения в виджете List
         formatted_tasks = []
         for task in tasks:
-            description = escape_html(task['description'] if task['description'] else "Нет описания")
-            status = escape_html(task['status']['name'] if task['status'] else "Не указан")
-            priority = escape_html(task['priority']['name'] if task['priority'] else "Не указан")
-            task_type = escape_html(task['type']['name'] if task['type'] else "Не указан")
-            deadline = escape_html(str(task['deadline']) if task['deadline'] else "Не указан")
+            description = escape_html(task['description'] if task['description'] else i18n.format_value("description-not-set"))
+            status = escape_html(task['status']['name'] if task['status'] else i18n.format_value("status-not-set"))
+            priority = escape_html(task['priority']['name'] if task['priority'] else i18n.format_value("priority-not-set"))
+            task_type = escape_html(task['type']['name'] if task['type'] else i18n.format_value("type-not-set"))
+            deadline = escape_html(str(task['deadline']) if task['deadline'] else i18n.format_value("deadline-not-set"))
             completed = "✅" if task['completed_at'] is not None else "❌"
             
             task_info = {
