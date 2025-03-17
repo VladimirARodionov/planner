@@ -4,7 +4,7 @@ from datetime import datetime
 from aiogram.fsm.state import State, StatesGroup
 from aiogram_dialog import Dialog, Window
 from aiogram_dialog.widgets.text import Format
-from aiogram_dialog.widgets.kbd import Button, Select, Back, Next, Row, Group, Cancel, SwitchTo, Calendar
+from aiogram_dialog.widgets.kbd import Button, Select, Row, Group, Cancel, SwitchTo, Calendar
 from aiogram_dialog.widgets.input import TextInput
 from aiogram_dialog import DialogManager
 from typing import Any
@@ -283,7 +283,7 @@ async def on_toggle_completed(callback: CallbackQuery, button: Button, manager: 
         task["completed_at"] = None
     
     manager.dialog_data["task"] = task
-    await manager.update()
+    await manager.update(data={})
 
 async def on_save_changes(callback: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик сохранения изменений"""

@@ -1,9 +1,8 @@
 import json
 import logging
 from typing import Dict, Any, List, Optional, Type
-from sqlalchemy import select, update, delete
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from backend.db.models import (
     DefaultSettings, StatusSetting, PrioritySetting, 
@@ -118,7 +117,7 @@ class SettingsService:
         # Сначала пробуем получить пользовательские настройки
         result = await self.session.execute(
             select(TaskTypeSetting).where(
-                TaskTypeSetting.user_id == user.telegram_id,
+                TaskTypeSetting.user_id == user.telegram_id, # type: ignore
                 TaskTypeSetting.is_active == True
             ).order_by(TaskTypeSetting.order)
         )
@@ -490,7 +489,7 @@ class SettingsService:
         # Сначала пробуем получить пользовательские настройки
         result = await self.session.execute(
             select(StatusSetting).where(
-                StatusSetting.user_id == user.telegram_id,
+                StatusSetting.user_id == user.telegram_id, # type: ignore
                 StatusSetting.is_active == True
             ).order_by(StatusSetting.order)
         )
@@ -545,7 +544,7 @@ class SettingsService:
         # Сначала пробуем получить пользовательские настройки
         result = await self.session.execute(
             select(PrioritySetting).where(
-                PrioritySetting.user_id == user.telegram_id,
+                PrioritySetting.user_id == user.telegram_id, # type: ignore
                 PrioritySetting.is_active == True
             ).order_by(PrioritySetting.order)
         )
@@ -598,7 +597,7 @@ class SettingsService:
         # Сначала пробуем получить пользовательские настройки
         result = await self.session.execute(
             select(DurationSetting).where(
-                DurationSetting.user_id == user.telegram_id,
+                DurationSetting.user_id == user.telegram_id, # type: ignore
                 DurationSetting.is_active == True
             ).order_by(DurationSetting.id)
         )

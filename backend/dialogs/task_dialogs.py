@@ -159,19 +159,19 @@ async def on_skip_duration(event, widget, manager: DialogManager):
     manager.dialog_data["duration_id"] = None
     await manager.switch_to(TaskDialog.confirm)
 
-async def on_deadline_selected(c: CallbackQuery, widget: Any, manager: DialogManager, date: datetime):
+async def on_deadline_selected(c: CallbackQuery, widget: Any, manager: DialogManager, deadline_date: datetime):
     """Обработчик выбора дедлайна"""
-    logger.debug(f"on_deadline_selected called with date: {date}, type: {type(date)}")
+    logger.debug(f"on_deadline_selected called with date: {deadline_date}, type: {type(deadline_date)}")
     
     # Сохраняем время в выбранной дате
     # Проверяем, что date - это datetime, а не date
-    if isinstance(date, datetime):
+    if isinstance(deadline_date, datetime):
         # Дата уже содержит время
-        manager.dialog_data["deadline"] = date
+        manager.dialog_data["deadline"] = deadline_date
     else:
         # Преобразуем date в datetime с текущим временем
         now = datetime.now()
-        date_with_time = datetime.combine(date, now.time())
+        date_with_time = datetime.combine(deadline_date, now.time())
         manager.dialog_data["deadline"] = date_with_time
         logger.debug(f"Установлен дедлайн с текущим временем: {date_with_time}")
     

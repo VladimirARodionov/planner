@@ -7,7 +7,7 @@ from aiogram_dialog.widgets.text import List, Format
 from aiogram_dialog.widgets.kbd import NumberedPager, StubScroll
 from aiogram_dialog.widgets.kbd import FirstPage, LastPage, NextPage, PrevPage, CurrentPage
 from aiogram_dialog.widgets.input import TextInput
-from aiogram_dialog.widgets.kbd import Button, Row, Select, Group, Cancel, SwitchTo, Start
+from aiogram_dialog.widgets.kbd import Button, Row, Select, Group, Cancel, SwitchTo
 from aiogram.types import Message, CallbackQuery
 from aiogram_dialog import DialogManager
 from aiogram_dialog.widgets.widget_event import SimpleEventProcessor
@@ -130,7 +130,7 @@ async def get_tasks_data(dialog_manager: DialogManager, **kwargs):
         total_pages = (total_tasks + page_size - 1) // page_size if total_tasks > 0 else 1
         
         # Если запрошенная страница больше общего количества страниц, показываем последнюю страницу
-        if page > total_pages and total_pages > 0:
+        if page > total_pages > 0:
             page = total_pages
             dialog_manager.dialog_data["page"] = page
             # Получаем задачи для последней страницы

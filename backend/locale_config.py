@@ -265,7 +265,7 @@ async def reload_user_locale(user_id: str) -> bool:
             if language_code and language_code in AVAILABLE_LANGUAGES:
                 language = language_code
                 user_locales[user_id] = FluentLocalization([language], ["main.ftl"], loader)
-                logger.debug(f"Перезагружен язык {language} из БД для пользователя {user_id} (прямой SQL)")
+                logger.debug(f"Перезагружен язык {language} из БД для пользователя {user_id}")
                 return True
         return False
     except Exception as e:
@@ -275,7 +275,7 @@ async def reload_user_locale(user_id: str) -> bool:
 # Создаем прокси для i18n, который будет автоматически использовать локализацию пользователя
 class I18nProxy:
     @classmethod
-    def format_value(cls, id, args=None):
+    def format_value(cls, tag_id, args=None):
         # Сначала пытаемся получить пользователя из контекстной переменной
         user_id = current_user_id.get()
         if user_id:
@@ -292,15 +292,15 @@ class I18nProxy:
         # Проверяем кеш локализаций
         if user_id and user_id in user_locales:
             logger.debug(f"[I18nProxy] Локализация: {user_locales[user_id].locales}")
-            return user_locales[user_id].format_value(id, args)
+            return user_locales[user_id].format_value(tag_id, args)
         
         # Если не нашли пользователя или его нет в кеше, используем локализацию по умолчанию
         if not user_id:
-            logger.debug(f"[I18nProxy] Не удалось определить пользователя, используем локализацию по умолчанию для ключа: {id}")
+            logger.debug(f"[I18nProxy] Не удалось определить пользователя, используем локализацию по умолчанию для ключа: {tag_id}")
         elif user_id not in user_locales:
-            logger.debug(f"[I18nProxy] Для пользователя {user_id} нет локализации в кеше, используем локализацию по умолчанию для ключа: {id}")
+            logger.debug(f"[I18nProxy] Для пользователя {user_id} нет локализации в кеше, используем локализацию по умолчанию для ключа: {tag_id}")
             
-        return default_i18n.format_value(id, args)
+        return default_i18n.format_value(tag_id, args)
 
 # Создаем глобальный объект i18n, который будет использоваться во всем приложении
 i18n = I18nProxy()
