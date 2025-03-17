@@ -26,6 +26,7 @@ import {
     useTheme
 } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
+import { loadUserLanguage } from './i18n';
 
 // Компонент для защищенных маршрутов
 const ProtectedRoute: React.FC<{ element: React.ReactNode }> = ({ element }) => {
@@ -139,6 +140,11 @@ const AppLayout: React.FC = () => {
         return () => {
             window.removeEventListener('resize', handleResize);
         };
+    }, []);
+
+    useEffect(() => {
+        // Загружаем язык пользователя при инициализации приложения
+        loadUserLanguage();
     }, []);
 
     return (

@@ -122,3 +122,69 @@ def telegram_login():
     logger.info(f"Redirecting to Telegram auth: {telegram_auth_url}")
     return redirect(telegram_auth_url)
 
+
+@bp.route('/api/users/language', methods=['GET', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+@async_route
+async def get_user_language():
+    """Получить язык пользователя"""
+    if request.method == 'OPTIONS':
+        return '', 200
+    # Получаем ID пользователя из JWT-токена
+    user_id = get_jwt_identity()
+    
+    async with get_session() as session:
+        auth_service = AuthService(session)
+        language = await auth_service.get_user_language(user_id)
+        
+        return jsonify({
+            'language': language
+        }), 200
+
+@bp.route('/api/users/language', methods=['POST', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+@async_route
+async def set_user_language():
+    """Установить язык пользователя"""
+    if request.method == 'OPTIONS':
+        return '', 200
+    # Получаем ID пользователя из JWT-токена
+    user_id = get_jwt_identity()
+    
+    # Получаем данные из запроса
+    data = request.get_json()
+    language = data.get('language')
+    
+    if not language:
+        return jsonify({'error': 'Language is required'}), 400
+        
+    if language not in ['ru', 'en']:
+        return jsonify({'error': 'Unsupported language'}), 400
+    
+    async with get_session() as session:
+        auth_service = AuthService(session)
+        success = await auth_service.set_user_language(user_id, language)
+        
+        if success:
+            # Обновляем кеш локализации
+            from backend.locale_config import set_user_locale
+            set_success = set_user_locale(user_id, language)
+            logger.debug(f"Обновление локализации пользователя {user_id} на {language} успешно: {set_success}")
+
+            # Устанавливаем флаг для обновления команд бота
+            try:
+                # Устанавливаем флаг "needs_bot_update" для пользователя
+                await auth_service.set_user_bot_update_flag(user_id, True)
+                logger.debug(f"Установлен флаг обновления бота для пользователя {user_id}")
+            except Exception as e:
+                logger.exception(f"Ошибка при установке флага обновления бота: {e}")
+            
+            return jsonify({
+                'message': 'Language updated successfully',
+                'language': language
+            }), 200
+        else:
+            return jsonify({'error': 'Failed to update language'}), 500
+

@@ -20,6 +20,11 @@ export interface RefreshResponse {
     access: string;
 }
 
+// Интерфейс для ответа с данными о языке пользователя
+export interface UserLanguageResponse {
+    language: string;
+}
+
 export const AuthAPI = {
     login: async (username: string, password: string): Promise<LoginResponse> => {
         const response = await api.post<LoginResponse>('/auth/login/', { username, password });
@@ -49,5 +54,47 @@ export const AuthAPI = {
     getTelegramAuthUrl: (): string => {
         const currentUrl = window.location.origin;
         return `${API_URL}/auth/telegram/login?redirect_url=${encodeURIComponent(currentUrl + '/auth/callback')}`;
+    },
+    
+    // Метод для получения языка пользователя
+    getUserLanguage: async (): Promise<string> => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                return navigator.language.split('-')[0]; // Если нет токена, используем язык браузера
+            }
+            
+            const response = await api.get<UserLanguageResponse>('/users/language', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            return response.data.language || 'ru';
+        } catch (error) {
+            console.error('Error fetching user language:', error);
+            return 'ru'; // По умолчанию русский
+        }
+    },
+    
+    // Метод для установки языка пользователя
+    setUserLanguage: async (language: string): Promise<boolean> => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                return false; // Если нет токена, не можем сохранить язык
+            }
+            
+            await api.post('/users/language', { language }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            return true;
+        } catch (error) {
+            console.error('Error setting user language:', error);
+            return false;
+        }
     }
 }; 

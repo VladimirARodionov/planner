@@ -4,6 +4,10 @@ from typing import Dict
 import inspect
 import contextvars
 
+
+from backend.database import get_session
+from backend.services.auth_service import AuthService
+
 logger = logging.getLogger(__name__)
 
 loader = FluentResourceLoader("backend/locale_files/{locale}")
@@ -100,7 +104,7 @@ def get_locale(language: str) -> FluentLocalization:
         logger.error(f"Ошибка при создании локализации для языка {language}: {e}")
         return default_i18n
 
-def get_user_locale(user_id: str) -> FluentLocalization:
+async def get_user_locale(user_id: str) -> FluentLocalization:
     """
     Получить локализацию для конкретного пользователя
     
@@ -110,6 +114,35 @@ def get_user_locale(user_id: str) -> FluentLocalization:
     Returns:
         FluentLocalization для пользователя или по умолчанию
     """
+    # Всегда сначала проверяем язык в базе данных для обеспечения актуальности
+    try:
+        async with get_session() as session:
+            auth_service = AuthService(session)
+            language_code = await auth_service.get_user_language(user_id)
+            
+            # Если язык в базе данных отличается от кэша, обновляем кэш
+            if language_code and language_code in AVAILABLE_LANGUAGES:
+                need_update = True
+                
+                if user_id in user_locales:
+                    # Проверяем, совпадает ли язык в кэше с языком в базе
+                    cached_lang = user_locales[user_id].locales[0] if user_locales[user_id].locales else "ru"
+                    need_update = cached_lang != language_code
+                    logger.debug(f"Язык в кэше: {cached_lang}, язык в БД: {language_code}, требуется обновление: {need_update}")
+                
+                # Если языки не совпадают, обновляем кэш
+                if need_update:
+                    user_locales[user_id] = FluentLocalization([language_code], ["main.ftl"], loader)
+                    logger.debug(f"Обновлен язык {language_code} из БД для пользователя {user_id}")
+                
+                # Устанавливаем пользователя в контекст
+                if current_user_id.get() is None:
+                    set_current_user_id(user_id)
+                    
+                return user_locales[user_id]
+    except Exception as e:
+        logger.exception(f"Ошибка при загрузке языка пользователя {user_id}: {e}")
+    
     # Проверяем, есть ли локализация для пользователя в кеше
     if user_id in user_locales:
         # Устанавливаем текущего пользователя в контекстную переменную
@@ -117,9 +150,15 @@ def get_user_locale(user_id: str) -> FluentLocalization:
         if current_user_id.get() is None:
             set_current_user_id(user_id)
             
+        logger.debug(f"Используем язык из кэша для пользователя {user_id}: {user_locales[user_id].locales}")
         return user_locales[user_id]
-    else:
-        return default_i18n
+                
+    # Устанавливаем пользователя в контекст даже при использовании локализации по умолчанию
+    if current_user_id.get() is None:
+        set_current_user_id(user_id)
+    
+    logger.debug(f"Используем язык по умолчанию для пользователя {user_id}")    
+    return default_i18n
 
 def set_user_locale(user_id: str, language: str) -> bool:
     """
@@ -208,6 +247,31 @@ async def save_user_locale_to_db(user_id: str, language: str, auth_service) -> b
         logger.error(f"Ошибка при сохранении языка пользователя {user_id} в БД: {e}")
         return False
 
+async def reload_user_locale(user_id: str) -> bool:
+    """
+    Принудительно перезагружает локализацию пользователя из БД и обновляет кеш
+    
+    Args:
+        user_id: ID пользователя в Telegram
+        
+    Returns:
+        True если перезагрузка успешна, иначе False
+    """
+    try:
+        async with get_session() as session:
+            auth_service = AuthService(session)
+            language_code = await auth_service.get_user_language(user_id)
+
+            if language_code and language_code in AVAILABLE_LANGUAGES:
+                language = language_code
+                user_locales[user_id] = FluentLocalization([language], ["main.ftl"], loader)
+                logger.debug(f"Перезагружен язык {language} из БД для пользователя {user_id} (прямой SQL)")
+                return True
+        return False
+    except Exception as e:
+        logger.error(f"Ошибка при перезагрузке языка пользователя {user_id}: {e}")
+        return False
+
 # Создаем прокси для i18n, который будет автоматически использовать локализацию пользователя
 class I18nProxy:
     @classmethod
@@ -227,6 +291,7 @@ class I18nProxy:
         
         # Проверяем кеш локализаций
         if user_id and user_id in user_locales:
+            logger.debug(f"[I18nProxy] Локализация: {user_locales[user_id].locales}")
             return user_locales[user_id].format_value(id, args)
         
         # Если не нашли пользователя или его нет в кеше, используем локализацию по умолчанию

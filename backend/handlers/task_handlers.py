@@ -18,7 +18,6 @@ from backend.services.auth_service import AuthService
 from backend.services.settings_service import SettingsService
 from backend.dialogs.task_dialogs import TaskDialog
 from backend.load_env import env_config
-from backend.run import main_bot, set_user_commands
 
 logger = logging.getLogger(__name__)
 
@@ -500,7 +499,7 @@ async def language_command(message: Message):
     set_current_user_id(user_id)
     
     # Получаем локализацию пользователя
-    user_locale = get_user_locale(user_id)
+    user_locale = await get_user_locale(user_id)
     
     # Создаем клавиатуру с кнопками выбора языка
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -539,16 +538,22 @@ async def language_callback(callback_query: CallbackQuery):
     success = set_user_locale(user_id, language)
     
     # Получаем обновленную локализацию
-    user_locale = get_user_locale(user_id)
+    user_locale = await get_user_locale(user_id)
     
     if success:
-        # Сохраняем выбранный язык в базу данных
+        # Сохраняем выбранный язык в базе данных
         async with get_session() as session:
             auth_service = AuthService(session)
             await auth_service.set_user_language(user_id, language)
+            
+            # Устанавливаем флаг для обновления команд бота
+            await auth_service.set_user_bot_update_flag(user_id, True)
+            logger.debug(f"Установлен флаг обновления бота для пользователя {user_id}")
         
-        # Обновляем команды бота для пользователя с новым языком
-        await set_user_commands(main_bot, user_id, user_locale)
+        # Дополнительно загружаем обновленные локализации в кеш
+        from backend.locale_config import reload_user_locale
+        reload_success = await reload_user_locale(user_id)
+        logger.debug(f"Локализация перезагружена: {reload_success}")
         
         await callback_query.message.answer(user_locale.format_value("language_changed"))
     else:
