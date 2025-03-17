@@ -552,6 +552,19 @@ async def language_callback(callback_query: CallbackQuery):
         reload_success = await reload_user_locale(user_id)
         logger.debug(f"Локализация перезагружена: {reload_success}")
 
-        await callback_query.message.answer(i18n.format_value("language_changed"))
+        # Получаем обновленную локализацию
+        user_locale = await get_user_locale(user_id)
+        
+        await callback_query.message.answer(user_locale.format_value("language_changed"))
+        
+        # Немедленно обновляем команды бота вместо ожидания фоновой задачи
+        from backend.run import main_bot, set_user_commands
+        try:
+            await set_user_commands(main_bot, user_id, user_locale)
+            logger.info(f"Немедленно обновлены команды бота для пользователя {user_id}")
+        except Exception as e:
+            logger.error(f"Ошибка при немедленном обновлении команд бота: {e}")
     else:
-        await callback_query.message.answer(i18n.format_value("language_change_error"))
+        # Получаем обновленную локализацию с await
+        user_locale = await get_user_locale(user_id)
+        await callback_query.message.answer(user_locale.format_value("language_change_error"))

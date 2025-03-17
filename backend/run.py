@@ -112,9 +112,33 @@ async def set_commands(bot: Bot):
                 BotCommand(command='language', description=i18n.format_value("settings_language")),
                 BotCommand(command='help', description=i18n.format_value("help-menu")),
                 BotCommand(command='stop', description=i18n.format_value("stop_menu"))]
-                
+    
+    # Создаем область видимости команд по умолчанию
+    default_scope = BotCommandScopeDefault()
+    
+    # Сначала удаляем все существующие команды
+    try:
+        await bot.delete_my_commands(scope=default_scope)
+        logger.debug("Удалены глобальные команды бота")
+    except Exception as e:
+        logger.warning(f"Ошибка при удалении глобальных команд бота: {e}")
+    
     # Устанавливаем команды для чата по умолчанию
-    await bot.set_my_commands(commands, BotCommandScopeDefault())
+    await bot.set_my_commands(commands, default_scope)
+    logger.debug("Установлены глобальные команды бота на русском языке")
+    
+    # Удаляем команды для всех приватных чатов на русском языке
+    try:
+        all_private_scope = BotCommandScopeAllPrivateChats()
+        await bot.delete_my_commands(scope=all_private_scope, language_code="ru")
+        logger.debug("Удалены команды бота для всех приватных чатов на русском языке")
+    except Exception as e:
+        logger.warning(f"Ошибка при удалении команд для всех приватных чатов на русском: {e}")
+    
+    # Устанавливаем команды для всех приватных чатов на русском языке
+    all_private_scope = BotCommandScopeAllPrivateChats()
+    await bot.set_my_commands(commands, all_private_scope, language_code="ru")
+    logger.debug("Установлены команды бота для всех приватных чатов на русском языке")
     
     # Дополнительно устанавливаем команды для английского языка
     # Это нужно для корректного отображения на старте до выбора языка пользователем
@@ -127,10 +151,17 @@ async def set_commands(bot: Bot):
                    BotCommand(command='language', description=en_locale.format_value("settings_language")),
                    BotCommand(command='help', description=en_locale.format_value("help-menu")),
                    BotCommand(command='stop', description=en_locale.format_value("stop_menu"))]
-
-    # # Устанавливаем команды для пользователей с английским языком интерфейса
+    
+    # Удаляем команды для всех приватных чатов на английском языке
     try:
-        await bot.set_my_commands(commands_en, BotCommandScopeAllPrivateChats(), language_code="en")
+        await bot.delete_my_commands(scope=all_private_scope, language_code="en")
+        logger.debug("Удалены команды бота для всех приватных чатов на английском языке")
+    except Exception as e:
+        logger.warning(f"Ошибка при удалении команд для всех приватных чатов на английском: {e}")
+
+    # Устанавливаем команды для пользователей с английским языком интерфейса
+    try:
+        await bot.set_my_commands(commands_en, all_private_scope, language_code="en")
         logger.info("Установлены команды бота для английского языка")
     except Exception as e:
         logger.exception(f"Ошибка при установке команд бота для английского языка: {e}")
@@ -266,9 +297,30 @@ async def set_user_commands(bot: Bot, user_id: str, user_locale: FluentLocalizat
     ]
     
     try:
-        # Устанавливаем команды для конкретного пользователя с учетом его языка
-        scope = BotCommandScopeChat(chat_id=int(user_id))
-        await bot.set_my_commands(commands, scope, language_code=language_code)
+        # Преобразуем ID пользователя в число
+        chat_id = int(user_id)
+        scope = BotCommandScopeChat(chat_id=chat_id)
+        
+        # Сначала удаляем существующие команды для этого пользователя
+        try:
+            # Очистка команд без указания языка
+            await bot.delete_my_commands(scope=scope)
+            logger.debug(f"Удалены команды бота для пользователя {user_id}")
+            
+            # Очистка команд для конкретного языка
+            await bot.delete_my_commands(scope=scope, language_code=language_code)
+            logger.debug(f"Удалены команды бота для пользователя {user_id} с языком {language_code}")
+        except Exception as e:
+            logger.warning(f"Не удалось удалить команды бота для пользователя {user_id}: {e}")
+        
+        # Устанавливаем команды для конкретного пользователя с учетом языка и без него
+        # Сначала без указания языка
+        await bot.set_my_commands(commands, scope=scope)
+        logger.debug(f"Установлены команды бота для пользователя {user_id} без указания языка")
+        
+        # Затем с указанием языка
+        await bot.set_my_commands(commands, scope=scope, language_code="ru")
+        await bot.set_my_commands(commands, scope=scope, language_code="en")
         logger.info(f"Установлены команды бота для пользователя {user_id} с языком {language_code}")
     except Exception as e:
         logger.exception(f"Ошибка при установке команд бота для пользователя {user_id}: {e}")
