@@ -172,7 +172,7 @@ help-tasks = /tasks - Show task list
 add-task-menu = Create new task
 help-add-task = /add_task Create new task
 help-delete-task = /delete_task id - Delete task by ID
-help-menu = Show this help
+help-menu = Show help
 help-help = /help Show this help
 
 # Statuses and priorities
@@ -253,7 +253,7 @@ language-change-error = ❌ Error changing language. Please try again later
 
 # Add language to settings menu
 settings_language = 🌐 Change language
-settings_language_help = Change language
+settings_language_help = /language Change language
 
 # Common messages for command outputs
 common-default = Default

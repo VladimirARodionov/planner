@@ -537,9 +537,6 @@ async def language_callback(callback_query: CallbackQuery):
     # Обновляем язык пользователя в кеше
     success = set_user_locale(user_id, language)
     
-    # Получаем обновленную локализацию
-    user_locale = await get_user_locale(user_id)
-    
     if success:
         # Сохраняем выбранный язык в базе данных
         async with get_session() as session:
@@ -554,7 +551,7 @@ async def language_callback(callback_query: CallbackQuery):
         from backend.locale_config import reload_user_locale
         reload_success = await reload_user_locale(user_id)
         logger.debug(f"Локализация перезагружена: {reload_success}")
-        
-        await callback_query.message.answer(user_locale.format_value("language_changed"))
+
+        await callback_query.message.answer(i18n.format_value("language_changed"))
     else:
-        await callback_query.message.answer(user_locale.format_value("language_change_error"))
+        await callback_query.message.answer(i18n.format_value("language_change_error"))
