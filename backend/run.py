@@ -5,12 +5,14 @@ from asyncio import set_event_loop, new_event_loop
 from multiprocessing import Process
 
 from aiogram import Bot
-from aiogram.types import BotCommand, BotCommandScopeDefault
+from aiogram.types import BotCommand, BotCommandScopeDefault, BotCommandScopeChat, BotCommandScopeAllPrivateChats
 from aiogram_dialog import setup_dialogs
 from flask import Flask
 from flask_jwt_extended import JWTManager
 
 from flask_cors import CORS
+from fluent.runtime import FluentLocalization
+from fluentogram import TranslatorHub
 
 from backend.cache_config import cache
 from backend.create_bot import main_bot, dp
@@ -18,8 +20,10 @@ from backend.dialogs.task_dialogs import task_dialog
 from backend.dialogs.task_edit_dialog import task_edit_dialog
 from backend.dialogs.task_list_dialog import task_list_dialog
 from backend.handlers import task_handlers
+from backend.i18n_factory import create_translator_hub
 from backend.load_env import env_config
-from backend.locale_config import i18n
+from backend.locale_config import i18n, get_user_locale, set_user_locale_cache, get_locale, AVAILABLE_LANGUAGES
+from backend.middleware import TranslatorRunnerMiddleware
 
 logging.config.fileConfig(fname=pathlib.Path(__file__).resolve().parent.parent / 'logging.ini',
                           disable_existing_loggers=False)
@@ -45,18 +49,122 @@ def on_startup():
 async def start_bot(bot: Bot):
     await set_commands(bot)
     logger.info('Бот стартован')
+    
+    # Запускаем фоновую задачу для проверки обновлений команд бота
+    asyncio.create_task(check_bot_updates_task())
 
+async def check_bot_updates_task():
+    """Фоновая задача для проверки обновлений команд бота"""
+    logger.info("Запущена фоновая задача проверки обновлений команд бота")
+    
+    while True:
+        try:
+            await check_and_update_bot_commands()
+        except Exception as e:
+            logger.exception(f"Ошибка при проверке обновлений команд бота: {e}")
+        
+        # Проверяем каждые 30 секунд
+        await asyncio.sleep(30)
+
+async def check_and_update_bot_commands():
+    """Проверяет и обновляет команды бота для пользователей с флагом needs_bot_update"""
+    from backend.database import get_session
+    from backend.services.auth_service import AuthService
+    
+    async with get_session() as session:
+        auth_service = AuthService(session)
+        # Получаем пользователей, которым нужно обновить команды бота
+        users = await auth_service.get_users_needing_bot_update()
+        
+        if not users:
+            return
+            
+        logger.info(f"Найдено {len(users)} пользователей для обновления команд бота")
+        
+        # Если есть пользователи с обновлениями, обновляем также глобальные команды бота
+        # Это нужно чтобы обновить меню для всех пользователей, так как настройки по умолчанию 
+        # могут не меняться автоматически
+        await set_commands(main_bot)
+        logger.info("Обновлены глобальные команды бота")
+        
+        for user in users:
+            try:
+                # Получаем локализацию пользователя, с принудительным обновлением из БД
+                user_locale = await get_user_locale(str(user.telegram_id))
+                
+                # Обновляем команды бота для пользователя
+                await set_user_commands(main_bot, str(user.telegram_id), user_locale)
+                logger.info(f"Обновлены команды бота для пользователя {user.telegram_id}")
+                
+                # Сбрасываем флаг needs_bot_update
+                await auth_service.set_user_bot_update_flag(str(user.telegram_id), False)
+            except Exception as e:
+                logger.exception(f"Ошибка при обновлении команд бота для пользователя {user.telegram_id}: {e}")
 
 # Функция, которая настроит командное меню (дефолтное для всех пользователей)
 async def set_commands(bot: Bot):
+    # Создаем команды на русском (по умолчанию)
     commands = [BotCommand(command='start', description=i18n.format_value("start_menu")),
                 BotCommand(command='profile', description=i18n.format_value("my_profile_menu")),
                 BotCommand(command='tasks', description=i18n.format_value("tasks-menu")),
                 BotCommand(command='add_task', description=i18n.format_value("add-task-menu")),
                 BotCommand(command='settings', description=i18n.format_value("settings_menu")),
+                BotCommand(command='language', description=i18n.format_value("settings_language")),
                 BotCommand(command='help', description=i18n.format_value("help-menu")),
                 BotCommand(command='stop', description=i18n.format_value("stop_menu"))]
-    await bot.set_my_commands(commands, BotCommandScopeDefault())
+    
+    # Создаем область видимости команд по умолчанию
+    default_scope = BotCommandScopeDefault()
+    
+    # Сначала удаляем все существующие команды
+    # try:
+    #     await bot.delete_my_commands(scope=default_scope)
+    #     logger.debug("Удалены глобальные команды бота")
+    # except Exception as e:
+    #     logger.warning(f"Ошибка при удалении глобальных команд бота: {e}")
+    
+    # Устанавливаем команды для чата по умолчанию
+    await bot.set_my_commands(commands, default_scope)
+    logger.debug("Установлены глобальные команды бота на русском языке")
+    
+    # Удаляем команды для всех приватных чатов на русском языке
+    try:
+        all_private_scope = BotCommandScopeAllPrivateChats()
+        await bot.delete_my_commands(scope=all_private_scope, language_code="ru")
+        logger.debug("Удалены команды бота для всех приватных чатов на русском языке")
+    except Exception as e:
+        logger.warning(f"Ошибка при удалении команд для всех приватных чатов на русском: {e}")
+    
+    # Устанавливаем команды для всех приватных чатов на русском языке
+    all_private_scope = BotCommandScopeAllPrivateChats()
+    await bot.set_my_commands(commands, all_private_scope, language_code="ru")
+    logger.debug("Установлены команды бота для всех приватных чатов на русском языке")
+    
+    # Дополнительно устанавливаем команды для английского языка
+    # Это нужно для корректного отображения на старте до выбора языка пользователем
+    en_locale = get_locale("en")
+    commands_en = [BotCommand(command='start', description=en_locale.format_value("start_menu")),
+                   BotCommand(command='profile', description=en_locale.format_value("my_profile_menu")),
+                   BotCommand(command='tasks', description=en_locale.format_value("tasks-menu")),
+                   BotCommand(command='add_task', description=en_locale.format_value("add-task-menu")),
+                   BotCommand(command='settings', description=en_locale.format_value("settings_menu")),
+                   BotCommand(command='language', description=en_locale.format_value("settings_language")),
+                   BotCommand(command='help', description=en_locale.format_value("help-menu")),
+                   BotCommand(command='stop', description=en_locale.format_value("stop_menu"))]
+    
+    # # Удаляем команды для всех приватных чатов на английском языке
+    # try:
+    #     await bot.delete_my_commands(scope=all_private_scope, language_code="en")
+    #     logger.debug("Удалены команды бота для всех приватных чатов на английском языке")
+    # except Exception as e:
+    #     logger.warning(f"Ошибка при удалении команд для всех приватных чатов на английском: {e}")
+
+    # Устанавливаем команды для пользователей с английским языком интерфейса
+    try:
+        await bot.set_my_commands(commands_en, all_private_scope, language_code="en")
+        logger.info("Установлены команды бота для английского языка")
+    except Exception as e:
+        logger.exception(f"Ошибка при установке команд бота для английского языка: {e}")
 
 # Функция, которая выполнится когда бот завершит свою работу
 async def stop_bot(bot: Bot):
@@ -69,6 +177,9 @@ async def main():
     
     # Регистрируем роутеры
     dp.include_router(task_handlers.router)
+    translator_hub: TranslatorHub = create_translator_hub()
+    dp.update.middleware(TranslatorRunnerMiddleware(translator_hub))
+
     dp.include_router(task_dialog)
     dp.include_router(task_list_dialog)
     dp.include_router(task_edit_dialog)
@@ -153,3 +264,64 @@ if __name__ == '__main__':
             bot_process.terminate()
             bot_process.join()
         logger.info('Приложение остановлено')
+
+async def set_user_commands(bot: Bot, user_id: str, user_locale: FluentLocalization):
+    """Устанавливает список команд бота для конкретного пользователя"""
+    # Обновляем локализацию в кеше
+    set_user_locale_cache(user_id, user_locale)
+    logger.debug(f"Обновлены локализации для пользователя {user_id} в кэше на {user_locale.locales}")
+    
+    # Определяем язык пользователя
+    from backend.database import get_session
+    from backend.services.auth_service import AuthService
+    
+    language_code = "ru"  # Значение по умолчанию
+    
+    try:
+        async with get_session() as session:
+            auth_service = AuthService(session)
+            language_code = await auth_service.get_user_language(user_id)
+            logger.debug(f"Получен язык {language_code} для пользователя {user_id}")
+    except Exception as e:
+        logger.error(f"Ошибка при получении языка пользователя {user_id}: {e}")
+    
+    commands = [
+        BotCommand(command='start', description=user_locale.format_value("start_menu")),
+        BotCommand(command='profile', description=user_locale.format_value("my_profile_menu")),
+        BotCommand(command='tasks', description=user_locale.format_value("tasks-menu")),
+        BotCommand(command='add_task', description=user_locale.format_value("add-task-menu")),
+        BotCommand(command='settings', description=user_locale.format_value("settings_menu")),
+        BotCommand(command='language', description=user_locale.format_value("settings_language")),
+        BotCommand(command='help', description=user_locale.format_value("help-menu")),
+        BotCommand(command='stop', description=user_locale.format_value("stop_menu"))
+    ]
+    
+    try:
+        # Преобразуем ID пользователя в число
+        chat_id = int(user_id)
+        scope = BotCommandScopeChat(chat_id=chat_id)
+        
+        # Сначала удаляем существующие команды для этого пользователя
+        # try:
+        #     # Очистка команд без указания языка
+        #     await bot.delete_my_commands(scope=scope)
+        #     logger.debug(f"Удалены команды бота для пользователя {user_id}")
+        #
+        #     # Очистка команд для конкретного языка
+        #     await bot.delete_my_commands(scope=scope, language_code=language_code)
+        #     logger.debug(f"Удалены команды бота для пользователя {user_id} с языком {language_code}")
+        # except Exception as e:
+        #     logger.warning(f"Не удалось удалить команды бота для пользователя {user_id}: {e}")
+        
+        # Устанавливаем команды для конкретного пользователя с учетом языка и без него
+        # Сначала без указания языка
+        await bot.set_my_commands(commands, scope=scope)
+        logger.debug(f"Установлены команды бота для пользователя {user_id} без указания языка")
+        
+        # Затем с указанием языка
+        for lang_code in AVAILABLE_LANGUAGES:
+            await bot.set_my_commands(commands, scope=scope, language_code=lang_code)
+            await bot.set_my_commands(commands, scope=scope, language_code=lang_code)
+        logger.info(f"Установлены команды бота для пользователя {user_id} с языками {AVAILABLE_LANGUAGES}")
+    except Exception as e:
+        logger.exception(f"Ошибка при установке команд бота для пользователя {user_id}: {e}")

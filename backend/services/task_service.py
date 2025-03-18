@@ -27,7 +27,7 @@ class TaskService:
         if not user:
             return []
 
-        query = select(Task).where(Task.user_id == user.telegram_id)
+        query = select(Task).where(Task.user_id == user.telegram_id) # type: ignore
 
         if filters:
             if filters.get('id'):
@@ -45,10 +45,10 @@ class TaskService:
             if 'is_completed' in filters:
                 if filters['is_completed'] is False:
                     # Показываем только незавершенные задачи (completed_at is NULL)
-                    query = query.where(Task.completed_at == None)
+                    query = query.where(Task.completed_at is None)
                 elif filters['is_completed'] is True:
                     # Показываем только завершенные задачи (completed_at is NOT NULL)
-                    query = query.where(Task.completed_at != None)
+                    query = query.where(Task.completed_at is not None)
             
             # Добавляем фильтрацию по дедлайну
             deadline_conditions = []
@@ -227,7 +227,7 @@ class TaskService:
         if not user:
             return 0
             
-        query = select(func.count()).select_from(Task).where(Task.user_id == user.telegram_id)
+        query = select(func.count()).select_from(Task).where(Task.user_id == user.telegram_id) # type: ignore
         
         if filters:
             if filters.get('status_id'):
@@ -243,10 +243,10 @@ class TaskService:
             if 'is_completed' in filters:
                 if filters['is_completed'] is False:
                     # Показываем только незавершенные задачи (completed_at is NULL)
-                    query = query.where(Task.completed_at == None)
+                    query = query.where(Task.completed_at is None)
                 elif filters['is_completed'] is True:
                     # Показываем только завершенные задачи (completed_at is NOT NULL)
-                    query = query.where(Task.completed_at != None)
+                    query = query.where(Task.completed_at is not None)
             
             # Добавляем фильтрацию по дедлайну
             deadline_conditions = []
@@ -293,8 +293,8 @@ class TaskService:
         if task_data.get('type_id'):
             logger.debug(f"Checking if type_id {task_data['type_id']} belongs to user {user_id}")
             type_query = select(TaskTypeSetting).where(
-                TaskTypeSetting.id == task_data['type_id'],
-                TaskTypeSetting.user_id == user.telegram_id
+                TaskTypeSetting.id == task_data['type_id'], # type: ignore
+                TaskTypeSetting.user_id == user.telegram_id # type: ignore
             )
             type_result = await self.session.execute(type_query)
             if not type_result.scalar_one_or_none():
@@ -305,7 +305,7 @@ class TaskService:
         # Получаем настройки по умолчанию, если они не указаны
         if not task_data.get('status_id'):
             status_query = select(StatusSetting).where(
-                StatusSetting.user_id == user.telegram_id,
+                StatusSetting.user_id == user.telegram_id, # type: ignore
                 StatusSetting.is_default == True
             )
             status_result = await self.session.execute(status_query)
@@ -318,7 +318,7 @@ class TaskService:
                 
         if not task_data.get('priority_id'):
             priority_query = select(PrioritySetting).where(
-                PrioritySetting.user_id == user.telegram_id,
+                PrioritySetting.user_id == user.telegram_id, # type: ignore
                 PrioritySetting.is_default == True
             )
             priority_result = await self.session.execute(priority_query)
@@ -331,7 +331,7 @@ class TaskService:
                 
         if not task_data.get('type_id'):
             type_query = select(TaskTypeSetting).where(
-                TaskTypeSetting.user_id == user.telegram_id,
+                TaskTypeSetting.user_id == user.telegram_id, # type: ignore
                 TaskTypeSetting.is_default == True
             )
             type_result = await self.session.execute(type_query)
@@ -362,7 +362,7 @@ class TaskService:
 
         # Устанавливаем статус и проверяем, является ли он финальным
         if task_data.get('status_id'):
-            status_query = select(StatusSetting).where(StatusSetting.id == task_data['status_id'])
+            status_query = select(StatusSetting).where(StatusSetting.id == task_data['status_id']) # type: ignore
             status_result = await self.session.execute(status_query)
             status = status_result.scalar_one_or_none()
             if status:
@@ -409,8 +409,8 @@ class TaskService:
         # Проверяем, принадлежит ли тип задачи пользователю
         if task_data.get('type_id'):
             type_query = select(TaskTypeSetting).where(
-                TaskTypeSetting.id == task_data['type_id'],
-                TaskTypeSetting.user_id == user.telegram_id
+                TaskTypeSetting.id == task_data['type_id'], # type: ignore
+                TaskTypeSetting.user_id == user.telegram_id # type: ignore
             )
             type_result = await self.session.execute(type_query)
             if not type_result.scalar_one_or_none():
@@ -424,7 +424,7 @@ class TaskService:
             task.type_id = task_data['type_id']
         if 'status_id' in task_data:
             # Получаем новый статус
-            status_query = select(StatusSetting).where(StatusSetting.id == task_data['status_id'])
+            status_query = select(StatusSetting).where(StatusSetting.id == task_data['status_id']) # type: ignore
             status_result = await self.session.execute(status_query)
             new_status = status_result.scalar_one_or_none()
             
@@ -487,21 +487,21 @@ class TaskService:
         try:
             # Загружаем связанные объекты заранее
             if task.type_id:
-                type_query = select(TaskTypeSetting).where(TaskTypeSetting.id == task.type_id)
+                type_query = select(TaskTypeSetting).where(TaskTypeSetting.id == task.type_id) # type: ignore
                 type_result = await self.session.execute(type_query)
                 task_type = type_result.scalar_one_or_none()
             else:
                 task_type = None
                 
             if task.status_id:
-                status_query = select(StatusSetting).where(StatusSetting.id == task.status_id)
+                status_query = select(StatusSetting).where(StatusSetting.id == task.status_id) # type: ignore
                 status_result = await self.session.execute(status_query)
                 status = status_result.scalar_one_or_none()
             else:
                 status = None
                 
             if task.priority_id:
-                priority_query = select(PrioritySetting).where(PrioritySetting.id == task.priority_id)
+                priority_query = select(PrioritySetting).where(PrioritySetting.id == task.priority_id) # type: ignore
                 priority_result = await self.session.execute(priority_query)
                 priority = priority_result.scalar_one_or_none()
             else:
@@ -511,7 +511,7 @@ class TaskService:
             duration_data = None
             if task.duration_id:
                 try:
-                    duration_query = select(DurationSetting).where(DurationSetting.id == task.duration_id)
+                    duration_query = select(DurationSetting).where(DurationSetting.id == task.duration_id) # type: ignore
                     duration_result = await self.session.execute(duration_query)
                     duration = duration_result.scalar_one_or_none()
                     

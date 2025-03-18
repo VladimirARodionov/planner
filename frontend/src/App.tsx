@@ -26,6 +26,7 @@ import {
     useTheme
 } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
+import { loadUserLanguage } from './i18n';
 
 // Компонент для защищенных маршрутов
 const ProtectedRoute: React.FC<{ element: React.ReactNode }> = ({ element }) => {
@@ -45,6 +46,11 @@ const AppLayout: React.FC = () => {
         message: string;
         type: AlertProps['severity'];
     } | null>(null);
+
+    // Загружаем язык пользователя при инициализации
+    useEffect(() => {
+        loadUserLanguage();
+    }, []);
 
     const handleLogout = () => {
         localStorage.removeItem('token');
@@ -250,6 +256,10 @@ const LoginPage: React.FC = () => {
 
 // Главный компонент с маршрутизацией
 export const App: React.FC = () => {
+    useEffect(() => {
+        document.title = process.env.REACT_APP_TITLE || 'Планировщик задач';
+    }, []);
+
     return (
         <Router>
             <Routes>

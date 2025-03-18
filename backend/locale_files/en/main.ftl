@@ -172,7 +172,7 @@ help-tasks = /tasks - Show task list
 add-task-menu = Create new task
 help-add-task = /add_task Create new task
 help-delete-task = /delete_task id - Delete task by ID
-help-menu = Show this help
+help-menu = Show help
 help-help = /help Show this help
 
 # Statuses and priorities
@@ -181,6 +181,7 @@ priority-not-set = Not specified
 duration-not-set = Not specified
 deadline-not-set = Not specified
 type-not-set = Not specified
+description-not-set = No description
 
 stop_menu = Stop bot
 
@@ -188,18 +189,15 @@ stop_menu = Stop bot
 task-edit-title = 🔄 Task editing
 task-edit-error = Error: {$error}
 task-edit-details = 
-    <b>Task:</b> {$title}
-    <b>Description:</b> {$description}
-    <b>Type:</b> {$type_name}
-    <b>Status:</b> {$status_name}
-    <b>Priority:</b> {$priority_name}
-    <b>Duration:</b> {$duration_name}
-    <b>Deadline:</b> {$deadline_display}
-    <b>Completed:</b> {$completed}
-    {$completed_at ->
-        [null] {}
-        *[other] <b>Completion date:</b> {$completed_at}
-    }
+    Task: {$title}
+    Description: {$description}
+    Type: {$type_name}
+    Status: {$status_name}
+    Priority: {$priority_name}
+    Duration: {$duration_name}
+    Deadline: {$deadline_display}
+    Completed: {$completed}
+    Completion date: {$completed_at}
 
 task-edit-button-title = ✏️ Title
 task-edit-button-description = 📝 Description
@@ -240,4 +238,50 @@ task-delete-confirm-yes = ✅ Yes, delete
 task-delete-confirm-no = ❌ No, cancel
 task-delete-success = ✅ Task #{$id} successfully deleted
 task-delete-error = ❌ Failed to delete task #{$id}
-task-delete-error-no-id = ❌ No task ID specified for deletion 
+task-delete-error-no-id = ❌ No task ID specified for deletion
+
+# Language settings
+language-settings-menu = 🌐 Language selection
+language-current = Current language: {$language}
+language-select = Select language:
+language-ru = 🇷🇺 Русский
+language-en = 🇬🇧 English
+language-changed = ✅ Language changed to English
+
+# Language notifications
+language-not-supported = ❌ Selected language is not supported
+language-change-error = ❌ Error changing language. Please try again later
+
+# Add language to settings menu
+settings_language = 🌐 Change language
+settings_language_help = /language Change language
+
+# Common messages for command outputs
+common-default = Default
+common-description = Description
+common-color = Color
+common-type = Type
+common-value = Value
+common-error-user-not-found = User not found. Please run the /start command first
+
+# Additional settings strings
+settings-is-final = Final status
+settings-color = Color
+settings-value = Value
+settings-position = Position
+
+# Task list messages
+task-list-loading = Loading task list...
+task-list-error-loading = Error loading task list: {$error}
+
+# Language selection strings
+language_selection_header = 🌐 Choose interface language:
+language_changed = ✅ Language successfully changed to English.
+language_change_error = ❌ Failed to change language. Please try again.
+language_not_supported = ❌ Selected language is not supported.
+
+# Add language to settings menu
+settings_language = 🌐 Change language
+
+task_list_dialog_forward = Forward ▶️
+task_list_dialog_back = ◀️ Back

@@ -54,7 +54,7 @@ export const PrioritySettings: React.FC = () => {
             setFormData({
                 name: priority.name,
                 color: priority.color || '#1976D2',
-                position: priority.position || 0
+                position: priority.order || 0
             });
         } else {
             setEditingPriority(null);
@@ -142,7 +142,7 @@ export const PrioritySettings: React.FC = () => {
                         />
                         <ListItemText 
                             primary={priority.name}
-                            secondary={t('settings.position', { position: priority.position })}
+                            secondary={t('settings.position', { position: priority.order })}
                         />
                         <ListItemSecondaryAction>
                             <IconButton edge="end" onClick={() => handleOpen(priority)} title={t('common.edit')}>

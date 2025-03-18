@@ -97,7 +97,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask }) 
                                 size="small"
                                 sx={{
                                     backgroundColor: task.status.color || '#ccc',
-                                    color: '#fff'
+                                    color: '#fff',
+                                    boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)',
+                                    textShadow: '0px 0px 2px rgba(0, 0, 0, 0.7)',
                                 }}
                             />
                         )}
@@ -107,7 +109,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask }) 
                                 size="small"
                                 sx={{
                                     backgroundColor: task.priority.color || '#ccc',
-                                    color: '#fff'
+                                    color: '#fff',
+                                    boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)',
+                                    textShadow: '0px 0px 2px rgba(0, 0, 0, 0.7)',
                                 }}
                             />
                         )}
@@ -117,7 +121,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask }) 
                                 size="small"
                                 sx={{
                                     backgroundColor: task.type.color || '#ccc',
-                                    color: '#fff'
+                                    color: '#fff',
+                                    boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)',
+                                    textShadow: '0px 0px 2px rgba(0, 0, 0, 0.7)',
                                 }}
                             />
                         )}

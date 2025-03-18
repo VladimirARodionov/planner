@@ -30,11 +30,11 @@ target_metadata = [model_metadata]
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
-def include_object(object, name, type_, reflected, compare_to):
+def include_object(obj, name, type_, reflected, compare_to):
     """
     Exclude views from Alembic's consideration.
     """
-    return not object.info.get('is_view', False)
+    return not obj.info.get('is_view', False)
 
 
 def run_migrations_offline() -> None:
@@ -71,7 +71,7 @@ def run_migrations_online() -> None:
     # this callback is used to prevent an auto-migration from being generated
     # when there are no changes to the schema
     # reference: http://alembic.zzzcomputing.com/en/latest/cookbook.html
-    def process_revision_directives(context, revision, directives):
+    def process_revision_directives(ctx, revision, directives):
         if getattr(config.cmd_opts, 'autogenerate', False):
             script = directives[0]
             if script.upgrade_ops.is_empty():
