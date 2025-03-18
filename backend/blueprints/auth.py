@@ -8,6 +8,7 @@ from flask_jwt_extended import create_access_token, create_refresh_token, get_jw
 from backend.blueprints.wrapper import async_route
 from backend.cache_config import cache
 from backend.database import get_session
+from backend.locale_config import AVAILABLE_LANGUAGES
 from backend.services.auth_service import AuthService
 from backend.load_env import env_config
 from backend.handlers.task_handlers import add_auth_state
@@ -160,7 +161,7 @@ async def set_user_language():
     if not language:
         return jsonify({'error': 'Language is required'}), 400
         
-    if language not in ['ru', 'en']:
+    if language not in AVAILABLE_LANGUAGES:
         return jsonify({'error': 'Unsupported language'}), 400
     
     async with get_session() as session:

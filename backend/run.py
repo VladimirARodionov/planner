@@ -22,7 +22,7 @@ from backend.dialogs.task_list_dialog import task_list_dialog
 from backend.handlers import task_handlers
 from backend.i18n_factory import create_translator_hub
 from backend.load_env import env_config
-from backend.locale_config import i18n, get_user_locale, set_user_locale_cache, get_locale
+from backend.locale_config import i18n, get_user_locale, set_user_locale_cache, get_locale, AVAILABLE_LANGUAGES
 from backend.middleware import TranslatorRunnerMiddleware
 
 logging.config.fileConfig(fname=pathlib.Path(__file__).resolve().parent.parent / 'logging.ini',
@@ -319,8 +319,9 @@ async def set_user_commands(bot: Bot, user_id: str, user_locale: FluentLocalizat
         logger.debug(f"Установлены команды бота для пользователя {user_id} без указания языка")
         
         # Затем с указанием языка
-        await bot.set_my_commands(commands, scope=scope, language_code="ru")
-        await bot.set_my_commands(commands, scope=scope, language_code="en")
-        logger.info(f"Установлены команды бота для пользователя {user_id} с языком {language_code}")
+        for lang_code in AVAILABLE_LANGUAGES:
+            await bot.set_my_commands(commands, scope=scope, language_code=lang_code)
+            await bot.set_my_commands(commands, scope=scope, language_code=lang_code)
+        logger.info(f"Установлены команды бота для пользователя {user_id} с языками {AVAILABLE_LANGUAGES}")
     except Exception as e:
         logger.exception(f"Ошибка при установке команд бота для пользователя {user_id}: {e}")
