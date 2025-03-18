@@ -47,6 +47,11 @@ const AppLayout: React.FC = () => {
         type: AlertProps['severity'];
     } | null>(null);
 
+    // Загружаем язык пользователя при инициализации
+    useEffect(() => {
+        loadUserLanguage();
+    }, []);
+
     const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
@@ -140,11 +145,6 @@ const AppLayout: React.FC = () => {
         return () => {
             window.removeEventListener('resize', handleResize);
         };
-    }, []);
-
-    useEffect(() => {
-        // Загружаем язык пользователя при инициализации приложения
-        loadUserLanguage();
     }, []);
 
     return (
@@ -256,6 +256,10 @@ const LoginPage: React.FC = () => {
 
 // Главный компонент с маршрутизацией
 export const App: React.FC = () => {
+    useEffect(() => {
+        document.title = process.env.REACT_APP_TITLE || 'Планировщик задач';
+    }, []);
+
     return (
         <Router>
             <Routes>

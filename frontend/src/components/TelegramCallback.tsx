@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Box, CircularProgress, Typography } from '@mui/material';
+import { loadUserLanguage } from '../i18n';
 
 const TelegramCallback: React.FC = () => {
     const { t } = useTranslation();
@@ -33,6 +34,9 @@ const TelegramCallback: React.FC = () => {
                 localStorage.setItem('token', accessToken);
                 localStorage.setItem('refreshToken', refreshToken);
                 localStorage.setItem('user', userId);
+                
+                // Загружаем язык пользователя
+                await loadUserLanguage();
                 
                 // Перенаправляем на главную страницу
                 navigate('/');
