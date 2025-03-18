@@ -287,7 +287,6 @@ async def show_help(message: Message):
             i18n.format_value("settings_priorities_command_help") + "\n" +
             i18n.format_value("settings_durations_command_help") + "\n" +
             i18n.format_value("settings_task_types_command_help") + "\n" +
-            i18n.format_value("create_settings_command_help") + "\n" +
             "\n" +
             i18n.format_value("settings_language_help") + "\n" +
             "\n" +
