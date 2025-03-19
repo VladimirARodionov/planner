@@ -6,6 +6,8 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import BotCommand
+from fluent.runtime import FluentLocalization
 from sqlalchemy import create_engine
 
 # настраиваем логирование и выводим в переменную для отдельного использования в нужных местах
@@ -63,3 +65,20 @@ storage = MemoryStorage()
 
 # инициируем объект бота
 dp = Dispatcher(storage=storage)
+
+def get_bot_commands(user_locale: FluentLocalization = None):
+    if not user_locale:
+        from backend.locale_config import i18n
+        user_locale = i18n
+
+    commands = [
+        BotCommand(command='start', description=user_locale.format_value("start_menu")),
+        BotCommand(command='profile', description=user_locale.format_value("my_profile_menu")),
+        BotCommand(command='tasks', description=user_locale.format_value("tasks-menu")),
+        BotCommand(command='add_task', description=user_locale.format_value("add-task-menu")),
+        BotCommand(command='settings', description=user_locale.format_value("settings_menu")),
+        BotCommand(command='language', description=user_locale.format_value("settings_language")),
+        BotCommand(command='help', description=user_locale.format_value("help-menu")),
+        BotCommand(command='stop', description=user_locale.format_value("stop_menu"))
+    ]
+    return commands

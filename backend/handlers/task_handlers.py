@@ -542,10 +542,6 @@ async def language_callback(callback_query: CallbackQuery):
             auth_service = AuthService(session)
             await auth_service.set_user_language(user_id, language)
             
-            # Устанавливаем флаг для обновления команд бота
-            await auth_service.set_user_bot_update_flag(user_id, True)
-            logger.debug(f"Установлен флаг обновления бота для пользователя {user_id}")
-        
         # Дополнительно загружаем обновленные локализации в кеш
         from backend.locale_config import reload_user_locale
         reload_success = await reload_user_locale(user_id)

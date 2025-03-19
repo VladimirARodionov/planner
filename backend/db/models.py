@@ -63,7 +63,6 @@ class User(Base):
     first_name = Column(String(100))
     last_name = Column(String(100))
     language = Column(String(10), default='ru')  # Предпочитаемый язык пользователя
-    needs_bot_update = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=func.now())
     updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
     settings = Column(JSON, default=dict)  # Пользовательские настройки в JSON
