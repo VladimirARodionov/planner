@@ -280,8 +280,5 @@ language_changed = ✅ Language successfully changed to English.
 language_change_error = ❌ Failed to change language. Please try again.
 language_not_supported = ❌ Selected language is not supported.
 
-# Add language to settings menu
-settings_language = 🌐 Change language
-
 task_list_dialog_forward = Forward ▶️
 task_list_dialog_back = ◀️ Back

@@ -199,7 +199,6 @@ task-edit-details =
     Завершена: {$completed}
     Дата завершения: {$completed_at}
 
-
 task-edit-button-title = ✏️ Заголовок
 task-edit-button-description = 📝 Описание
 task-edit-button-type = 🏷️ Тип
