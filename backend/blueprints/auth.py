@@ -174,14 +174,6 @@ async def set_user_language():
             set_success = set_user_locale(user_id, language)
             logger.debug(f"Обновление локализации пользователя {user_id} на {language} успешно: {set_success}")
 
-            # Устанавливаем флаг для обновления команд бота
-            try:
-                # Устанавливаем флаг "needs_bot_update" для пользователя
-                await auth_service.set_user_bot_update_flag(user_id, True)
-                logger.debug(f"Установлен флаг обновления бота для пользователя {user_id}")
-            except Exception as e:
-                logger.exception(f"Ошибка при установке флага обновления бота: {e}")
-            
             return jsonify({
                 'message': 'Language updated successfully',
                 'language': language
