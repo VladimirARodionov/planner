@@ -306,7 +306,7 @@ async def start_add_task(message: Message, dialog_manager: DialogManager):
         user = await auth_service.get_user_by_id(str(message.from_user.id))
 
         if not user:
-            await message.answer("Пользователь не найден. Сначала выполните команду /start")
+            await message.answer(i18n.format_value("common-error-user-not-found"))
             return
     """Начать процесс создания новой задачи"""
     await dialog_manager.start(TaskDialog.title, mode=StartMode.NORMAL)
@@ -492,6 +492,14 @@ async def list_tasks(message: Message, dialog_manager: DialogManager):
 @router.message(Command("language"))
 async def language_command(message: Message):
     """Обработчик команды выбора языка"""
+    async with get_session() as session:
+        auth_service = AuthService(session)
+        user = await auth_service.get_user_by_id(str(message.from_user.id))
+
+        if not user:
+            await message.answer(i18n.format_value("common-error-user-not-found"))
+            return
+
     user_id = str(message.from_user.id)
     
     # Устанавливаем пользователя в контекст
