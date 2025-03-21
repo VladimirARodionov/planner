@@ -6,6 +6,7 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 const api = axios.create({
     baseURL: API_URL,
+    timeout: 15000,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -106,6 +107,13 @@ export interface PaginatedResponse {
         total_pages: number;
     };
 }
+
+export interface UserPreferences {
+    filters: TaskFilters;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+}
+
 
 export const TasksAPI = {
     // Задачи
@@ -309,6 +317,34 @@ export const TasksAPI = {
         } catch (error) {
             console.error('Error calculating deadline:', error);
             throw error;
+        }
+    }
+};
+
+export const SettingsAPI = {
+    // Получение настроек пользователя
+    getUserPreferences: async (): Promise<UserPreferences> => {
+        try {
+            const response = await api.get('/user-preferences/');
+            return response.data;
+        } catch (error) {
+            console.error('Error getting user preferences:', error);
+            return {
+                filters: {},
+                sort_by: 'deadline',
+                sort_order: 'asc'
+            };
+        }
+    },
+
+    // Сохранение настроек пользователя
+    saveUserPreferences: async (preferences: UserPreferences): Promise<boolean> => {
+        try {
+            await api.post('/user-preferences/', preferences);
+            return true;
+        } catch (error) {
+            console.error('Error saving user preferences:', error);
+            return false;
         }
     }
 }

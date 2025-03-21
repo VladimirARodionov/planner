@@ -20,6 +20,7 @@ from backend.services.settings_service import SettingsService
 from backend.database import get_session
 from backend.utils import escape_html
 from backend.dialogs.task_edit_dialog import TaskEditStates
+from backend.services.auth_service import AuthService
 
 logger = logging.getLogger(__name__)
 
@@ -337,8 +338,19 @@ async def on_page_next(c: CallbackQuery, button: Button, manager: DialogManager)
 
 async def on_reset_filters(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик сброса фильтров"""
-    # Полностью очищаем фильтры и устанавливаем дефолтные значения
+    # Полностью очищаем фильтры
     manager.dialog_data["filters"] = {}
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            manager.dialog_data["filters"],
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.update(data={})
 
 async def on_reset_sort(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -347,6 +359,17 @@ async def on_reset_sort(c: CallbackQuery, button: Button, manager: DialogManager
         manager.dialog_data.pop("sort_by")
     if "sort_order" in manager.dialog_data:
         manager.dialog_data.pop("sort_order")
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            manager.dialog_data.get("filters", {}),
+            None,
+            None
+        )
+    
     await manager.update(data={})
 
 async def on_status_selected(c: CallbackQuery, select: Any, manager: DialogManager, item_id: str):
@@ -354,6 +377,17 @@ async def on_status_selected(c: CallbackQuery, select: Any, manager: DialogManag
     filters = manager.dialog_data.get("filters", {})
     filters["status_id"] = item_id
     manager.dialog_data["filters"] = filters
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            filters,
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_priority_selected(c: CallbackQuery, select: Any, manager: DialogManager, item_id: str):
@@ -361,6 +395,17 @@ async def on_priority_selected(c: CallbackQuery, select: Any, manager: DialogMan
     filters = manager.dialog_data.get("filters", {})
     filters["priority_id"] = item_id
     manager.dialog_data["filters"] = filters
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            filters,
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_type_selected(c: CallbackQuery, select: Any, manager: DialogManager, item_id: str):
@@ -368,6 +413,17 @@ async def on_type_selected(c: CallbackQuery, select: Any, manager: DialogManager
     filters = manager.dialog_data.get("filters", {})
     filters["type_id"] = item_id
     manager.dialog_data["filters"] = filters
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            filters,
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_completed_all(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -376,6 +432,17 @@ async def on_completed_all(c: CallbackQuery, button: Button, manager: DialogMana
     if "is_completed" in filters:
         filters.pop("is_completed")
     manager.dialog_data["filters"] = filters
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            filters,
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_completed_only(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -383,6 +450,17 @@ async def on_completed_only(c: CallbackQuery, button: Button, manager: DialogMan
     filters = manager.dialog_data.get("filters", {})
     filters["is_completed"] = True
     manager.dialog_data["filters"] = filters
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            filters,
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_uncompleted_only(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -390,6 +468,17 @@ async def on_uncompleted_only(c: CallbackQuery, button: Button, manager: DialogM
     filters = manager.dialog_data.get("filters", {})
     filters["is_completed"] = False
     manager.dialog_data["filters"] = filters
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            filters,
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_deadline_today(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -401,6 +490,17 @@ async def on_deadline_today(c: CallbackQuery, button: Button, manager: DialogMan
     filters["deadline_from"] = today
     filters["deadline_to"] = today
     manager.dialog_data["filters"] = filters
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            filters,
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_deadline_tomorrow(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -412,6 +512,17 @@ async def on_deadline_tomorrow(c: CallbackQuery, button: Button, manager: Dialog
     filters["deadline_from"] = tomorrow
     filters["deadline_to"] = tomorrow
     manager.dialog_data["filters"] = filters
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            filters,
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_deadline_week(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -462,16 +573,49 @@ async def on_deadline_overdue(c: CallbackQuery, button: Button, manager: DialogM
 async def on_sort_by_title(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора сортировки по названию"""
     manager.dialog_data["sort_by"] = "title"
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            manager.dialog_data.get("filters", {}),
+            "title",
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_sort_by_deadline(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора сортировки по дедлайну"""
     manager.dialog_data["sort_by"] = "deadline"
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            manager.dialog_data.get("filters", {}),
+            "deadline",
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_sort_by_priority(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора сортировки по приоритету"""
     manager.dialog_data["sort_by"] = "priority"
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            manager.dialog_data.get("filters", {}),
+            "priority",
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_sort_by_created(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -482,11 +626,33 @@ async def on_sort_by_created(c: CallbackQuery, button: Button, manager: DialogMa
 async def on_sort_asc(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора сортировки по возрастанию"""
     manager.dialog_data["sort_order"] = "asc"
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            manager.dialog_data.get("filters", {}),
+            manager.dialog_data.get("sort_by"),
+            "asc"
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_sort_desc(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора сортировки по убыванию"""
     manager.dialog_data["sort_order"] = "desc"
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            manager.dialog_data.get("filters", {}),
+            manager.dialog_data.get("sort_by"),
+            "desc"
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_search_query_input(message: Message, widget: Any, manager: DialogManager, data: dict = None):
@@ -548,13 +714,77 @@ async def get_delete_confirmation_data(dialog_manager: DialogManager, **kwargs):
     task_id = dialog_manager.dialog_data.get("task_to_delete", "")
     return {"task_to_delete": task_id}
 
-
-async def start_with_defaults(self, manager: DialogManager):
-    # Также устанавливаем значения в dialog_data
-    if manager is not None:
+async def start_with_defaults(self, state: State, data: dict = None, manager: DialogManager = None, **kwargs):
+    if data is None:
+        data = {}
+    
+    user_id = manager.event.from_user.id if hasattr(manager.event, 'from_user') else None
+    
+    if user_id:
+        # Пытаемся загрузить сохраненные настройки пользователя
+        async with get_session() as session:
+            auth_service = AuthService(session)
+            user = await auth_service.get_user_by_id(str(user_id))
+            
+            if user and user.settings:
+                user_settings = user.settings
+                # Загружаем сохраненные фильтры и сортировку, если они есть
+                if 'filters' in user_settings:
+                    manager.dialog_data["filters"] = user_settings['filters']
+                else:
+                    manager.dialog_data["filters"] = DEFAULT_FILTERS.copy()
+                    
+                if 'sort_by' in user_settings:
+                    manager.dialog_data["sort_by"] = user_settings['sort_by']
+                else:
+                    manager.dialog_data["sort_by"] = DEFAULT_SORT["sort_by"]
+                    
+                if 'sort_order' in user_settings:
+                    manager.dialog_data["sort_order"] = user_settings['sort_order']
+                else:
+                    manager.dialog_data["sort_order"] = DEFAULT_SORT["sort_order"]
+            else:
+                # Если нет сохраненных настроек, используем дефолтные
+                manager.dialog_data["filters"] = DEFAULT_FILTERS.copy()
+                manager.dialog_data["sort_by"] = DEFAULT_SORT["sort_by"]
+                manager.dialog_data["sort_order"] = DEFAULT_SORT["sort_order"]
+    else:
+        # Если нет пользователя, используем дефолтные настройки
         manager.dialog_data["filters"] = DEFAULT_FILTERS.copy()
-        manager.dialog_data["sort_by"] = DEFAULT_SORT["sort_by"]
+        manager.dialog_data["sort_by"] = DEFAULT_SORT["sort_by"] 
         manager.dialog_data["sort_order"] = DEFAULT_SORT["sort_order"]
+    
+    # Для совместимости также устанавливаем в data
+    data["filters"] = manager.dialog_data["filters"]
+    data["sort_by"] = manager.dialog_data["sort_by"]
+    data["sort_order"] = manager.dialog_data["sort_order"]
+    
+    return await original_start(state, data, manager=manager, **kwargs)
+
+# Функция для сохранения настроек пользователя
+async def save_user_settings(user_id: str, filters: dict, sort_by: str = None, sort_order: str = None):
+    """Сохраняет настройки фильтров и сортировки пользователя в базе данных"""
+    if not user_id:
+        return
+    
+    async with get_session() as session:
+        auth_service = AuthService(session)
+        user = await auth_service.get_user_by_id(user_id)
+        
+        if user:
+            settings = user.settings or {}
+            settings['filters'] = filters
+            
+            if sort_by is not None:
+                settings['sort_by'] = sort_by
+                
+            if sort_order is not None:
+                settings['sort_order'] = sort_order
+            
+            user.settings = settings
+            session.add(user)
+            await session.commit()
+            logger.info(f"Saved user settings for user {user_id}: filters={filters}, sort_by={sort_by}, sort_order={sort_order}")
 
 # Создаем диалог для списка задач
 task_list_dialog = Dialog(
@@ -859,9 +1089,7 @@ task_list_dialog = Dialog(
     on_start=start_with_defaults
 )
 # Устанавливаем значения по умолчанию для нового диалога
-DEFAULT_FILTERS = {
-    "is_completed": False  # По умолчанию показываем только незавершенные задачи
-}
+DEFAULT_FILTERS = {}  # По умолчанию показываем все задачи
 DEFAULT_SORT = {
     "sort_by": "deadline",  # По умолчанию сортировка по дедлайну
     "sort_order": "asc"  # По умолчанию по возрастанию

@@ -143,9 +143,10 @@ def create_app():
         JWT_HEADER_TYPE="Bearer"
     )
     # apply the blueprints to the app
-    from backend.blueprints import auth_bp, planner_bp
+    from backend.blueprints import auth_bp, planner_bp, settings_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(planner_bp)
+    app.register_blueprint(settings_bp)
 
     jwt = JWTManager(app)
     app.debug = True

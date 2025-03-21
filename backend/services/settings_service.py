@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.models import (
     DefaultSettings, StatusSetting, PrioritySetting, 
-    DurationSetting, TaskTypeSetting, DurationType
+    DurationSetting, TaskTypeSetting, DurationType, User
 )
 from backend.services.auth_service import AuthService
 from backend.models.settings import Settings
@@ -642,3 +642,35 @@ class SettingsService:
             }
             for duration in durations
         ]
+
+    async def get_user_settings(self, user_id: str):
+        """Получить пользователя по ID"""
+        query = select(User.settings).where(User.telegram_id == user_id)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def save_user_preferences(self, user_id: str, preferences: dict) -> bool:
+        """Сохранение настроек пользователя."""
+        user = await self.auth_service.get_user_by_id(user_id)
+        if not user:
+            return False
+
+        if not user.settings:
+            preferences = {}
+
+        # Сохраняем настройки фильтров, если они есть
+        if "filters" in preferences:
+            user.settings["filters"] = preferences["filters"]
+
+        # Сохраняем настройки сортировки, если они есть
+        if "sort_by" in preferences:
+            user.settings["sort_by"] = preferences["sort_by"]
+
+        if "sort_order" in preferences:
+            user.settings["sort_order"] = preferences["sort_order"]
+                
+                # Сохраняем изменения
+        self.session.add(user)
+        await self.session.commit()
+
+        return True
