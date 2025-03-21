@@ -100,8 +100,14 @@ async def get_tasks_data(dialog_manager: DialogManager, **kwargs):
 
     # Получаем фильтры и параметры сортировки
     filters = dialog_manager.dialog_data.get("filters", {})
-    sort_by = dialog_manager.dialog_data.get("sort_by", {})
-    sort_order = dialog_manager.dialog_data.get("sort_order", {})
+    sort_by = dialog_manager.dialog_data.get("sort_by")
+    sort_order = dialog_manager.dialog_data.get("sort_order")
+    
+    # Проверяем, что sort_by и sort_order являются строками, а не словарями
+    if isinstance(sort_by, dict):
+        sort_by = None
+    if isinstance(sort_order, dict):
+        sort_order = "asc"
     
     search_query = filters.get("search", "")
     
@@ -337,8 +343,10 @@ async def on_reset_filters(c: CallbackQuery, button: Button, manager: DialogMana
 
 async def on_reset_sort(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик сброса сортировки"""
-    manager.dialog_data["sort_by"] = {}
-    manager.dialog_data["sort_order"] = {}
+    if "sort_by" in manager.dialog_data:
+        manager.dialog_data.pop("sort_by")
+    if "sort_order" in manager.dialog_data:
+        manager.dialog_data.pop("sort_order")
     await manager.update(data={})
 
 async def on_status_selected(c: CallbackQuery, select: Any, manager: DialogManager, item_id: str):
@@ -850,7 +858,6 @@ task_list_dialog = Dialog(
     ),
     on_start=start_with_defaults
 )
-
 # Устанавливаем значения по умолчанию для нового диалога
 DEFAULT_FILTERS = {
     "is_completed": False  # По умолчанию показываем только незавершенные задачи
@@ -868,3 +875,4 @@ DEFAULT_FILTER = {
 
 # Переопределяем метод start диалога для установки значений по умолчанию
 original_start = task_list_dialog.startup
+

@@ -45,10 +45,10 @@ class TaskService:
             if 'is_completed' in filters:
                 if filters['is_completed'] is False:
                     # Показываем только незавершенные задачи (completed_at is NULL)
-                    query = query.where(Task.completed_at is None)
+                    query = query.where(Task.completed_at == None)
                 elif filters['is_completed'] is True:
                     # Показываем только завершенные задачи (completed_at is NOT NULL)
-                    query = query.where(Task.completed_at is not None)
+                    query = query.where(Task.completed_at != None)
             
             # Добавляем фильтрацию по дедлайну
             deadline_conditions = []
@@ -243,10 +243,10 @@ class TaskService:
             if 'is_completed' in filters:
                 if filters['is_completed'] is False:
                     # Показываем только незавершенные задачи (completed_at is NULL)
-                    query = query.where(Task.completed_at is None)
+                    query = query.where(Task.completed_at == None)
                 elif filters['is_completed'] is True:
                     # Показываем только завершенные задачи (completed_at is NOT NULL)
-                    query = query.where(Task.completed_at is not None)
+                    query = query.where(Task.completed_at != None)
             
             # Добавляем фильтрацию по дедлайну
             deadline_conditions = []
