@@ -34,12 +34,12 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { ru } from 'date-fns/locale';
 
 interface TaskListProps {
-    onEditTask?: (task: Task) => void;
+    onEditTask: (task: Task) => void;
     onDeleteTask?: (taskId: number) => void;
-    refreshTrigger?: number;
+    refreshTrigger: number;
 }
 
-export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }) => {
+export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, refreshTrigger }): JSX.Element => {
     const { t, i18n } = useTranslation();
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -48,7 +48,9 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
         page: 1,
         page_size: 10,
     });
-    const [filters, setFilters] = useState<TaskFilters>({});
+    const [filters, setFilters] = useState<TaskFilters>({
+        is_completed: false // Показывать только незавершенные задачи по умолчанию
+    });
     const [searchQuery, setSearchQuery] = useState<string>('');
     
     // Состояния для фильтров
@@ -60,11 +62,11 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
     const [selectedType, setSelectedType] = useState<number | ''>('');
     const [deadlineFrom, setDeadlineFrom] = useState<Date | null>(null);
     const [deadlineTo, setDeadlineTo] = useState<Date | null>(null);
-    const [showCompleted, setShowCompleted] = useState<boolean>(true);
+    const [showCompleted, setShowCompleted] = useState<boolean>(false);
     
     // Состояние для сортировки
-    const [sortField, setSortField] = useState<string | ''>('');
-    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+    const [sortField, setSortField] = useState<string>("deadline"); // Сортировка по дедлайну по умолчанию
+    const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc"); // По возрастанию по умолчанию
     
     // Загрузка настроек (статусы, приоритеты, типы задач)
     const fetchSettings = useCallback(async () => {
@@ -154,7 +156,9 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
     };
 
     const handleClearFilters = () => {
-        setFilters({});
+        setFilters({
+            is_completed: false // Показывать только незавершенные задачи по умолчанию
+        });
         setSearchQuery('');
         setSelectedStatus('');
         setSelectedPriority('');
@@ -558,6 +562,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, refreshTrigger }
                                 task={task} 
                                 onTaskUpdated={fetchTasksStable}
                                 onEditTask={onEditTask}
+                                onDeleteTask={onDeleteTask}
                             />
                         ))}
                     </Box>

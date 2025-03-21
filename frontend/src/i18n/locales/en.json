@@ -58,13 +58,27 @@
     "filter_by_priority": "Filter by priority",
     "filter_by_type": "Filter by type",
     "sort_by": "Sort by",
+    "sort": {
+      "direction": "sort direction",
+      "sort_by": "sort",
+      "ascending": "Ascending",
+      "descending": "Descending",
+      "no_sort": "No sort",
+      "by_deadline": "By deadline",
+      "by_title": "By title",
+      "by_created_date": "By created date",
+      "by_completed_at": "By completed at",
+      "by_status": "By status",
+      "by_priority": "By priority"
+    },
     "all_tasks": "All tasks",
     "completed_tasks": "Completed tasks",
     "pending_tasks": "Pending tasks",
     "error_loading": "Error loading tasks",
     "error_creating": "Error creating task",
     "error_updating": "Error updating task",
-    "error_deleting": "Error deleting task"
+    "error_deleting": "Error deleting task",
+    "active_filters": "Active filters"
   },
   "settings": {
     "general": "General settings",

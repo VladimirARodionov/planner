@@ -58,13 +58,27 @@
     "filter_by_priority": "Фильтр по приоритету",
     "filter_by_type": "Фильтр по типу",
     "sort_by": "Сортировка",
+    "sort": {
+      "direction": "Направление сортировки",
+      "sort_by": "Сортировка",
+      "ascending": "По возрастанию",
+      "descending": "По убыванию",
+      "no_sort": "Без сортировки",
+      "by_deadline": "По сроку",
+      "by_title": "По названию",
+      "by_created_date": "По дате создания",
+      "by_completed_at": "По дате завершения",
+      "by_status": "По статусу",
+      "by_priority": "По приоритету"
+    },
     "all_tasks": "Все задачи",
     "completed_tasks": "Завершенные задачи",
     "pending_tasks": "Незавершенные задачи",
     "error_loading": "Ошибка загрузки задач",
     "error_creating": "Ошибка создания задачи",
     "error_updating": "Ошибка обновления задачи",
-    "error_deleting": "Ошибка удаления задачи"
+    "error_deleting": "Ошибка удаления задачи",
+    "active_filters": "Активные фильтры"
   },
   "settings": {
     "general": "Общие настройки",

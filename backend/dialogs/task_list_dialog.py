@@ -97,15 +97,18 @@ async def get_tasks_data(dialog_manager: DialogManager, **kwargs):
 
     # Сохраняем текущую страницу в dialog_data для совместимости
     dialog_manager.dialog_data["page"] = page
-    
+
     # Получаем фильтры и параметры сортировки
-    filters = dialog_manager.dialog_data.get("filters", dialog_manager.start_data.get("filters", {}))
-    sort_by = dialog_manager.dialog_data.get("sort_by", dialog_manager.start_data.get("sort_by"))
-    sort_order = dialog_manager.dialog_data.get("sort_order", dialog_manager.start_data.get("sort_order", "asc"))
+    filters = dialog_manager.dialog_data.get("filters", {})
+    sort_by = dialog_manager.dialog_data.get("sort_by", {})
+    sort_order = dialog_manager.dialog_data.get("sort_order", {})
+    
     search_query = filters.get("search", "")
     
     # Безопасное отображение поискового запроса
     safe_search_query = search_query
+
+    logger.info(f"Filters: {filters}, sort_by: {sort_by}, sort_order: {sort_order}")  # Добавляем логирование
 
     async with get_session() as session:
         task_service = TaskService(session)
@@ -245,18 +248,31 @@ async def get_filter_description(filters: dict, user_id: str = None) -> str:
         statuses = {status["id"]: escape_html(status["name"]) for status in settings["statuses"]}
         priorities = {priority["id"]: escape_html(priority["name"]) for priority in settings["priorities"]}
         task_types = {task_type["id"]: escape_html(task_type["name"]) for task_type in settings["task_types"]}
+        
+        logger.info(f"Available task types: {task_types}")
+        logger.info(f"Available statuses: {statuses}")
+        logger.info(f"Available priorities: {priorities}")
     
     if 'status_id' in filters_copy:
-        status_name = statuses.get(filters_copy['status_id'], f"Статус {filters_copy['status_id']}")
-        filter_parts.append(f"Статус: {status_name}")
+        status_id = int(filters_copy['status_id'])  # Преобразуем строковый ID в число
+        status_name = statuses.get(status_id)
+        logger.info(f"Status filter: id={status_id}, name={status_name}")
+        if status_name:
+            filter_parts.append(f"Статус: {status_name}")
     
     if 'priority_id' in filters_copy:
-        priority_name = priorities.get(filters_copy['priority_id'], f"Приоритет {filters_copy['priority_id']}")
-        filter_parts.append(f"Приоритет: {priority_name}")
+        priority_id = int(filters_copy['priority_id'])  # Преобразуем строковый ID в число
+        priority_name = priorities.get(priority_id)
+        logger.info(f"Priority filter: id={priority_id}, name={priority_name}")
+        if priority_name:
+            filter_parts.append(f"Приоритет: {priority_name}")
     
     if 'type_id' in filters_copy:
-        type_name = task_types.get(filters_copy['type_id'], f"Тип {filters_copy['type_id']}")
-        filter_parts.append(f"Тип: {type_name}")
+        type_id = int(filters_copy['type_id'])  # Преобразуем строковый ID в число
+        type_name = task_types.get(type_id)
+        logger.info(f"Type filter: id={type_id}, name={type_name}")
+        if type_name:
+            filter_parts.append(f"Тип: {type_name}")
     
     if 'deadline_from' in filters_copy:
         deadline_from = escape_html(str(filters_copy['deadline_from']))
@@ -269,6 +285,9 @@ async def get_filter_description(filters: dict, user_id: str = None) -> str:
     if 'is_completed' in filters_copy:
         completed_status = "Завершенные" if filters_copy['is_completed'] else "Незавершенные"
         filter_parts.append(f"Статус: {completed_status}")
+    
+    logger.info(f"Applied filters: {filters_copy}")
+    logger.info(f"Filter description parts: {filter_parts}")
     
     return ", ".join(filter_parts)
 
@@ -312,13 +331,14 @@ async def on_page_next(c: CallbackQuery, button: Button, manager: DialogManager)
 
 async def on_reset_filters(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик сброса фильтров"""
+    # Полностью очищаем фильтры и устанавливаем дефолтные значения
     manager.dialog_data["filters"] = {}
     await manager.update(data={})
 
 async def on_reset_sort(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик сброса сортировки"""
-    manager.dialog_data.pop("sort_by", None)
-    manager.dialog_data.pop("sort_order", None)
+    manager.dialog_data["sort_by"] = {}
+    manager.dialog_data["sort_order"] = {}
     await manager.update(data={})
 
 async def on_status_selected(c: CallbackQuery, select: Any, manager: DialogManager, item_id: str):
@@ -519,6 +539,14 @@ async def get_delete_confirmation_data(dialog_manager: DialogManager, **kwargs):
     """Получает данные для экрана подтверждения удаления задачи"""
     task_id = dialog_manager.dialog_data.get("task_to_delete", "")
     return {"task_to_delete": task_id}
+
+
+async def start_with_defaults(self, manager: DialogManager):
+    # Также устанавливаем значения в dialog_data
+    if manager is not None:
+        manager.dialog_data["filters"] = DEFAULT_FILTERS.copy()
+        manager.dialog_data["sort_by"] = DEFAULT_SORT["sort_by"]
+        manager.dialog_data["sort_order"] = DEFAULT_SORT["sort_order"]
 
 # Создаем диалог для списка задач
 task_list_dialog = Dialog(
@@ -820,4 +848,23 @@ task_list_dialog = Dialog(
         state=TaskListStates.confirm_delete,
         getter=get_delete_confirmation_data,
     ),
-) 
+    on_start=start_with_defaults
+)
+
+# Устанавливаем значения по умолчанию для нового диалога
+DEFAULT_FILTERS = {
+    "is_completed": False  # По умолчанию показываем только незавершенные задачи
+}
+DEFAULT_SORT = {
+    "sort_by": "deadline",  # По умолчанию сортировка по дедлайну
+    "sort_order": "asc"  # По умолчанию по возрастанию
+}
+
+DEFAULT_FILTER = {
+    "is_completed": False,  # По умолчанию показываем только незавершенные задачи
+    "sort_by": "deadline",  # По умолчанию сортировка по дедлайну
+    "sort_order": "asc"  # По умолчанию по возрастанию
+}
+
+# Переопределяем метод start диалога для установки значений по умолчанию
+original_start = task_list_dialog.startup

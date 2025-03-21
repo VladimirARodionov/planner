@@ -484,7 +484,7 @@ async def list_tasks(message: Message, dialog_manager: DialogManager):
     """Показать список задач с пагинацией"""
     try:
         # Запускаем диалог списка задач с начальными данными
-        await dialog_manager.start(TaskListStates.main, data={"page": 1, "filters": {}})
+        await dialog_manager.start(TaskListStates.main, data={"page": 1, "filters": {"is_completed": False}, "sort_by": "deadline", "sort_order": "asc"})
     except Exception as e:
         logger.exception(f"Ошибка при запуске диалога списка задач: {e}")
         await message.answer(f"Произошла ошибка при загрузке списка задач: {e}")
