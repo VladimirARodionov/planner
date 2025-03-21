@@ -156,9 +156,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, re
     };
 
     const handleClearFilters = () => {
-        setFilters({
-            is_completed: false // Показывать только незавершенные задачи по умолчанию
-        });
+        setFilters({});
         setSearchQuery('');
         setSelectedStatus('');
         setSelectedPriority('');
