@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import timedelta
 
@@ -20,7 +21,6 @@ from backend.services.settings_service import SettingsService
 from backend.database import get_session
 from backend.utils import escape_html
 from backend.dialogs.task_edit_dialog import TaskEditStates
-from backend.services.auth_service import AuthService
 
 logger = logging.getLogger(__name__)
 
@@ -714,39 +714,30 @@ async def get_delete_confirmation_data(dialog_manager: DialogManager, **kwargs):
     task_id = dialog_manager.dialog_data.get("task_to_delete", "")
     return {"task_to_delete": task_id}
 
-async def start_with_defaults(self, state: State, data: dict = None, manager: DialogManager = None, **kwargs):
-    if data is None:
-        data = {}
-    
+async def start_with_defaults(self, manager: DialogManager = None, **kwargs):
     user_id = manager.event.from_user.id if hasattr(manager.event, 'from_user') else None
     
     if user_id:
-        # Пытаемся загрузить сохраненные настройки пользователя
         async with get_session() as session:
-            auth_service = AuthService(session)
-            user = await auth_service.get_user_by_id(str(user_id))
-            
-            if user and user.settings:
-                user_settings = user.settings
-                # Загружаем сохраненные фильтры и сортировку, если они есть
-                if 'filters' in user_settings:
-                    manager.dialog_data["filters"] = user_settings['filters']
-                else:
-                    manager.dialog_data["filters"] = DEFAULT_FILTERS.copy()
-                    
-                if 'sort_by' in user_settings:
-                    manager.dialog_data["sort_by"] = user_settings['sort_by']
-                else:
-                    manager.dialog_data["sort_by"] = DEFAULT_SORT["sort_by"]
-                    
-                if 'sort_order' in user_settings:
-                    manager.dialog_data["sort_order"] = user_settings['sort_order']
-                else:
-                    manager.dialog_data["sort_order"] = DEFAULT_SORT["sort_order"]
+            settings_service = SettingsService(session)
+            user_settings = await settings_service.get_user_settings(str(user_id))
+            logger.info(f"Loaded user settings for user {user_id}: {user_settings}")
+
+            user_settings = json.loads(str(user_settings))
+            # Загружаем сохраненные фильтры и сортировку, если они есть
+            if 'filters' in user_settings:
+                manager.dialog_data["filters"] = user_settings.get('filters', {})
             else:
-                # Если нет сохраненных настроек, используем дефолтные
                 manager.dialog_data["filters"] = DEFAULT_FILTERS.copy()
+
+            if 'sort_by' in user_settings:
+                manager.dialog_data["sort_by"] = user_settings.get('sort_by')
+            else:
                 manager.dialog_data["sort_by"] = DEFAULT_SORT["sort_by"]
+
+            if 'sort_order' in user_settings:
+                manager.dialog_data["sort_order"] = user_settings.get('sort_order')
+            else:
                 manager.dialog_data["sort_order"] = DEFAULT_SORT["sort_order"]
     else:
         # Если нет пользователя, используем дефолтные настройки
@@ -754,37 +745,27 @@ async def start_with_defaults(self, state: State, data: dict = None, manager: Di
         manager.dialog_data["sort_by"] = DEFAULT_SORT["sort_by"] 
         manager.dialog_data["sort_order"] = DEFAULT_SORT["sort_order"]
     
-    # Для совместимости также устанавливаем в data
-    data["filters"] = manager.dialog_data["filters"]
-    data["sort_by"] = manager.dialog_data["sort_by"]
-    data["sort_order"] = manager.dialog_data["sort_order"]
-    
-    return await original_start(state, data, manager=manager, **kwargs)
 
 # Функция для сохранения настроек пользователя
 async def save_user_settings(user_id: str, filters: dict, sort_by: str = None, sort_order: str = None):
     """Сохраняет настройки фильтров и сортировки пользователя в базе данных"""
     if not user_id:
         return
-    
+
+    settings = {'filters': filters}
+
+    if sort_by is not None:
+        settings['sort_by'] = sort_by
+
+    if sort_order is not None:
+        settings['sort_order'] = sort_order
     async with get_session() as session:
-        auth_service = AuthService(session)
-        user = await auth_service.get_user_by_id(user_id)
-        
-        if user:
-            settings = user.settings or {}
-            settings['filters'] = filters
-            
-            if sort_by is not None:
-                settings['sort_by'] = sort_by
-                
-            if sort_order is not None:
-                settings['sort_order'] = sort_order
-            
-            user.settings = settings
-            session.add(user)
-            await session.commit()
+        settings_service = SettingsService(session)
+        success = await settings_service.save_user_preferences(user_id, settings)
+        if success:
             logger.info(f"Saved user settings for user {user_id}: filters={filters}, sort_by={sort_by}, sort_order={sort_order}")
+        else:
+            logger.error(f"Failed to save user settings for user {user_id}")
 
 # Создаем диалог для списка задач
 task_list_dialog = Dialog(

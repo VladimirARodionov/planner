@@ -651,25 +651,17 @@ class SettingsService:
 
     async def save_user_preferences(self, user_id: str, preferences: dict) -> bool:
         """Сохранение настроек пользователя."""
-        user = await self.auth_service.get_user_by_id(user_id)
+        result = await self.session.execute(
+            select(User).where(User.telegram_id == user_id)
+        )
+        user = result.scalar_one_or_none()
         if not user:
+            logger.warning(f"Пользователь {user_id} не найден")
             return False
 
-        if not user.settings:
-            preferences = {}
-
-        # Сохраняем настройки фильтров, если они есть
-        if "filters" in preferences:
-            user.settings["filters"] = preferences["filters"]
-
-        # Сохраняем настройки сортировки, если они есть
-        if "sort_by" in preferences:
-            user.settings["sort_by"] = preferences["sort_by"]
-
-        if "sort_order" in preferences:
-            user.settings["sort_order"] = preferences["sort_order"]
-                
-                # Сохраняем изменения
+        user.settings = json.dumps(preferences)
+        # Сохраняем изменения
+        logger.info(f"Сохранение настроек пользователя {user_id}: {user.settings}")
         self.session.add(user)
         await self.session.commit()
 
