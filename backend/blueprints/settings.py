@@ -43,11 +43,13 @@ async def get_user_preferences():
 @cross_origin()
 @jwt_required()
 @async_route
-async def save_user_preferences(preferences: dict):
+async def save_user_preferences():
     """Сохранение настроек пользователя."""
     if request.method == 'OPTIONS':
         return '', 200
     user_id = get_jwt_identity()
+
+    preferences = request.get_json()
 
     # Получаем пользователя из базы данных
     async with get_session() as session:

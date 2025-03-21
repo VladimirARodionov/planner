@@ -88,43 +88,73 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, re
             const preferences = await SettingsAPI.getUserPreferences();
             console.log('Loaded user preferences:', preferences);
             
-            // Применяем сохраненные фильтры, если они есть
-            if (preferences.filters) {
-                setFilters(preferences.filters);
-                
-                // Устанавливаем состояния UI компонентов фильтров
-                if (preferences.filters.status_id !== undefined) {
-                    setSelectedStatus(preferences.filters.status_id);
+            // Проверяем, что у нас есть предпочтения и они не пустые && Object.keys(preferences).length > 0
+            if (preferences) {
+                // Применяем сохраненные фильтры, если они есть && Object.keys(preferences.filters).length > 0
+                if (preferences.filters) {
+                    setFilters(preferences.filters);
+                    
+                    // Устанавливаем состояния UI компонентов фильтров
+                    if (preferences.filters.status_id !== undefined) {
+                        setSelectedStatus(preferences.filters.status_id);
+                    }
+                    
+                    if (preferences.filters.priority_id !== undefined) {
+                        setSelectedPriority(preferences.filters.priority_id);
+                    }
+                    
+                    if (preferences.filters.type_id !== undefined) {
+                        setSelectedType(preferences.filters.type_id);
+                    }
+                    
+                    if (preferences.filters.deadline_from) {
+                        setDeadlineFrom(new Date(preferences.filters.deadline_from));
+                    }
+                    
+                    if (preferences.filters.deadline_to) {
+                        setDeadlineTo(new Date(preferences.filters.deadline_to));
+                    }
+                    
+                    if (preferences.filters.is_completed !== undefined) {
+                        setShowCompleted(!preferences.filters.is_completed);
+                    }
+                } else {
+                    console.log('No filters found, using default settings');
+                    setFilters({});
+                    setSearchQuery('');
+                    setSelectedStatus('');
+                    setSelectedPriority('');
+                    setSelectedType('');
+                    setDeadlineFrom(null);
+                    setDeadlineTo(null);
                 }
                 
-                if (preferences.filters.priority_id !== undefined) {
-                    setSelectedPriority(preferences.filters.priority_id);
+                // Применяем сохраненную сортировку, если она есть
+                if (preferences.sort_by) {
+                    setSortField(preferences.sort_by);
+                } else {
+                    console.log('No sort order found, using default');
+                    setSortField("deadline");
                 }
                 
-                if (preferences.filters.type_id !== undefined) {
-                    setSelectedType(preferences.filters.type_id);
+                if (preferences.sort_order) {
+                    setSortDirection(preferences.sort_order);
+                } else {
+                    console.log('No sort direction found, using default');
+                    setSortDirection("asc");
                 }
-                
-                if (preferences.filters.deadline_from) {
-                    setDeadlineFrom(new Date(preferences.filters.deadline_from));
-                }
-                
-                if (preferences.filters.deadline_to) {
-                    setDeadlineTo(new Date(preferences.filters.deadline_to));
-                }
-                
-                if (preferences.filters.is_completed !== undefined) {
-                    setShowCompleted(!preferences.filters.is_completed);
-                }
-            }
-            
-            // Применяем сохраненную сортировку, если она есть
-            if (preferences.sort_by) {
-                setSortField(preferences.sort_by);
-            }
-            
-            if (preferences.sort_order) {
-                setSortDirection(preferences.sort_order);
+            } else {
+                console.log('No user preferences found, using default settings');
+                setFilters({});
+                setSearchQuery('');
+                setSelectedStatus('');
+                setSelectedPriority('');
+                setSelectedType('');
+                setDeadlineFrom(null);
+                setDeadlineTo(null);
+                setShowCompleted(true);
+                setSortField('');
+                setSortDirection('asc');
             }
         } catch (error) {
             console.error('Error loading user preferences:', error);
@@ -134,6 +164,12 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, re
     // Сохранение настроек пользователя
     const saveUserPreferences = useCallback(async () => {
         try {
+            // Проверяем, есть ли что сохранять
+            //if (Object.keys(filters).length === 0 && !sortField && !sortDirection) {
+            //    console.log('No user preferences to save, skipping API call');
+            //    return;
+            //}
+            
             const preferences: UserPreferences = {
                 filters,
                 sort_by: sortField,
@@ -190,7 +226,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, re
         loadUserPreferences();
         
         // Загружаем начальные данные
-        fetchTasksStable();
+        // Не вызываем здесь fetchTasksStable, так как он будет вызван в другом useEffect
         
         // Создаем стабильный обработчик событий
         const handleRefreshEvent = () => {
@@ -206,13 +242,14 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, re
             console.log('TaskList unmounted - cleaning up');
             window.removeEventListener('refresh-tasks', handleRefreshEvent);
         };
-    }, [fetchSettings, fetchTasksStable, loadUserPreferences]);
+    }, [fetchSettings, loadUserPreferences]); // Не добавляем fetchTasksStable в зависимости
     
-    // Реагируем на изменения состояния фильтров, сортировки и т.д.
+    // Отдельный useEffect для реагирования на изменения состояния фильтров, сортировки и т.д.
     useEffect(() => {
         console.log('Filters, sort or pagination changed - fetching tasks');
         fetchTasksStable();
-    }, [pagination.page, filters, sortField, sortDirection, refreshTrigger, searchQuery, fetchTasksStable]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pagination.page, filters, sortField, sortDirection, refreshTrigger, searchQuery]);
 
     const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
         setPagination(prev => ({ ...prev, page: value }));
@@ -223,7 +260,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, re
         fetchTasksStable();
     };
 
-    const handleClearFilters = () => {
+    const handleClearFilters = async () => {
         setFilters({});
         setSearchQuery('');
         setSelectedStatus('');
@@ -239,11 +276,9 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, re
             page_size: 10
         });
         
-        // Сохраняем очищенные настройки
-        setTimeout(() => {
-            saveUserPreferences();
-            fetchTasksStable();
-        }, 0);
+        // Сохраняем очищенные настройки и затем запрашиваем данные
+        await saveUserPreferences();
+        fetchTasksStable();
     };
     
     const applyFilters = () => {
@@ -277,8 +312,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, re
         setFilters(newFilters);
         setPagination(prev => ({ ...prev, page: 1 }));
         
-        // Сохраняем настройки пользователя
-        setTimeout(() => saveUserPreferences(), 0);
+        // Не сохраняем здесь настройки, так как они будут сохранены при нажатии на кнопку "Применить"
     };
     
     const applySorting = () => {
@@ -298,8 +332,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, re
             }));
         }
         
-        // Сохраняем настройки пользователя
-        setTimeout(() => saveUserPreferences(), 0);
+        // Не сохраняем здесь настройки, так как они будут сохранены при нажатии на кнопку "Применить"
     };
     
     // Получаем активные фильтры для отображения
@@ -592,12 +625,16 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, re
                                     </Button>
                                     <Button 
                                         variant="contained" 
-                                        onClick={() => {
+                                        onClick={async () => {
+                                            // Применяем фильтры и сортировку
                                             applyFilters();
                                             applySorting();
                                             
                                             // Сохраняем настройки пользователя
-                                            setTimeout(() => saveUserPreferences(), 0);
+                                            await saveUserPreferences();
+                                            
+                                            // Загружаем данные только один раз после сохранения настроек
+                                            fetchTasksStable();
                                         }}
                                         startIcon={<FilterListIcon />}
                                     >
