@@ -322,29 +322,35 @@ export const TasksAPI = {
 };
 
 export const SettingsAPI = {
-    // Получение настроек пользователя
     getUserPreferences: async (): Promise<UserPreferences> => {
         try {
             const response = await api.get('/user-preferences/');
-            return response.data;
+            return JSON.parse(response.data);
         } catch (error) {
             console.error('Error getting user preferences:', error);
+            // Возвращаем значения по умолчанию
             return {
-                filters: {},
+                filters: { is_completed: false },
                 sort_by: 'deadline',
                 sort_order: 'asc'
             };
         }
     },
-
-    // Сохранение настроек пользователя
-    saveUserPreferences: async (preferences: UserPreferences): Promise<boolean> => {
+    
+    saveUserPreferences: async (preferences: UserPreferences): Promise<void> => {
         try {
-            await api.post('/user-preferences/', preferences);
-            return true;
+            // Убедимся, что у нас есть валидный объект предпочтений
+            const validPreferences: UserPreferences = {
+                filters: preferences.filters || {},
+                sort_by: preferences.sort_by || 'deadline',
+                sort_order: preferences.sort_order || 'asc'
+            };
+            
+            console.log('Saving preferences to API:', validPreferences);
+            await api.post('/user-preferences/', validPreferences);
         } catch (error) {
             console.error('Error saving user preferences:', error);
-            return false;
+            throw error;
         }
     }
 }
