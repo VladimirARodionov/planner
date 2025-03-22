@@ -265,33 +265,33 @@ async def get_filter_description(filters: dict, user_id: str = None) -> str:
         status_name = statuses.get(status_id)
         logger.info(f"Status filter: id={status_id}, name={status_name}")
         if status_name:
-            filter_parts.append(f"Статус: {status_name}")
+            filter_parts.append(i18n.format_value("status_filter", {'status_name': status_name}))
     
     if 'priority_id' in filters_copy:
         priority_id = int(filters_copy['priority_id'])  # Преобразуем строковый ID в число
         priority_name = priorities.get(priority_id)
         logger.info(f"Priority filter: id={priority_id}, name={priority_name}")
         if priority_name:
-            filter_parts.append(f"Приоритет: {priority_name}")
+            filter_parts.append(i18n.format_value("priority_filter", {'priority_name': priority_name}))
     
     if 'type_id' in filters_copy:
         type_id = int(filters_copy['type_id'])  # Преобразуем строковый ID в число
         type_name = task_types.get(type_id)
         logger.info(f"Type filter: id={type_id}, name={type_name}")
         if type_name:
-            filter_parts.append(f"Тип: {type_name}")
+            filter_parts.append(i18n.format_value("type_filter", {'type_name': type_name}))
     
     if 'deadline_from' in filters_copy:
         deadline_from = escape_html(str(filters_copy['deadline_from']))
-        filter_parts.append(f"Дедлайн от: {deadline_from}")
+        filter_parts.append(i18n.format_value("deadline_from_filter", {'deadline_from': deadline_from}))
     
     if 'deadline_to' in filters_copy:
         deadline_to = escape_html(str(filters_copy['deadline_to']))
-        filter_parts.append(f"Дедлайн до: {deadline_to}")
+        filter_parts.append(i18n.format_value("deadline_to_filter", {'deadline_to': deadline_to}))
     
     if 'is_completed' in filters_copy:
-        completed_status = "Завершенные" if filters_copy['is_completed'] else "Незавершенные"
-        filter_parts.append(f"Статус: {completed_status}")
+        completed_status = i18n.format_value("task-list-filter-completed-all") if filters_copy['is_completed'] else i18n.format_value("task-list-filter-uncompleted-only")
+        filter_parts.append(completed_status)
     
     logger.info(f"Applied filters: {filters_copy}")
     logger.info(f"Filter description parts: {filter_parts}")
