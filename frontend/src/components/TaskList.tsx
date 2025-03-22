@@ -291,7 +291,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, re
         setDeadlineFrom(null);
         setDeadlineTo(null);
         setShowCompleted(true);
-        setSortField('deadline');
+        setSortField('');
         setSortDirection('asc');
         setPagination({
             page: 1,
@@ -378,6 +378,18 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, re
         
         if (searchQuery) {
             activeFilters.push(`Поиск: "${searchQuery}"`);
+        }
+
+        if (sortField) {
+            var sortFieldText;
+            switch (sortField) {
+                case "title" : sortFieldText = t('tasks.sort.by_title'); break;
+                case "deadline": sortFieldText = t('tasks.sort.by_deadline'); break;
+                case "priority": sortFieldText = t('tasks.sort.by_priority'); break;
+                case "status": sortFieldText =t('tasks.sort.by_status'); break;
+                case "created_at": sortFieldText = t('tasks.sort.by_created_date'); break;
+            }
+            activeFilters.push(`Сортировка: ${sortFieldText} (${sortDirection === 'asc' ? t('tasks.sort.ascending') : t('tasks.sort.descending')})`);
         }
         
         return activeFilters;
