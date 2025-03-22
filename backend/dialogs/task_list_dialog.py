@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import timedelta
 
@@ -97,15 +98,24 @@ async def get_tasks_data(dialog_manager: DialogManager, **kwargs):
 
     # Сохраняем текущую страницу в dialog_data для совместимости
     dialog_manager.dialog_data["page"] = page
-    
+
     # Получаем фильтры и параметры сортировки
-    filters = dialog_manager.dialog_data.get("filters", dialog_manager.start_data.get("filters", {}))
-    sort_by = dialog_manager.dialog_data.get("sort_by", dialog_manager.start_data.get("sort_by"))
-    sort_order = dialog_manager.dialog_data.get("sort_order", dialog_manager.start_data.get("sort_order", "asc"))
+    filters = dialog_manager.dialog_data.get("filters", {})
+    sort_by = dialog_manager.dialog_data.get("sort_by")
+    sort_order = dialog_manager.dialog_data.get("sort_order")
+    
+    # Проверяем, что sort_by и sort_order являются строками, а не словарями
+    if isinstance(sort_by, dict):
+        sort_by = None
+    if isinstance(sort_order, dict):
+        sort_order = "asc"
+    
     search_query = filters.get("search", "")
     
     # Безопасное отображение поискового запроса
     safe_search_query = search_query
+
+    logger.info(f"Filters: {filters}, sort_by: {sort_by}, sort_order: {sort_order}")  # Добавляем логирование
 
     async with get_session() as session:
         task_service = TaskService(session)
@@ -245,30 +255,46 @@ async def get_filter_description(filters: dict, user_id: str = None) -> str:
         statuses = {status["id"]: escape_html(status["name"]) for status in settings["statuses"]}
         priorities = {priority["id"]: escape_html(priority["name"]) for priority in settings["priorities"]}
         task_types = {task_type["id"]: escape_html(task_type["name"]) for task_type in settings["task_types"]}
+        
+        logger.info(f"Available task types: {task_types}")
+        logger.info(f"Available statuses: {statuses}")
+        logger.info(f"Available priorities: {priorities}")
     
     if 'status_id' in filters_copy:
-        status_name = statuses.get(filters_copy['status_id'], f"Статус {filters_copy['status_id']}")
-        filter_parts.append(f"Статус: {status_name}")
+        status_id = int(filters_copy['status_id'])  # Преобразуем строковый ID в число
+        status_name = statuses.get(status_id)
+        logger.info(f"Status filter: id={status_id}, name={status_name}")
+        if status_name:
+            filter_parts.append(i18n.format_value("status_filter", {'status_name': status_name}))
     
     if 'priority_id' in filters_copy:
-        priority_name = priorities.get(filters_copy['priority_id'], f"Приоритет {filters_copy['priority_id']}")
-        filter_parts.append(f"Приоритет: {priority_name}")
+        priority_id = int(filters_copy['priority_id'])  # Преобразуем строковый ID в число
+        priority_name = priorities.get(priority_id)
+        logger.info(f"Priority filter: id={priority_id}, name={priority_name}")
+        if priority_name:
+            filter_parts.append(i18n.format_value("priority_filter", {'priority_name': priority_name}))
     
     if 'type_id' in filters_copy:
-        type_name = task_types.get(filters_copy['type_id'], f"Тип {filters_copy['type_id']}")
-        filter_parts.append(f"Тип: {type_name}")
+        type_id = int(filters_copy['type_id'])  # Преобразуем строковый ID в число
+        type_name = task_types.get(type_id)
+        logger.info(f"Type filter: id={type_id}, name={type_name}")
+        if type_name:
+            filter_parts.append(i18n.format_value("type_filter", {'type_name': type_name}))
     
     if 'deadline_from' in filters_copy:
         deadline_from = escape_html(str(filters_copy['deadline_from']))
-        filter_parts.append(f"Дедлайн от: {deadline_from}")
+        filter_parts.append(i18n.format_value("deadline_from_filter", {'deadline_from': deadline_from}))
     
     if 'deadline_to' in filters_copy:
         deadline_to = escape_html(str(filters_copy['deadline_to']))
-        filter_parts.append(f"Дедлайн до: {deadline_to}")
+        filter_parts.append(i18n.format_value("deadline_to_filter", {'deadline_to': deadline_to}))
     
     if 'is_completed' in filters_copy:
-        completed_status = "Завершенные" if filters_copy['is_completed'] else "Незавершенные"
-        filter_parts.append(f"Статус: {completed_status}")
+        completed_status = i18n.format_value("task-list-filter-completed-all") if filters_copy['is_completed'] else i18n.format_value("task-list-filter-uncompleted-only")
+        filter_parts.append(completed_status)
+    
+    logger.info(f"Applied filters: {filters_copy}")
+    logger.info(f"Filter description parts: {filter_parts}")
     
     return ", ".join(filter_parts)
 
@@ -312,13 +338,38 @@ async def on_page_next(c: CallbackQuery, button: Button, manager: DialogManager)
 
 async def on_reset_filters(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик сброса фильтров"""
+    # Полностью очищаем фильтры
     manager.dialog_data["filters"] = {}
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            manager.dialog_data["filters"],
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.update(data={})
 
 async def on_reset_sort(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик сброса сортировки"""
-    manager.dialog_data.pop("sort_by", None)
-    manager.dialog_data.pop("sort_order", None)
+    if "sort_by" in manager.dialog_data:
+        manager.dialog_data.pop("sort_by")
+    if "sort_order" in manager.dialog_data:
+        manager.dialog_data.pop("sort_order")
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            manager.dialog_data.get("filters", {}),
+            None,
+            None
+        )
+    
     await manager.update(data={})
 
 async def on_status_selected(c: CallbackQuery, select: Any, manager: DialogManager, item_id: str):
@@ -326,6 +377,17 @@ async def on_status_selected(c: CallbackQuery, select: Any, manager: DialogManag
     filters = manager.dialog_data.get("filters", {})
     filters["status_id"] = item_id
     manager.dialog_data["filters"] = filters
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            filters,
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_priority_selected(c: CallbackQuery, select: Any, manager: DialogManager, item_id: str):
@@ -333,6 +395,17 @@ async def on_priority_selected(c: CallbackQuery, select: Any, manager: DialogMan
     filters = manager.dialog_data.get("filters", {})
     filters["priority_id"] = item_id
     manager.dialog_data["filters"] = filters
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            filters,
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_type_selected(c: CallbackQuery, select: Any, manager: DialogManager, item_id: str):
@@ -340,6 +413,17 @@ async def on_type_selected(c: CallbackQuery, select: Any, manager: DialogManager
     filters = manager.dialog_data.get("filters", {})
     filters["type_id"] = item_id
     manager.dialog_data["filters"] = filters
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            filters,
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_completed_all(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -348,6 +432,17 @@ async def on_completed_all(c: CallbackQuery, button: Button, manager: DialogMana
     if "is_completed" in filters:
         filters.pop("is_completed")
     manager.dialog_data["filters"] = filters
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            filters,
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_completed_only(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -355,6 +450,17 @@ async def on_completed_only(c: CallbackQuery, button: Button, manager: DialogMan
     filters = manager.dialog_data.get("filters", {})
     filters["is_completed"] = True
     manager.dialog_data["filters"] = filters
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            filters,
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_uncompleted_only(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -362,6 +468,17 @@ async def on_uncompleted_only(c: CallbackQuery, button: Button, manager: DialogM
     filters = manager.dialog_data.get("filters", {})
     filters["is_completed"] = False
     manager.dialog_data["filters"] = filters
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            filters,
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_deadline_today(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -373,6 +490,17 @@ async def on_deadline_today(c: CallbackQuery, button: Button, manager: DialogMan
     filters["deadline_from"] = today
     filters["deadline_to"] = today
     manager.dialog_data["filters"] = filters
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            filters,
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_deadline_tomorrow(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -384,6 +512,17 @@ async def on_deadline_tomorrow(c: CallbackQuery, button: Button, manager: Dialog
     filters["deadline_from"] = tomorrow
     filters["deadline_to"] = tomorrow
     manager.dialog_data["filters"] = filters
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            filters,
+            manager.dialog_data.get("sort_by"),
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_deadline_week(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -434,16 +573,49 @@ async def on_deadline_overdue(c: CallbackQuery, button: Button, manager: DialogM
 async def on_sort_by_title(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора сортировки по названию"""
     manager.dialog_data["sort_by"] = "title"
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            manager.dialog_data.get("filters", {}),
+            "title",
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_sort_by_deadline(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора сортировки по дедлайну"""
     manager.dialog_data["sort_by"] = "deadline"
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            manager.dialog_data.get("filters", {}),
+            "deadline",
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_sort_by_priority(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора сортировки по приоритету"""
     manager.dialog_data["sort_by"] = "priority"
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            manager.dialog_data.get("filters", {}),
+            "priority",
+            manager.dialog_data.get("sort_order")
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_sort_by_created(c: CallbackQuery, button: Button, manager: DialogManager):
@@ -454,11 +626,33 @@ async def on_sort_by_created(c: CallbackQuery, button: Button, manager: DialogMa
 async def on_sort_asc(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора сортировки по возрастанию"""
     manager.dialog_data["sort_order"] = "asc"
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            manager.dialog_data.get("filters", {}),
+            manager.dialog_data.get("sort_by"),
+            "asc"
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_sort_desc(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора сортировки по убыванию"""
     manager.dialog_data["sort_order"] = "desc"
+    
+    # Сохраняем настройки пользователя
+    user_id = str(manager.event.from_user.id) if hasattr(manager.event, 'from_user') else None
+    if user_id:
+        await save_user_settings(
+            user_id, 
+            manager.dialog_data.get("filters", {}),
+            manager.dialog_data.get("sort_by"),
+            "desc"
+        )
+    
     await manager.switch_to(TaskListStates.main)
 
 async def on_search_query_input(message: Message, widget: Any, manager: DialogManager, data: dict = None):
@@ -519,6 +713,59 @@ async def get_delete_confirmation_data(dialog_manager: DialogManager, **kwargs):
     """Получает данные для экрана подтверждения удаления задачи"""
     task_id = dialog_manager.dialog_data.get("task_to_delete", "")
     return {"task_to_delete": task_id}
+
+async def start_with_defaults(self, manager: DialogManager = None, **kwargs):
+    user_id = manager.event.from_user.id if hasattr(manager.event, 'from_user') else None
+    
+    if user_id:
+        async with get_session() as session:
+            settings_service = SettingsService(session)
+            user_settings = await settings_service.get_user_settings(str(user_id))
+            logger.info(f"Loaded user settings for user {user_id}: {user_settings}")
+
+            user_settings = json.loads(str(user_settings))
+            # Загружаем сохраненные фильтры и сортировку, если они есть
+            if 'filters' in user_settings:
+                manager.dialog_data["filters"] = user_settings.get('filters', {})
+            else:
+                manager.dialog_data["filters"] = DEFAULT_FILTERS.copy()
+
+            if 'sort_by' in user_settings:
+                manager.dialog_data["sort_by"] = user_settings.get('sort_by')
+            else:
+                manager.dialog_data["sort_by"] = DEFAULT_SORT["sort_by"]
+
+            if 'sort_order' in user_settings:
+                manager.dialog_data["sort_order"] = user_settings.get('sort_order')
+            else:
+                manager.dialog_data["sort_order"] = DEFAULT_SORT["sort_order"]
+    else:
+        # Если нет пользователя, используем дефолтные настройки
+        manager.dialog_data["filters"] = DEFAULT_FILTERS.copy()
+        manager.dialog_data["sort_by"] = DEFAULT_SORT["sort_by"] 
+        manager.dialog_data["sort_order"] = DEFAULT_SORT["sort_order"]
+    
+
+# Функция для сохранения настроек пользователя
+async def save_user_settings(user_id: str, filters: dict, sort_by: str = None, sort_order: str = None):
+    """Сохраняет настройки фильтров и сортировки пользователя в базе данных"""
+    if not user_id:
+        return
+
+    settings = {'filters': filters}
+
+    if sort_by is not None:
+        settings['sort_by'] = sort_by
+
+    if sort_order is not None:
+        settings['sort_order'] = sort_order
+    async with get_session() as session:
+        settings_service = SettingsService(session)
+        success = await settings_service.save_user_preferences(user_id, settings)
+        if success:
+            logger.info(f"Saved user settings for user {user_id}: filters={filters}, sort_by={sort_by}, sort_order={sort_order}")
+        else:
+            logger.error(f"Failed to save user settings for user {user_id}")
 
 # Создаем диалог для списка задач
 task_list_dialog = Dialog(
@@ -820,4 +1067,21 @@ task_list_dialog = Dialog(
         state=TaskListStates.confirm_delete,
         getter=get_delete_confirmation_data,
     ),
-) 
+    on_start=start_with_defaults
+)
+# Устанавливаем значения по умолчанию для нового диалога
+DEFAULT_FILTERS = {}  # По умолчанию показываем все задачи
+DEFAULT_SORT = {
+    "sort_by": "deadline",  # По умолчанию сортировка по дедлайну
+    "sort_order": "asc"  # По умолчанию по возрастанию
+}
+
+DEFAULT_FILTER = {
+    "is_completed": False,  # По умолчанию показываем только незавершенные задачи
+    "sort_by": "deadline",  # По умолчанию сортировка по дедлайну
+    "sort_order": "asc"  # По умолчанию по возрастанию
+}
+
+# Переопределяем метод start диалога для установки значений по умолчанию
+original_start = task_list_dialog.startup
+

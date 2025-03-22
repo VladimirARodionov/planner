@@ -282,3 +282,9 @@ language_not_supported = ❌ Selected language is not supported.
 
 task_list_dialog_forward = Forward ▶️
 task_list_dialog_back = ◀️ Back
+
+status_filter = Status: {$status_name}
+priority_filter = Priority: {$priority_name}
+type_filter = Type: {$type_name}
+deadline_from_filter = Deadline from: {$deadline_from}
+deadline_to_filter = Deadline to: {$deadline_to}

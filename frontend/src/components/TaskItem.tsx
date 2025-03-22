@@ -9,8 +9,10 @@ interface TaskItemProps {
     task: Task;
     onTaskUpdated: () => void;
     onEditTask?: (task: Task) => void;
- }
-const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask }) => {
+    onDeleteTask?: (taskId: number) => void;
+}
+
+const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask, onDeleteTask }) => {
     const { t } = useTranslation();
     
     const handleDelete = async () => {
@@ -34,16 +36,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask }) 
     };
 
     const handleEdit = () => {
-        console.log('Edit button clicked for task:', task.id);
-        
         if (onEditTask) {
-            console.log('Using direct callback for editing');
             onEditTask(task);
-        } else {
-            // Создаем пользовательское событие для редактирования задачи
-            console.log('Dispatching edit-task event');
-            const event = new CustomEvent('edit-task', { detail: task });
-            window.dispatchEvent(event);
         }
     };
 
