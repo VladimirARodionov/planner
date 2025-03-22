@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from aiogram.fsm.state import State, StatesGroup
 from aiogram_dialog import Dialog, Window
@@ -37,6 +37,7 @@ class TaskListStates(StatesGroup):
     filter_completed = State()  # Фильтр по завершенности
     search = State()  # Поиск задач
     sort = State()  # Сортировка задач
+    sort_direction = State()  # Направление сортировки задач
     confirm_delete = State()  # Подтверждение удаления задачи
 
 # Функции-обработчики для условий when
@@ -177,7 +178,7 @@ async def get_tasks_data(dialog_manager: DialogManager, **kwargs):
             status = escape_html(task['status']['name'] if task['status'] else i18n.format_value("status-not-set"))
             priority = escape_html(task['priority']['name'] if task['priority'] else i18n.format_value("priority-not-set"))
             task_type = escape_html(task['type']['name'] if task['type'] else i18n.format_value("type-not-set"))
-            deadline = escape_html(str(task['deadline']) if task['deadline'] else i18n.format_value("deadline-not-set"))
+            deadline = escape_html(str(task['deadline']) + ((" " + i18n.format_value("deadline-overdue")) if task['deadline'] and not task['completed_at'] and datetime.strptime(task['deadline'], "%d.%m.%Y %H:%M") < datetime.now() else "") if task['deadline'] else i18n.format_value("deadline-not-set"))
             completed = "✅" if task['completed_at'] is not None else "❌"
             
             task_info = {
@@ -584,7 +585,7 @@ async def on_sort_by_title(c: CallbackQuery, button: Button, manager: DialogMana
             manager.dialog_data.get("sort_order")
         )
     
-    await manager.switch_to(TaskListStates.main)
+    await manager.switch_to(TaskListStates.sort_direction)
 
 async def on_sort_by_deadline(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора сортировки по дедлайну"""
@@ -600,7 +601,7 @@ async def on_sort_by_deadline(c: CallbackQuery, button: Button, manager: DialogM
             manager.dialog_data.get("sort_order")
         )
     
-    await manager.switch_to(TaskListStates.main)
+    await manager.switch_to(TaskListStates.sort_direction)
 
 async def on_sort_by_priority(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора сортировки по приоритету"""
@@ -616,12 +617,12 @@ async def on_sort_by_priority(c: CallbackQuery, button: Button, manager: DialogM
             manager.dialog_data.get("sort_order")
         )
     
-    await manager.switch_to(TaskListStates.main)
+    await manager.switch_to(TaskListStates.sort_direction)
 
 async def on_sort_by_created(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора сортировки по дате создания"""
     manager.dialog_data["sort_by"] = "created_at"
-    await manager.switch_to(TaskListStates.main)
+    await manager.switch_to(TaskListStates.sort_direction)
 
 async def on_sort_asc(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора сортировки по возрастанию"""
@@ -1037,13 +1038,22 @@ task_list_dialog = Dialog(
             Button(I18NFormat("task-list-sort-by-created"), id="sort_created", on_click=on_sort_by_created),
         ),
         Row(
+            SwitchTo(I18NFormat("task-list-back-button"), id="back_to_main", state=TaskListStates.main),
+        ),
+        state=TaskListStates.sort,
+    ),
+
+    # Экран направления сортировки
+    Window(
+        I18NFormat("task-list-sort-direction-title"),
+        Row(
             Button(I18NFormat("task-list-sort-asc"), id="sort_asc", on_click=on_sort_asc),
             Button(I18NFormat("task-list-sort-desc"), id="sort_desc", on_click=on_sort_desc),
         ),
         Row(
             SwitchTo(I18NFormat("task-list-back-button"), id="back_to_main", state=TaskListStates.main),
         ),
-        state=TaskListStates.sort,
+        state=TaskListStates.sort_direction,
     ),
 
     # Экран поиска

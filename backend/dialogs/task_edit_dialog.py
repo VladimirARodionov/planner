@@ -262,7 +262,8 @@ async def on_duration_selected(callback: CallbackQuery, widget: Any, manager: Di
 async def on_deadline_selected(c: CallbackQuery, widget: Any, manager: DialogManager, date: datetime):
     """Обработчик выбора дедлайна"""
     task = manager.dialog_data.get("task", {})
-    task["deadline"] = date
+    date_now = datetime.now()
+    task["deadline"] = date_now.replace(year=date.year, month=date.month, day=date.day)
     manager.dialog_data["task"] = task
     await manager.switch_to(TaskEditStates.main)
 
