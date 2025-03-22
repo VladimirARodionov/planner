@@ -78,7 +78,10 @@
     "error_creating": "Error creating task",
     "error_updating": "Error updating task",
     "error_deleting": "Error deleting task",
-    "active_filters": "Active filters"
+    "active_filters": "Active filters",
+    "all_statuses": "All statuses",
+    "all_priorities": "All priorities",
+    "all_types": "All types"
   },
   "settings": {
     "general": "General settings",
@@ -132,8 +135,9 @@
   "about": {
     "title": "About",
     "description": "This is a task management and planning application. Create tasks, set deadlines, and track progress.",
-    "version": "Version {{version}}",
-    "developer": "Developed with ❤️"
+    "app_version": "Version",
+    "developer": "Developed with ❤️",
+    "copyright": "© 2025 Task Planner"
   },
   "language": {
     "change": "Change language",
