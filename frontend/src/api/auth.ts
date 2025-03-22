@@ -32,22 +32,39 @@ export const AuthAPI = {
     },
     
     // Метод для обновления токена доступа
-    refreshToken: async (): Promise<RefreshResponse> => {
+    refreshToken: async (): Promise<boolean> => {
         const refreshToken = localStorage.getItem('refreshToken');
+        
         if (!refreshToken) {
-            throw new Error('Refresh token not found');
+            console.error('No refresh token available');
+            return false;
         }
         
-        const response = await api.post<RefreshResponse>('/auth/refresh/', {}, {
-            headers: {
-                'Authorization': `Bearer ${refreshToken}`
+        try {
+            console.log('Attempting to refresh token with refresh token');
+            
+            const response = await api.post('/auth/refresh/', {
+                refresh_token: refreshToken
+            });
+            
+            if (response.data.access_token) {
+                localStorage.setItem('token', response.data.access_token);
+                
+                // Если сервер вернул новый refresh token, сохраняем его
+                if (response.data.refresh_token) {
+                    localStorage.setItem('refreshToken', response.data.refresh_token);
+                }
+                
+                console.log('Token successfully refreshed');
+                return true;
+            } else {
+                console.error('Refresh response missing access token');
+                return false;
             }
-        });
-        
-        // Обновляем токен в localStorage
-        localStorage.setItem('token', response.data.access);
-        
-        return response.data;
+        } catch (error) {
+            console.error('Error refreshing token:', error);
+            return false;
+        }
     },
     
     // Метод для получения URL для авторизации через Telegram

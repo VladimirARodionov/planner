@@ -48,9 +48,7 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, re
         page: 1,
         page_size: 10,
     });
-    const [filters, setFilters] = useState<TaskFilters>({
-        is_completed: false // Показывать только незавершенные задачи по умолчанию
-    });
+    const [filters, setFilters] = useState<TaskFilters>({});
     const [searchQuery, setSearchQuery] = useState<string>('');
     
     // Состояния для фильтров
@@ -131,7 +129,10 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, re
                     
                     if (preferences.filters.is_completed !== undefined) {
                         console.log('Setting is_completed filter:', preferences.filters.is_completed);
-                        setShowCompleted(!preferences.filters.is_completed);
+                        setShowCompleted(preferences.filters.is_completed);
+                    } else {
+                        console.log('No is_completed filter found in preferences');
+                        setShowCompleted(true);
                     }
                 } else {
                     console.log('No filters found in preferences or filters is empty:', preferences.filters);

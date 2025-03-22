@@ -27,14 +27,24 @@ api.interceptors.response.use(
     async (error: AxiosError) => {
         const originalRequest = error.config;
         
-        // Если ошибка 401 (Unauthorized) и это не запрос на обновление токена
+        // Проверяем, есть ли ответ и стал ли код 401
         if (error.response?.status === 401 && 
             originalRequest && 
-            !(originalRequest.url === '/auth/refresh/')) {
+            !(originalRequest.url?.includes('auth/refresh'))) {
             
             try {
+                console.log('Token expired, attempting to refresh...');
                 // Пытаемся обновить токен
-                await AuthAPI.refreshToken();
+                const refreshed = await AuthAPI.refreshToken();
+                
+                if (!refreshed) {
+                    console.error('Failed to refresh token');
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('refreshToken');
+                    localStorage.removeItem('user');
+                    window.location.href = '/login';
+                    return Promise.reject(error);
+                }
                 
                 // Повторяем исходный запрос с новым токеном
                 const token = localStorage.getItem('token');
@@ -42,6 +52,7 @@ api.interceptors.response.use(
                     originalRequest.headers.Authorization = `Bearer ${token}`;
                 }
                 
+                console.log('Token refreshed, retrying request');
                 return axios(originalRequest);
             } catch (refreshError) {
                 // Если не удалось обновить токен, перенаправляем на страницу входа
@@ -325,7 +336,32 @@ export const SettingsAPI = {
     getUserPreferences: async (): Promise<UserPreferences> => {
         try {
             const response = await api.get('/user-preferences/');
-            return JSON.parse(response.data);
+            console.log('Raw response from API:', JSON.stringify(response.data));
+            const received_data = JSON.parse(response.data);
+            // Создаем нормализованный объект настроек
+            const normalized: UserPreferences = {
+                filters: received_data.filters || {},
+                sort_by: received_data.sort_by || 'deadline',
+                sort_order: received_data.sort_order || 'asc'
+            };
+
+            // Убедимся, что type_id является числом
+            if (normalized.filters?.type_id) {
+                normalized.filters.type_id = Number(normalized.filters.type_id);
+            }
+
+            // Убедимся, что status_id является числом
+            if (normalized.filters?.status_id) {
+                normalized.filters.status_id = Number(normalized.filters.status_id);
+            }
+
+            // Убедимся, что priority_id является числом
+            if (normalized.filters?.priority_id) {
+                normalized.filters.priority_id = Number(normalized.filters.priority_id);
+            }
+
+            console.log('Normalized preferences:', normalized);
+            return normalized;
         } catch (error) {
             console.error('Error getting user preferences:', error);
             // Возвращаем значения по умолчанию
