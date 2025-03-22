@@ -119,6 +119,7 @@ task-list-sort-by-priority = По приоритету
 task-list-sort-by-created = По дате создания
 task-list-sort-asc = По возрастанию
 task-list-sort-desc = По убыванию
+task-list-sort-direction-title = Выберите направление сортировки:
 
 # Названия полей сортировки
 sort-field-title = Название
@@ -288,3 +289,4 @@ priority_filter = Приоритет: {$priority_name}
 type_filter = Тип: {$type_name}
 deadline_from_filter = Дедлайн от: {$deadline_from}
 deadline_to_filter = Дедлайн до: {$deadline_to}
+deadline-overdue = Просрочено
