@@ -43,7 +43,7 @@ if ENVIRONMENT == 'PRODUCTION':
     db_name = env_config.get('POSTGRES_DB')
     db_user = env_config.get('POSTGRES_USER')
     db_pass = env_config.get('POSTGRES_PASSWORD')
-    db_host = 'plannerdb'
+    db_host = 'postgres'
     db_port = env_config.get('POSTGRES_PORT') or '5432'
     db_string = 'postgresql+asyncpg://{}:{}@{}:{}/{}'.format(db_user, db_pass, db_host, db_port, db_name)
     db_string_sync = 'postgresql://{}:{}@{}:{}/{}'.format(db_user, db_pass, db_host, db_port, db_name)

@@ -1,12 +1,15 @@
 import asyncio
 import logging.config
 import pathlib
+import platform
 from asyncio import set_event_loop, new_event_loop
 from multiprocessing import Process
 
 from aiogram import Bot
 from aiogram.types import BotCommandScopeDefault, BotCommandScopeChat, BotCommandScopeAllPrivateChats
 from aiogram_dialog import setup_dialogs
+from alembic import command
+from alembic.config import Config
 from flask import Flask
 from flask_jwt_extended import JWTManager
 
@@ -28,6 +31,10 @@ from backend.middleware import TranslatorRunnerMiddleware
 logging.config.fileConfig(fname=pathlib.Path(__file__).resolve().parent.parent / 'logging.ini',
                           disable_existing_loggers=False)
 logging.getLogger('aiosqlite').propagate = False
+
+alembic_cfg = Config("alembic.ini")
+alembic_cfg.attributes['configure_logger'] = False
+command.upgrade(alembic_cfg, "head")
 
 logger = logging.getLogger(__name__)
 
@@ -143,10 +150,11 @@ def create_app():
         JWT_HEADER_TYPE="Bearer"
     )
     # apply the blueprints to the app
-    from backend.blueprints import auth_bp, planner_bp, settings_bp
+    from backend.blueprints import auth_bp, planner_bp, settings_bp, health_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(planner_bp)
     app.register_blueprint(settings_bp)
+    app.register_blueprint(health_bp)
 
     jwt = JWTManager(app)
     app.debug = True
@@ -154,7 +162,7 @@ def create_app():
 
 
 def run_flask(app):
-    app.run(host='127.0.0.1', port=5000, debug=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
 
 if __name__ == '__main__':
     # Создаем приложение Flask
@@ -165,7 +173,9 @@ if __name__ == '__main__':
     
     try:
         # Запускаем Flask в основном процессе
-        run_flask(app)
+        if platform.system() == 'Windows':
+            run_flask(app)
+
     except KeyboardInterrupt:
         logger.info('Завершение работы приложения')
     finally:
@@ -211,3 +221,12 @@ async def set_user_commands(bot: Bot, user_id: str, user_locale: FluentLocalizat
         logger.info(f"Установлены команды бота для пользователя {user_id} с языками {AVAILABLE_LANGUAGES}")
     except Exception as e:
         logger.exception(f"Ошибка при установке команд бота для пользователя {user_id}: {e}")
+
+def create_app_wsgi():
+    """Создание Flask приложения для запуска через Gunicorn"""
+    app, _ = create_app()
+    
+    # Запускаем бота в отдельном процессе
+    bot_process = start_process_aiogram()
+    
+    return app

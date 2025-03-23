@@ -17,4 +17,5 @@ aiogram-dialog
 pydantic
 contextvars
 fluentogram
+python-dateutil
 
