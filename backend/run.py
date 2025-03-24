@@ -137,7 +137,7 @@ def create_app():
     CORS(app,
          resources={
              r"/api/*": {
-                 "origins": ["http://localhost:3000", env_config.get('FRONTEND_URL'), env_config.get('PUBLIC_URL')],
+                 "origins": ["http://localhost:3000", "http://127.0.0.1:3000", env_config.get('FRONTEND_URL'), env_config.get('PUBLIC_URL')],
                  "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
                  "allow_headers": ["Content-Type", "Authorization"],
                  "supports_credentials": True,
@@ -176,6 +176,7 @@ def run_flask(app):
 if __name__ == '__main__':
     # Создаем приложение Flask
     app, jwt = create_app()
+    bot_process = None
     try:
         if ENVIRONMENT == "DEVELOPMENT":
             # Запускаем бота в отдельном процессе
@@ -191,7 +192,7 @@ if __name__ == '__main__':
     finally:
         if ENVIRONMENT == "DEVELOPMENT":
             # Завершаем процесс бота при выходе
-            if bot_process.is_alive():
+            if bot_process and bot_process.is_alive():
                 bot_process.terminate()
                 bot_process.join()
         logger.info('Приложение остановлено')

@@ -10,14 +10,22 @@ from backend.db.models import DurationType, DefaultSettings, GlobalSettings, Sta
 
 
 # Создаем асинхронный движок SQLAlchemy
-engine = create_async_engine(db_string, echo=True)
+engine = create_async_engine(db_string,
+                             pool_size=100,
+                             max_overflow=10,
+                             pool_timeout=30,
+                             pool_pre_ping=True,
+                             pool_recycle=1800,
+                             echo=False)
 logger = logging.getLogger(__name__)
 
 # Создаем фабрику асинхронных сессий
 async_session = async_sessionmaker(
     engine,
     class_=AsyncSession,
-    expire_on_commit=False
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False
 )
 
 @asynccontextmanager
