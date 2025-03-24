@@ -227,7 +227,7 @@ class Task(Base):
         """Проверить, просрочена ли задача"""
         if not self.deadline or self.completed_at or (self.status and self.status.is_final):
             return False
-        return datetime.now() > self.deadline
+        return datetime.now().timestamp() > self.deadline.timestamp()
 
 
 class TaskTypeSetting(Base):

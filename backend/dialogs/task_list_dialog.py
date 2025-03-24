@@ -723,22 +723,27 @@ async def start_with_defaults(self, manager: DialogManager = None, **kwargs):
             settings_service = SettingsService(session)
             user_settings = await settings_service.get_user_settings(str(user_id))
             logger.info(f"Loaded user settings for user {user_id}: {user_settings}")
+            if user_settings is not None:
+                user_settings = json.loads(str(user_settings))
+                # Загружаем сохраненные фильтры и сортировку, если они есть
+                if 'filters' in user_settings:
+                    manager.dialog_data["filters"] = user_settings.get('filters', {})
+                else:
+                    manager.dialog_data["filters"] = DEFAULT_FILTERS.copy()
 
-            user_settings = json.loads(str(user_settings))
-            # Загружаем сохраненные фильтры и сортировку, если они есть
-            if 'filters' in user_settings:
-                manager.dialog_data["filters"] = user_settings.get('filters', {})
+                if 'sort_by' in user_settings:
+                    manager.dialog_data["sort_by"] = user_settings.get('sort_by')
+                else:
+                    manager.dialog_data["sort_by"] = DEFAULT_SORT["sort_by"]
+
+                if 'sort_order' in user_settings:
+                    manager.dialog_data["sort_order"] = user_settings.get('sort_order')
+                else:
+                    manager.dialog_data["sort_order"] = DEFAULT_SORT["sort_order"]
             else:
+                # Если нет пользователя, используем дефолтные настройки
                 manager.dialog_data["filters"] = DEFAULT_FILTERS.copy()
-
-            if 'sort_by' in user_settings:
-                manager.dialog_data["sort_by"] = user_settings.get('sort_by')
-            else:
                 manager.dialog_data["sort_by"] = DEFAULT_SORT["sort_by"]
-
-            if 'sort_order' in user_settings:
-                manager.dialog_data["sort_order"] = user_settings.get('sort_order')
-            else:
                 manager.dialog_data["sort_order"] = DEFAULT_SORT["sort_order"]
     else:
         # Если нет пользователя, используем дефолтные настройки

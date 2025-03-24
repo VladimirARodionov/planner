@@ -645,14 +645,14 @@ class SettingsService:
 
     async def get_user_settings(self, user_id: str):
         """Получить пользователя по ID"""
-        query = select(User.settings).where(User.telegram_id == user_id)
+        query = select(User.settings).where(User.telegram_id == int(user_id))
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
     async def save_user_preferences(self, user_id: str, preferences: dict) -> bool:
         """Сохранение настроек пользователя."""
         result = await self.session.execute(
-            select(User).where(User.telegram_id == user_id)
+            select(User).where(User.telegram_id == int(user_id))
         )
         user = result.scalar_one_or_none()
         if not user:

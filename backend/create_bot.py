@@ -1,5 +1,6 @@
 import os
 import pathlib
+import logging
 
 import decouple
 from aiogram import Bot, Dispatcher
@@ -10,7 +11,9 @@ from aiogram.types import BotCommand
 from fluent.runtime import FluentLocalization
 from sqlalchemy import create_engine
 
-# настраиваем логирование и выводим в переменную для отдельного использования в нужных местах
+# настраиваем логирование
+logger = logging.getLogger(__name__)
+
 ENVIRONMENT = os.getenv("ENVIRONMENT", default="DEVELOPMENT")
 
 def get_env_config() -> decouple.Config:

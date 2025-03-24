@@ -21,7 +21,7 @@ class AuthService:
         logger.debug(f"Поиск пользователя с ID {user_id}")
         
         result = await self.session.execute(
-            select(User).where(User.telegram_id == user_id)
+            select(User).where(User.telegram_id == int(user_id))
         )
         user = result.scalar_one_or_none()
         
@@ -49,7 +49,7 @@ class AuthService:
         """Аутентифицировать пользователя"""
         # TODO: Реализовать проверку пароля
         result = await self.session.execute(
-            select(User).where(User.telegram_id == username)
+            select(User).where(User.telegram_id == int(username))
         )
         return result.scalar_one_or_none()
 
@@ -62,11 +62,11 @@ class AuthService:
 
     async def set_user_language(self, user_id: str, language: str) -> bool:
         """Установить предпочитаемый язык пользователя"""
-        user = await self.get_user_by_id(user_id)
+        user = await self.get_user_by_id(int(user_id))
         if not user:
             return False
             
-        stmt = update(User).where(User.telegram_id == user_id).values(language=language)
+        stmt = update(User).where(User.telegram_id == int(user_id)).values(language=language)
         await self.session.execute(stmt)
         await self.session.commit()
         bot = Bot(token=env_config.get('TELEGRAM_TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))

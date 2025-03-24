@@ -141,7 +141,7 @@ async def create_initial_default_settings(session: AsyncSession):
         db_setting = DefaultSettings(
             setting_type="status",
             name=status["name"],
-            value=json.dumps(status),
+            value=json.dumps(status, ensure_ascii=False),
             is_active=True
         )
         session.add(db_setting)
@@ -186,7 +186,7 @@ async def create_initial_default_settings(session: AsyncSession):
         db_setting = DefaultSettings(
             setting_type="priority",
             name=priority["name"],
-            value=json.dumps(priority),
+            value=json.dumps(priority, ensure_ascii=False),
             is_active=True
         )
         session.add(db_setting)
@@ -231,7 +231,7 @@ async def create_initial_default_settings(session: AsyncSession):
         db_setting = DefaultSettings(
             setting_type="duration",
             name=duration["name"],
-            value=json.dumps(duration),
+            value=json.dumps(duration, ensure_ascii=False),
             is_active=True
         )
         session.add(db_setting)
@@ -280,7 +280,7 @@ async def create_initial_default_settings(session: AsyncSession):
         db_setting = DefaultSettings(
             setting_type="task_type",
             name=task_type["name"],
-            value=json.dumps(task_type),
+            value=json.dumps(task_type, ensure_ascii=False),
             is_active=True
         )
         session.add(db_setting)
