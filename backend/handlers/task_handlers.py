@@ -1,7 +1,4 @@
 import logging
-import time
-import json
-import os
 import jwt
 import uuid
 from datetime import datetime, timedelta, UTC
@@ -20,12 +17,6 @@ from backend.dialogs.task_dialogs import TaskDialog
 from backend.load_env import env_config
 
 logger = logging.getLogger(__name__)
-
-# Путь к файлу с состояниями авторизации
-AUTH_STATES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'auth_states.json')
-
-# Время жизни состояния авторизации в секундах (10 минут)
-AUTH_STATE_TTL = 600
 
 # Функция для создания access token
 def create_custom_access_token(identity):
@@ -64,79 +55,22 @@ def create_custom_refresh_token(identity):
     
     return jwt.encode(payload, env_config.get('JWT_SECRET_KEY'), algorithm='HS256')
 
-# Функция для загрузки состояний авторизации из файла
-def load_auth_states():
-    """Загружает состояния авторизации из файла"""
-    if not os.path.exists(AUTH_STATES_FILE):
-        return {}
-    
-    try:
-        with open(AUTH_STATES_FILE, 'r') as f:
-            auth_states = json.load(f)
-        
-        # Преобразуем строковые ключи timestamp обратно в числа
-        for state, data in auth_states.items():
-            auth_states[state] = (data[0], float(data[1]))
-        
-        return auth_states
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке состояний авторизации: {e}")
-        return {}
-
-# Функция для сохранения состояний авторизации в файл
-def save_auth_states(auth_states):
-    """Сохраняет состояния авторизации в файл"""
-    try:
-        with open(AUTH_STATES_FILE, 'w') as f:
-            json.dump(auth_states, f)
-    except Exception as e:
-        logger.error(f"Ошибка при сохранении состояний авторизации: {e}")
-
-# Функция для добавления состояния авторизации
-def add_auth_state(state, redirect_url):
-    """Добавляет состояние авторизации"""
-    auth_states = load_auth_states()
-    auth_states[state] = (redirect_url, time.time())
-    save_auth_states(auth_states)
-
-# Функция для получения и удаления состояния авторизации
-def get_and_remove_auth_state(state):
-    """Получает и удаляет состояние авторизации"""
-    auth_states = load_auth_states()
-    if state in auth_states:
-        redirect_url, timestamp = auth_states.pop(state)
-        save_auth_states(auth_states)
-        
-        # Проверяем, не истекло ли состояние
-        if time.time() - timestamp <= AUTH_STATE_TTL:
-            return redirect_url
-    
-    return None
-
-# Функция для очистки старых состояний авторизации
-def cleanup_auth_states():
-    """Очищает старые состояния авторизации"""
-    auth_states = load_auth_states()
-    current_time = time.time()
-    expired_states = []
-    
-    for state, (_, timestamp) in auth_states.items():
-        if current_time - timestamp > AUTH_STATE_TTL:
-            expired_states.append(state)
-    
-    if expired_states:
-        for state in expired_states:
-            auth_states.pop(state)
-        save_auth_states(auth_states)
 
 router = Router()
+
+
+async def cleanup_auth_states():
+    async with get_session() as session:
+        auth_service = AuthService(session)
+        # Проверяем, существует ли пользователь
+        await auth_service.cleanup_auth_states()
 
 
 @router.message(Command("start"))
 async def start_command(message: Message):
     """Обработчик команды /start, создает нового пользователя"""
     # Очищаем старые состояния авторизации
-    cleanup_auth_states()
+    await cleanup_auth_states()
     
     user_id = message.from_user.id
     # Устанавливаем пользователя в контекст
@@ -198,8 +132,11 @@ async def start_command(message: Message):
     # Если есть параметр авторизации, генерируем токены и отправляем ссылку для входа
     if auth_state:
         # Получаем URL для редиректа
-        redirect_url = get_and_remove_auth_state(auth_state)
-        
+        async with get_session() as session:
+            auth_service = AuthService(session)
+            # Проверяем, существует ли пользователь
+            redirect_url = await auth_service.get_and_remove_auth_state(auth_state)
+
         if redirect_url:
             # Проверяем URL и заменяем localhost на публичный домен для Telegram
             if "localhost" in redirect_url:

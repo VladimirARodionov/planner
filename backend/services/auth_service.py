@@ -1,3 +1,4 @@
+from datetime import datetime, UTC, timedelta
 from typing import Optional
 
 from aiogram import Bot
@@ -7,10 +8,13 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
-from backend.db.models import User
+from backend.db.models import User, AuthStates
 from backend.load_env import env_config
 
 logger = logging.getLogger(__name__)
+
+# Время жизни состояния авторизации в секундах (10 минут)
+AUTH_STATE_TTL = 600
 
 class AuthService:
     def __init__(self, session: AsyncSession):
@@ -62,7 +66,7 @@ class AuthService:
 
     async def set_user_language(self, user_id: str, language: str) -> bool:
         """Установить предпочитаемый язык пользователя"""
-        user = await self.get_user_by_id(int(user_id))
+        user = await self.get_user_by_id(user_id)
         if not user:
             return False
             
@@ -75,3 +79,55 @@ class AuthService:
         locale = await get_user_locale(user_id)
         await set_user_commands(bot, user_id, locale)
         return True
+
+    # Функция для добавления состояния авторизации в базу данных
+    async def add_auth_state(self, state:str, redirect_url:str):
+        """Добавляет состояние авторизации в базу данных"""
+        result = await self.session.execute(
+            select(AuthStates).where(AuthStates.created_at < (datetime.now(UTC) - timedelta(seconds=AUTH_STATE_TTL)))) # type: ignore
+        states = result.scalars().all()
+        deleted = len(states)
+        for st in states:
+            await self.session.delete(st)
+        if deleted:
+            logger.info(f"Очищено {deleted} просроченных состояний авторизации")
+
+        # Добавляем новое состояние
+        auth_state = AuthStates(state=state, redirect_url=redirect_url)
+        self.session.add(auth_state)
+        await self.session.commit()
+        logger.info(f"Состояние авторизации {state} сохранено в базе данных")
+        return True
+
+    # Функция для получения и удаления состояния авторизации из базы данных
+    async def get_and_remove_auth_state(self, state:str):
+        """Получает и удаляет состояние авторизации из базы данных"""
+        result = await self.session.execute(
+            select(AuthStates).where(AuthStates.state == state).where(AuthStates.created_at < (datetime.now(UTC) + timedelta(seconds=AUTH_STATE_TTL)))) # type: ignore
+        row = result.scalar_one_or_none()
+        if not row:
+            logger.error(f"Состояние авторизации {state} не найдено в базе данных или истекло")
+            return None
+
+        redirect_url = row.redirect_url
+        # Проверяем, не истекло ли состояние
+        logger.info(f"Время создания состояния авторизации {state}: {row.created_at} ; now={datetime.now(UTC)}")
+        # Удаляем состояние
+        await self.session.delete(row)
+        await self.session.commit()
+        logger.info(f"Состояние авторизации {state} получено и удалено из базы данных")
+        return redirect_url
+
+    # Функция для очистки старых состояний авторизации
+    async def cleanup_auth_states(self):
+        """Очищает старые состояния авторизации из базы данных"""
+        result = await self.session.execute(
+            select(AuthStates).where(AuthStates.created_at < datetime.now(UTC) - timedelta(seconds=AUTH_STATE_TTL))) # type: ignore
+        states = result.scalars().all()
+        deleted = len(states)
+        for state in states:
+            await self.session.delete(state)
+        await self.session.commit()
+
+        if deleted:
+            logger.info(f"Очищено {deleted} просроченных состояний авторизации")
