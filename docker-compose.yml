@@ -42,6 +42,10 @@ services:
       - TZ=${TZ}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - ENVIRONMENT=${ENVIRONMENT:-PRODUCTION}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - FRONTEND_PORT=${FRONTEND_PORT}
+      - BACKEND_URL=${BACKEND_URL}
+      - BACKEND_PORT=${BACKEND_PORT}
       - RUN_BOT=0
     dns:
       - 8.8.8.8
@@ -95,6 +99,10 @@ services:
       - TZ=${TZ}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - ENVIRONMENT=${ENVIRONMENT:-PRODUCTION}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - FRONTEND_PORT=${FRONTEND_PORT}
+      - BACKEND_URL=${BACKEND_URL}
+      - BACKEND_PORT=${BACKEND_PORT}
       - RUN_BOT=1
     dns:
       - 8.8.8.8
