@@ -31,7 +31,7 @@ class TaskService:
 
         if filters:
             if filters.get('id'):
-                query = query.where(Task.id == filters['id'])
+                query = query.where(Task.id == int(filters['id']))
             if filters.get('status_id'):
                 query = query.where(Task.status_id == int(filters['status_id']))
             if filters.get('priority_id'):
@@ -469,7 +469,7 @@ class TaskService:
         if not user:
             return False
 
-        task = await self.session.get(Task, task_id)
+        task = await self.session.get(Task, int(task_id))
         if not task or task.user_id != user.telegram_id:
             return False
 
