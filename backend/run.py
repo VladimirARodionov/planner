@@ -4,6 +4,7 @@ import os
 import pathlib
 from asyncio import set_event_loop, new_event_loop
 from multiprocessing import Process
+import threading
 
 from aiogram import Bot
 from aiogram.types import BotCommandScopeDefault, BotCommandScopeChat, BotCommandScopeAllPrivateChats
@@ -236,6 +237,30 @@ async def set_user_commands(bot: Bot, user_id: str, user_locale: FluentLocalizat
 
 def create_app_wsgi():
     """Создание Flask приложения для запуска через Gunicorn"""
+    # Создаем глобальную переменную для хранения цикла событий
+    global _asyncio_loop
+    
+    # Устанавливаем политику для работы с asyncio в многопоточной среде
+    asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
+    
+    # Создаем новый цикл событий для основного WSGI процесса
+    main_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(main_loop)
+    _asyncio_loop = main_loop
+    
+    # Настраиваем переменную окружения для идентификации воркера Gunicorn
+    worker_id = os.environ.get('GUNICORN_WORKER_ID', '0')
+    
+    # Только в основном воркере (worker_id=0) запускаем бот
+    #if worker_id == '0':
+        #logger.info(f"Запуск бота в основном воркере (ID: {worker_id})")
+        # Запускаем бот в отдельном потоке
+        #bot_thread = threading.Thread(target=lambda: asyncio.run(main()))
+        #bot_thread.daemon = True
+        #bot_thread.start()
+    #else:
+        #logger.info(f"Пропуск запуска бота в дополнительном воркере (ID: {worker_id})")
+    
     app, _ = create_app()
     
     return app

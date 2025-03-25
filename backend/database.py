@@ -8,15 +8,18 @@ from backend.create_bot import db_string
 from backend.db.models import DurationType, DefaultSettings, GlobalSettings, StatusSetting, PrioritySetting, DurationSetting, TaskTypeSetting
 
 
+# Создаем асинхронный движок SQLAlchemy с оптимизированными настройками
+engine = create_async_engine(
+    db_string,
+    pool_size=50,           # Уменьшаем размер пула, чтобы избежать чрезмерного использования ресурсов
+    max_overflow=20,        # Увеличиваем максимальное переполнение
+    pool_timeout=60,        # Увеличиваем таймаут получения соединения
+    pool_pre_ping=True,     # Проверка соединения перед использованием
+    pool_recycle=900,       # Пересоздание соединений через 15 минут
+    pool_use_lifo=True,     # Использование стратегии LIFO для лучшего переиспользования соединений
+    echo=False              # Отключаем вывод SQL
+)
 
-# Создаем асинхронный движок SQLAlchemy
-engine = create_async_engine(db_string,
-                             pool_size=100,
-                             max_overflow=10,
-                             pool_timeout=30,
-                             pool_pre_ping=True,
-                             pool_recycle=1800,
-                             echo=False)
 logger = logging.getLogger(__name__)
 
 # Создаем фабрику асинхронных сессий
@@ -31,10 +34,17 @@ async_session = async_sessionmaker(
 @asynccontextmanager
 async def get_session() -> AsyncSession:
     """Получить асинхронную сессию базы данных"""
-    async with async_session() as session:
-        try:
-            yield session
-        finally:
+    session = None
+    try:
+        session = async_session()
+        yield session
+    except Exception as e:
+        logger.error(f"Ошибка сессии БД: {str(e)}")
+        if session:
+            await session.rollback()
+        raise
+    finally:
+        if session:
             await session.close()
 
 # Функция для инициализации базы данных
