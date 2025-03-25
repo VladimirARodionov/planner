@@ -289,4 +289,4 @@ priority_filter = Priority: {$priority_name}
 type_filter = Type: {$type_name}
 deadline_from_filter = Deadline from: {$deadline_from}
 deadline_to_filter = Deadline to: {$deadline_to}
-deadline-overdue = Overdue
+deadline-overdue = ❗ Overdue

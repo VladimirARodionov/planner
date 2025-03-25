@@ -11,7 +11,6 @@ from backend.database import get_session
 from backend.locale_config import AVAILABLE_LANGUAGES
 from backend.services.auth_service import AuthService
 from backend.load_env import env_config
-from backend.handlers.task_handlers import add_auth_state
 
 
 bp = Blueprint("auth", __name__)
@@ -95,7 +94,8 @@ def user_logout():
 
 @bp.route('/api/auth/telegram/login', methods=['GET'])
 @cross_origin()
-def telegram_login():
+@async_route
+async def telegram_login():
     """Инициировать авторизацию через Telegram"""
     # Генерируем случайную строку для защиты от CSRF
     auth_state = secrets.token_hex(16)
@@ -111,8 +111,14 @@ def telegram_login():
         redirect_url = redirect_url.replace("http://localhost:3000", public_domain)
         logger.info(f"Заменен localhost URL на публичный домен: {redirect_url}")
     
-    # Сохраняем состояние авторизации и URL для редиректа
-    add_auth_state(auth_state, redirect_url)
+    # Сохраняем состояние авторизации и URL для редиректа в базу данных
+    async with get_session() as session:
+        auth_service = AuthService(session)
+        success = await auth_service.add_auth_state(auth_state, redirect_url)
+    
+    if not success:
+        logger.error(f"Не удалось сохранить состояние авторизации {auth_state}")
+        return jsonify({"error": "Failed to save authentication state"}), 500
     
     # Получаем данные для авторизации
     bot_username = env_config.get('TELEGRAM_BOT_USERNAME')

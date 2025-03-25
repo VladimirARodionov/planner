@@ -1,7 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Box, Container, Typography, Card, CardContent, List, ListItem, ListItemIcon, ListItemText, Divider } from '@mui/material';
-import { Assignment, Schedule, PriorityHigh, Category } from '@mui/icons-material';
+import { Box, Container, Typography, Card, CardContent, Divider } from '@mui/material';
 
 export const AboutPage: React.FC = () => {
   const { t } = useTranslation();

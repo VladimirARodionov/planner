@@ -227,7 +227,7 @@ class Task(Base):
         """Проверить, просрочена ли задача"""
         if not self.deadline or self.completed_at or (self.status and self.status.is_final):
             return False
-        return datetime.now() > self.deadline
+        return datetime.now().timestamp() > self.deadline.timestamp()
 
 
 class TaskTypeSetting(Base):
@@ -246,3 +246,12 @@ class TaskTypeSetting(Base):
 
     tasks = relationship("Task", back_populates="type")
     user = relationship('User', back_populates='task_type_settings')
+
+
+class AuthStates(Base):
+    """Модель для хранения состояний авторизации пользователя"""
+    __tablename__ = 'auth_states'
+
+    state = Column(String, primary_key=True)
+    redirect_url = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now())

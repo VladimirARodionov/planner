@@ -289,4 +289,4 @@ priority_filter = Приоритет: {$priority_name}
 type_filter = Тип: {$type_name}
 deadline_from_filter = Дедлайн от: {$deadline_from}
 deadline_to_filter = Дедлайн до: {$deadline_to}
-deadline-overdue = Просрочено
+deadline-overdue = ❗ Просрочено

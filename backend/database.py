@@ -8,25 +8,43 @@ from backend.create_bot import db_string
 from backend.db.models import DurationType, DefaultSettings, GlobalSettings, StatusSetting, PrioritySetting, DurationSetting, TaskTypeSetting
 
 
+# Создаем асинхронный движок SQLAlchemy с оптимизированными настройками
+engine = create_async_engine(
+    db_string,
+    pool_size=50,           # Уменьшаем размер пула, чтобы избежать чрезмерного использования ресурсов
+    max_overflow=20,        # Увеличиваем максимальное переполнение
+    pool_timeout=60,        # Увеличиваем таймаут получения соединения
+    pool_pre_ping=True,     # Проверка соединения перед использованием
+    pool_recycle=900,       # Пересоздание соединений через 15 минут
+    pool_use_lifo=True,     # Использование стратегии LIFO для лучшего переиспользования соединений
+    echo=False              # Отключаем вывод SQL
+)
 
-# Создаем асинхронный движок SQLAlchemy
-engine = create_async_engine(db_string, echo=True)
 logger = logging.getLogger(__name__)
 
 # Создаем фабрику асинхронных сессий
 async_session = async_sessionmaker(
     engine,
     class_=AsyncSession,
-    expire_on_commit=False
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False
 )
 
 @asynccontextmanager
 async def get_session() -> AsyncSession:
     """Получить асинхронную сессию базы данных"""
-    async with async_session() as session:
-        try:
-            yield session
-        finally:
+    session = None
+    try:
+        session = async_session()
+        yield session
+    except Exception as e:
+        logger.error(f"Ошибка сессии БД: {str(e)}")
+        if session:
+            await session.rollback()
+        raise
+    finally:
+        if session:
             await session.close()
 
 # Функция для инициализации базы данных
@@ -141,7 +159,7 @@ async def create_initial_default_settings(session: AsyncSession):
         db_setting = DefaultSettings(
             setting_type="status",
             name=status["name"],
-            value=json.dumps(status),
+            value=json.dumps(status, ensure_ascii=False),
             is_active=True
         )
         session.add(db_setting)
@@ -186,7 +204,7 @@ async def create_initial_default_settings(session: AsyncSession):
         db_setting = DefaultSettings(
             setting_type="priority",
             name=priority["name"],
-            value=json.dumps(priority),
+            value=json.dumps(priority, ensure_ascii=False),
             is_active=True
         )
         session.add(db_setting)
@@ -231,7 +249,7 @@ async def create_initial_default_settings(session: AsyncSession):
         db_setting = DefaultSettings(
             setting_type="duration",
             name=duration["name"],
-            value=json.dumps(duration),
+            value=json.dumps(duration, ensure_ascii=False),
             is_active=True
         )
         session.add(db_setting)
@@ -280,7 +298,7 @@ async def create_initial_default_settings(session: AsyncSession):
         db_setting = DefaultSettings(
             setting_type="task_type",
             name=task_type["name"],
-            value=json.dumps(task_type),
+            value=json.dumps(task_type, ensure_ascii=False),
             is_active=True
         )
         session.add(db_setting)
