@@ -76,7 +76,7 @@ def get_bot_commands(user_locale: FluentLocalization = None):
 
     commands = [
         BotCommand(command='start', description=user_locale.format_value("start_menu")),
-        BotCommand(command='profile', description=user_locale.format_value("my_profile_menu")),
+        #BotCommand(command='profile', description=user_locale.format_value("my_profile_menu")),
         BotCommand(command='tasks', description=user_locale.format_value("tasks-menu")),
         BotCommand(command='add_task', description=user_locale.format_value("add-task-menu")),
         BotCommand(command='settings', description=user_locale.format_value("settings_menu")),

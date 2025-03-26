@@ -341,7 +341,7 @@ export const SettingsAPI = {
             // Создаем нормализованный объект настроек
             const normalized: UserPreferences = {
                 filters: received_data.filters || {},
-                sort_by: received_data.sort_by || 'deadline',
+                sort_by: received_data.sort_by,
                 sort_order: received_data.sort_order || 'asc'
             };
 
@@ -378,7 +378,7 @@ export const SettingsAPI = {
             // Убедимся, что у нас есть валидный объект предпочтений
             const validPreferences: UserPreferences = {
                 filters: preferences.filters || {},
-                sort_by: preferences.sort_by || 'deadline',
+                sort_by: preferences.sort_by,
                 sort_order: preferences.sort_order || 'asc'
             };
             
