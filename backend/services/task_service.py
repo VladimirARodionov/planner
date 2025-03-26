@@ -340,8 +340,8 @@ class TaskService:
                 task_data['type_id'] = task_type.id
 
         if not task_data.get('duration_id'):
-            type_query = select(TaskTypeSetting).where(
-                TaskTypeSetting.user_id == user.telegram_id, # type: ignore
+            type_query = select(DurationSetting).where(
+                DurationSetting.user_id == user.telegram_id, # type: ignore
                 DurationSetting.is_default == True
             )
             type_result = await self.session.execute(type_query)
