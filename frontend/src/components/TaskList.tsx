@@ -136,12 +136,20 @@ export const TaskList: React.FC<TaskListProps> = ({ onEditTask, onDeleteTask, re
                     }
                 } else {
                     console.log('No filters found in preferences or filters is empty:', preferences.filters);
+                    setFilters(prevFilters => ({...prevFilters, ...preferences.filters}));
+                    setSelectedStatus('');
+                    setSelectedPriority('');
+                    setSelectedType('');
+                    setShowCompleted(true);
                 }
                 
                 // Применяем сохраненную сортировку, если она есть
                 if (preferences.sort_by) {
                     console.log('Setting sort_by:', preferences.sort_by);
                     setSortField(preferences.sort_by);
+                } else {
+                    console.log('Setting empty sort_by');
+                    setSortField('');
                 }
                 
                 if (preferences.sort_order) {

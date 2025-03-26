@@ -157,7 +157,8 @@ const AppLayout: React.FC = () => {
                         easing: theme.transitions.easing.sharp,
                         duration: theme.transitions.duration.leavingScreen,
                     }),
-                    ...(isMenuOpen && {
+                    width: '100%',
+                    ...(isMenuOpen && !isMobile && {
                         marginLeft: contentMargin,
                         width: `calc(100% - ${contentMargin})`,
                         transition: theme.transitions.create(['width', 'margin'], {
@@ -167,28 +168,60 @@ const AppLayout: React.FC = () => {
                     })
                 }}
             >
-                <Toolbar>
-                    <Sidebar 
-                        open={isMenuOpen} 
-                        onClose={handleToggleMenu} 
-                        onOpen={handleToggleMenu} 
-                    />
-                    <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                        {t('common.app_name')}
-                    </Typography>
-                    <IconButton
-                        color="inherit"
-                        aria-label="create task"
-                        onClick={handleCreateTask}
-                        sx={{ mr: 2 }}
-                        title={t('tasks.new_task')}
-                    >
-                        <AddIcon />
-                    </IconButton>
-                    <LanguageSwitcher />
-                    <Button color="inherit" onClick={handleLogout}>
-                        {t('common.logout')}
-                    </Button>
+                <Toolbar sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between',
+                    flexWrap: 'nowrap',
+                    minHeight: { xs: 56, sm: 64 },
+                    px: { xs: 1, sm: 2 }
+                }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Sidebar 
+                            open={isMenuOpen} 
+                            onClose={handleToggleMenu} 
+                            onOpen={handleToggleMenu} 
+                        />
+                        <Typography 
+                            variant="h6" 
+                            component="div" 
+                            sx={{ 
+                                flexGrow: 0,
+                                ml: 1,
+                                display: { xs: 'none', sm: 'block' }
+                            }}
+                        >
+                            {t('common.app_name')}
+                        </Typography>
+                    </Box>
+                    
+                    <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        gap: { xs: 0.5, sm: 1 }
+                    }}>
+                        <IconButton
+                            color="inherit"
+                            aria-label="create task"
+                            onClick={handleCreateTask}
+                            sx={{ 
+                                minWidth: { xs: 40, sm: 48 },
+                            }}
+                            title={t('tasks.new_task')}
+                        >
+                            <AddIcon />
+                        </IconButton>
+                        <LanguageSwitcher />
+                        <Button 
+                            color="inherit" 
+                            onClick={handleLogout}
+                            sx={{
+                                minWidth: { xs: 'auto', sm: 64 },
+                                px: { xs: 1, sm: 2 }
+                            }}
+                        >
+                            {t('common.logout')}
+                        </Button>
+                    </Box>
                 </Toolbar>
             </AppBar>
 

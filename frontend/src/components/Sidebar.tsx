@@ -10,7 +10,9 @@ import {
   Divider, 
   Box, 
   Typography,
-  IconButton
+  IconButton,
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
 import { 
   List as ListIcon, 
@@ -31,6 +33,8 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onOpen }) => {
   const { t } = useTranslation();
   const location = useLocation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const drawerWidth = 240;
 
   // Определение списка пунктов меню с абсолютными путями
@@ -48,8 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onOpen }) => {
       onClick={onOpen}
       edge="start"
       sx={{ 
-        mr: 2, 
-        display: { xs: open ? 'none' : 'flex', sm: open ? 'none' : 'flex' } 
+        mr: 1
       }}
     >
       <MenuIcon />
@@ -60,23 +63,52 @@ export const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onOpen }) => {
     <>
       <MenuButton />
       <Drawer
-        sx={{
-          width: drawerWidth,
-          flexShrink: 0,
-          '& .MuiDrawer-paper': {
-            width: drawerWidth,
-            boxSizing: 'border-box',
-          },
-        }}
         variant="persistent"
         anchor="left"
         open={open}
+        sx={{
+          //width: open ? drawerWidth : 0,
+          width: 0,
+          flexShrink: 0,
+          transition: theme.transitions.create('width', {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
+          '& .MuiDrawer-paper': {
+            width: drawerWidth,
+            boxSizing: 'border-box',
+            transition: theme.transitions.create(['transform', 'width'], {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.enteringScreen,
+            }),
+            ...(!open && {
+              transform: 'translateX(-100%)',
+              visibility: 'hidden',
+            }),
+            ...(open && {
+              transform: 'translateX(0)',
+              visibility: 'visible',
+            }),
+          },
+        }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1 }}>
-          <Typography variant="h6" sx={{ pl: 1 }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          minHeight: { xs: 56, sm: 64 },
+          px: 2,
+          py: 1
+        }}>
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              fontSize: { xs: '1.1rem', sm: '1.25rem' }
+            }}
+          >
             {t('common.app_name')}
           </Typography>
-          <IconButton onClick={onClose}>
+          <IconButton onClick={onClose} size="small">
             <ChevronLeftIcon />
           </IconButton>
         </Box>
@@ -89,11 +121,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onOpen }) => {
                 to={item.path}
                 selected={location.pathname === item.path}
                 onClick={() => {
-                  if (window.innerWidth < 600) {
+                  if (isMobile) {
                     onClose();
                   }
                 }}
                 sx={{
+                  minHeight: 48,
+                  px: 2.5,
                   '&.Mui-selected': {
                     backgroundColor: 'primary.light',
                     '&:hover': {
@@ -102,10 +136,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onOpen }) => {
                   }
                 }}
               >
-                <ListItemIcon>
+                <ListItemIcon sx={{ minWidth: 40 }}>
                   {item.icon}
                 </ListItemIcon>
-                <ListItemText primary={item.title} />
+                <ListItemText 
+                  primary={item.title} 
+                  primaryTypographyProps={{
+                    fontSize: { xs: '0.9rem', sm: '1rem' }
+                  }}
+                />
               </ListItemButton>
             </ListItem>
           ))}
