@@ -339,6 +339,16 @@ class TaskService:
             if task_type:
                 task_data['type_id'] = task_type.id
 
+        if not task_data.get('duration_id'):
+            type_query = select(DurationSetting).where(
+                DurationSetting.user_id == user.telegram_id, # type: ignore
+                DurationSetting.is_default == True
+            )
+            type_result = await self.session.execute(type_query)
+            task_duration = type_result.scalar_one_or_none()
+            if task_duration:
+                task_data['duration_id'] = task_duration.id
+
         # Обрабатываем deadline, если он пришел в строковом формате
         deadline = task_data.get('deadline')
         if isinstance(deadline, str):
