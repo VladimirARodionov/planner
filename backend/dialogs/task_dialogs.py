@@ -137,7 +137,7 @@ async def on_duration_selected(callback: CallbackQuery, widget: Any, manager: Di
             if duration:
                 # Расчитываем дедлайн
                 # Используем datetime.now() чтобы сохранить текущее время
-                deadline = await duration.calculate_deadline_async(session, datetime.now())
+                deadline = await duration.calculate_deadline_async(session, datetime.now().astimezone())
                 logger.debug(f"Calculated deadline based on duration: {deadline}")
                 # Устанавливаем дедлайн в данные диалога
                 manager.dialog_data["deadline"] = deadline
@@ -170,7 +170,7 @@ async def on_deadline_selected(c: CallbackQuery, widget: Any, manager: DialogMan
         manager.dialog_data["deadline"] = deadline_date
     else:
         # Преобразуем date в datetime с текущим временем
-        now = datetime.now()
+        now = datetime.now().astimezone()
         date_with_time = datetime.combine(deadline_date, now.time())
         manager.dialog_data["deadline"] = date_with_time
         logger.debug(f"Установлен дедлайн с текущим временем: {date_with_time}")

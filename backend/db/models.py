@@ -134,10 +134,10 @@ class DurationSetting(Base):
         """Рассчитать дедлайн на основе продолжительности (асинхронный метод)"""
         if from_date is None:
             # Используем текущую дату и время
-            from_date = datetime.now()
+            from_date = datetime.now().astimezone()
         elif isinstance(from_date, date) and not isinstance(from_date, datetime):
             # Если передана только дата (без времени), добавляем текущее время
-            now = datetime.now()
+            now = datetime.now().astimezone()
             from_date = datetime.combine(from_date, now.time())
 
         # Получаем актуальные значения из базы данных
@@ -208,7 +208,7 @@ class Task(Base):
         """Получить следующее напоминание"""
         if not self.reminders:
             return None
-        now = datetime.now()
+        now = datetime.now().astimezone()
         future_reminders = [
             datetime.fromisoformat(r) for r in self.reminders
             if datetime.fromisoformat(r) > now
@@ -219,7 +219,7 @@ class Task(Base):
         """Изменить статус задачи"""
         self.status = new_status
         if new_status.is_final:
-            self.completed_at = datetime.now()
+            self.completed_at = datetime.now().astimezone()
         else:
             self.completed_at = None
 
@@ -227,7 +227,7 @@ class Task(Base):
         """Проверить, просрочена ли задача"""
         if not self.deadline or self.completed_at or (self.status and self.status.is_final):
             return False
-        return datetime.now().timestamp() > self.deadline.timestamp()
+        return datetime.now().astimezone().timestamp() > self.deadline.timestamp()
 
 
 class TaskTypeSetting(Base):
