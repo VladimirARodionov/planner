@@ -236,6 +236,7 @@ async def update_user_timezone():
 @bp.route('/api/timezones', methods=['GET', 'OPTIONS'])
 @cross_origin()
 @jwt_required()
+@async_route
 async def get_available_timezones():
     """Получение списка доступных часовых поясов."""
     if request.method == 'OPTIONS':
