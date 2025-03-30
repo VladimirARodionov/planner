@@ -477,7 +477,7 @@ async def calculate_deadline(duration_id):
     
     async with get_session() as session:
         try:
-            user = await session.get(User, current_user)
+            user = await session.get(User, int(current_user))
             duration = await session.get(DurationSetting, duration_id)
             
             # Проверяем, принадлежит ли длительность пользователю
