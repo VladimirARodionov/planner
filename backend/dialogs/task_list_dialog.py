@@ -2,6 +2,7 @@ import json
 import logging
 from datetime import timedelta, datetime
 
+import pytz
 from aiogram.fsm.state import State, StatesGroup
 from aiogram_dialog import Dialog, Window
 from aiogram_dialog.widgets.text import List, Format
@@ -15,6 +16,7 @@ from aiogram_dialog.widgets.widget_event import SimpleEventProcessor
 from typing import Any
 
 from backend.custom_widgets import I18NFormat
+from backend.db.models import User
 from backend.locale_config import i18n
 from backend.services.task_service import TaskService
 from backend.services.settings_service import SettingsService
@@ -485,7 +487,16 @@ async def on_uncompleted_only(c: CallbackQuery, button: Button, manager: DialogM
 async def on_deadline_today(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора фильтра по дедлайну на сегодня"""
     from datetime import datetime
-    today = datetime.now().astimezone().date().strftime("%Y-%m-%d")
+    user_id = manager.event.from_user.id if hasattr(manager.event, 'from_user') else None
+    timezone = "Europe/Moscow"
+    async with get_session() as session:
+        try:
+            user = await session.get(User, user_id)
+
+            timezone = user.timezone
+        except Exception as e:
+            logger.exception(f"Error on_deadline_today: {e}")
+    today = datetime.now(tz=pytz.timezone(timezone)).date().strftime("%Y-%m-%d")
     
     filters = manager.dialog_data.get("filters", {})
     filters["deadline_from"] = today
@@ -507,7 +518,16 @@ async def on_deadline_today(c: CallbackQuery, button: Button, manager: DialogMan
 async def on_deadline_tomorrow(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора фильтра по дедлайну на завтра"""
     from datetime import datetime, timedelta
-    tomorrow = (datetime.now().astimezone().date() + timedelta(days=1)).strftime("%Y-%m-%d")
+    user_id = manager.event.from_user.id if hasattr(manager.event, 'from_user') else None
+    timezone = "Europe/Moscow"
+    async with get_session() as session:
+        try:
+            user = await session.get(User, user_id)
+
+            timezone = user.timezone
+        except Exception as e:
+            logger.exception(f"Error on_deadline_tomorrow: {e}")
+    tomorrow = (datetime.now(tz=pytz.timezone(timezone)).date() + timedelta(days=1)).strftime("%Y-%m-%d")
     
     filters = manager.dialog_data.get("filters", {})
     filters["deadline_from"] = tomorrow
@@ -529,7 +549,16 @@ async def on_deadline_tomorrow(c: CallbackQuery, button: Button, manager: Dialog
 async def on_deadline_week(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора фильтра по дедлайну на текущую неделю"""
     from datetime import datetime, timedelta
-    today = datetime.now().astimezone().date()
+    timezone = "Europe/Moscow"
+    user_id = manager.event.from_user.id if hasattr(manager.event, 'from_user') else None
+    async with get_session() as session:
+        try:
+            user = await session.get(User, user_id)
+
+            timezone = user.timezone
+        except Exception as e:
+            logger.exception(f"Error on_deadline_week: {e}")
+    today = datetime.now(tz=pytz.timezone(timezone)).date()
     start_of_week = (today - timedelta(days=today.weekday())).strftime("%Y-%m-%d")
     end_of_week = (today + timedelta(days=6-today.weekday())).strftime("%Y-%m-%d")
     
@@ -542,7 +571,16 @@ async def on_deadline_week(c: CallbackQuery, button: Button, manager: DialogMana
 async def on_deadline_month(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора фильтра по дедлайну на текущий месяц"""
     from datetime import datetime
-    today = datetime.now().astimezone().date()
+    timezone = "Europe/Moscow"
+    user_id = manager.event.from_user.id if hasattr(manager.event, 'from_user') else None
+    async with get_session() as session:
+        try:
+            user = await session.get(User, user_id)
+
+            timezone = user.timezone
+        except Exception as e:
+            logger.exception(f"Error on_deadline_month: {e}")
+    today = datetime.now(tz=pytz.timezone(timezone)).date()
     start_of_month = today.replace(day=1).strftime("%Y-%m-%d")
     
     # Определяем последний день месяца
@@ -562,7 +600,16 @@ async def on_deadline_month(c: CallbackQuery, button: Button, manager: DialogMan
 async def on_deadline_overdue(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора фильтра по просроченным задачам"""
     from datetime import datetime
-    yesterday = (datetime.now().astimezone().date() - timedelta(days=1)).strftime("%Y-%m-%d")
+    user_id = manager.event.from_user.id if hasattr(manager.event, 'from_user') else None
+    timezone = "Europe/Moscow"
+    async with get_session() as session:
+        try:
+            user = await session.get(User, user_id)
+
+            timezone = user.timezone
+        except Exception as e:
+            logger.exception(f"Error on_deadline_overdue: {e}")
+    yesterday = (datetime.now(tz=pytz.timezone(timezone)).date() - timedelta(days=1)).strftime("%Y-%m-%d")
     
     filters = manager.dialog_data.get("filters", {})
     filters["deadline_to"] = yesterday

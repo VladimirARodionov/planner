@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
 
+import pytz
 from aiogram.fsm.state import State, StatesGroup
 from aiogram_dialog import Dialog, Window
 from aiogram_dialog.widgets.text import Format
@@ -12,6 +13,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram_dialog.widgets.widget_event import SimpleEventProcessor
 
 from backend.custom_widgets import I18NFormat
+from backend.db.models import User
 from backend.locale_config import i18n
 from backend.services.task_service import TaskService
 from backend.services.settings_service import SettingsService
@@ -262,7 +264,16 @@ async def on_duration_selected(callback: CallbackQuery, widget: Any, manager: Di
 async def on_deadline_selected(c: CallbackQuery, widget: Any, manager: DialogManager, date: datetime):
     """Обработчик выбора дедлайна"""
     task = manager.dialog_data.get("task", {})
-    date_now = datetime.now().astimezone()
+    user_id = manager.event.from_user.id if hasattr(manager.event, 'from_user') else None
+    timezone = "Europe/Moscow"
+    async with get_session() as session:
+        try:
+            user = await session.get(User, user_id)
+            timezone = user.timezone
+
+        except Exception as e:
+            logger.exception(f"Error on_deadline_selected: {e}")
+    date_now = datetime.now(tz=pytz.timezone(timezone))
     task["deadline"] = date_now.replace(year=date.year, month=date.month, day=date.day)
     manager.dialog_data["task"] = task
     await manager.switch_to(TaskEditStates.main)
@@ -277,12 +288,21 @@ async def on_deadline_clear(callback: CallbackQuery, button: Button, manager: Di
 async def on_toggle_completed(callback: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик переключения статуса завершения"""
     task = manager.dialog_data.get("task", {})
-    
+
+    user_id = manager.event.from_user.id if hasattr(manager.event, 'from_user') else None
+    timezone = "Europe/Moscow"
+    async with get_session() as session:
+        try:
+            user = await session.get(User, user_id)
+            timezone = user.timezone
+
+        except Exception as e:
+            logger.exception(f"Error on_toggle_completed: {e}")
+
     if task.get("completed_at") is None:
-        task["completed_at"] = datetime.now().astimezone()
+        task["completed_at"] = datetime.now(tz=pytz.timezone(timezone))
     else:
         task["completed_at"] = None
-    
     manager.dialog_data["task"] = task
     await manager.update(data={})
 

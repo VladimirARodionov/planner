@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
 
+import pytz
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -9,7 +10,7 @@ from backend.blueprints.wrapper import async_route
 from backend.database import get_session
 from backend.services.task_service import TaskService
 from backend.services.settings_service import SettingsService
-from backend.db.models import DurationSetting
+from backend.db.models import DurationSetting, User
 
 bp = Blueprint("planner", __name__)
 logger = logging.getLogger(__name__)
@@ -476,6 +477,7 @@ async def calculate_deadline(duration_id):
     
     async with get_session() as session:
         try:
+            user = await session.get(User, current_user)
             duration = await session.get(DurationSetting, duration_id)
             
             # Проверяем, принадлежит ли длительность пользователю
@@ -483,7 +485,7 @@ async def calculate_deadline(duration_id):
                 return jsonify({'error': 'Duration not found'}), 404
                 
             # Получаем начальную дату из запроса или используем текущую дату и время
-            from_date = datetime.now().astimezone()  # По умолчанию используем текущую дату и время
+            from_date = datetime.now(tz=pytz.timezone(user.timezone))  # По умолчанию используем текущую дату и время
             if request.args.get('from_date'):
                 try:
                     from_date = datetime.fromisoformat(
