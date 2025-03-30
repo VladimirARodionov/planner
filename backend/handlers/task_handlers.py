@@ -597,6 +597,14 @@ async def timezone_callback(callback_query: CallbackQuery):
         await show_timezone_regions(callback_query)
         return
     
+    # Проверяем, не является ли выбранное значение регионом
+    if selected_timezone.startswith("region_"):
+        logger.info(f"Выбран регион: {selected_timezone}")
+        # Обрабатываем выбор региона, а не конкретного часового пояса
+        selected_region = selected_timezone.split("_")[1]
+        await timezone_region_callback(callback_query)
+        return
+    
     # Проверяем валидность часового пояса
     import pytz
     try:
@@ -623,6 +631,7 @@ async def timezone_callback(callback_query: CallbackQuery):
                 i18n.format_value("timezone-error-message")
             )
     except pytz.exceptions.UnknownTimeZoneError:
+        logger.exception(f"Ошибка при изменении часового пояса")
         # Отправляем сообщение об ошибке
         await callback_query.message.edit_text(
             i18n.format_value("timezone-invalid-message")
@@ -689,31 +698,69 @@ async def show_timezone_regions(callback_query: CallbackQuery):
 @router.callback_query(F.data.startswith("timezone_region_"))
 async def timezone_region_callback(callback_query: CallbackQuery):
     """Обработчик нажатия на кнопку выбора региона часового пояса"""
-    # Получаем выбранный регион из callback_data
-    selected_region = callback_query.data.split("_")[2]
+    # Получаем выбранный регион и страницу из callback_data
+    callback_data = callback_query.data.split("_")
+    selected_region = callback_data[2]
+    
+    # Проверяем, есть ли номер страницы в callback_data
+    page = 1
+    if len(callback_data) > 3 and callback_data[3].isdigit():
+        page = int(callback_data[3])
     
     # Получаем список часовых поясов для выбранного региона
     import pytz
     timezones = [tz for tz in pytz.all_timezones if tz.startswith(selected_region)]
     
-    # Ограничиваем количество часовых поясов (макс. 20 кнопок)
-    if len(timezones) > 20:
-        timezones = timezones[:20]
+    # Настройки пагинации
+    items_per_page = 10  # Количество часовых поясов на странице
+    total_pages = (len(timezones) + items_per_page - 1) // items_per_page  # Округление вверх
+    
+    # Получаем список часовых поясов для текущей страницы
+    start_idx = (page - 1) * items_per_page
+    end_idx = min(start_idx + items_per_page, len(timezones))
+    page_timezones = timezones[start_idx:end_idx]
     
     # Создаем клавиатуру с кнопками часовых поясов
     keyboard_buttons = []
-    for i in range(0, len(timezones), 2):
+    for i in range(0, len(page_timezones), 2):
         row = []
         row.append(InlineKeyboardButton(
-            text=timezones[i].split("/")[-1].replace("_", " "),
-            callback_data=f"timezone_{timezones[i]}"
+            text=page_timezones[i].split("/")[-1].replace("_", " "),
+            callback_data=f"timezone_{page_timezones[i]}"
         ))
-        if i + 1 < len(timezones):
+        if i + 1 < len(page_timezones):
             row.append(InlineKeyboardButton(
-                text=timezones[i+1].split("/")[-1].replace("_", " "),
-                callback_data=f"timezone_{timezones[i+1]}"
+                text=page_timezones[i+1].split("/")[-1].replace("_", " "),
+                callback_data=f"timezone_{page_timezones[i+1]}"
             ))
         keyboard_buttons.append(row)
+    
+    # Добавляем навигационные кнопки
+    nav_row = []
+    
+    # Кнопка предыдущей страницы
+    if page > 1:
+        nav_row.append(InlineKeyboardButton(
+            text="« Пред",
+            callback_data=f"timezone_region_{selected_region}_{page - 1}"
+        ))
+    
+    # Информация о текущей странице
+    nav_row.append(InlineKeyboardButton(
+        text=f"{page}/{total_pages}",
+        callback_data="timezone_page_info"
+    ))
+    
+    # Кнопка следующей страницы
+    if page < total_pages:
+        nav_row.append(InlineKeyboardButton(
+            text="След »",
+            callback_data=f"timezone_region_{selected_region}_{page + 1}"
+        ))
+    
+    # Добавляем строку навигации
+    if nav_row:
+        keyboard_buttons.append(nav_row)
     
     # Добавляем кнопку "Назад"
     keyboard_buttons.append([
@@ -732,7 +779,7 @@ async def timezone_region_callback(callback_query: CallbackQuery):
             {
                 "region": selected_region
             }
-        ),
+        ) + f" (страница {page}/{total_pages})",
         reply_markup=keyboard
     )
 
@@ -807,3 +854,9 @@ async def timezone_back_to_main_callback(callback_query: CallbackQuery):
         ),
         reply_markup=keyboard
     )
+
+@router.callback_query(F.data == "timezone_page_info")
+async def timezone_page_info_callback(callback_query: CallbackQuery):
+    """Обработчик нажатия на кнопку с информацией о текущей странице"""
+    # Просто отвечаем на коллбэк без изменения сообщения
+    await callback_query.answer("Текущая страница списка часовых поясов")
