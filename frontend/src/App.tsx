@@ -127,26 +127,6 @@ const AppLayout: React.FC = () => {
         };
     }, []);
 
-    // Добавляем useEffect для адаптации меню к размеру экрана
-    useEffect(() => {
-        const handleResize = () => {
-            if (window.innerWidth < 600) {
-                setIsMenuOpen(false);
-            } else {
-                setIsMenuOpen(true);
-            }
-        };
-
-        // Вызываем один раз при монтировании
-        handleResize();
-
-        // Слушаем изменение размера окна
-        window.addEventListener('resize', handleResize);
-        return () => {
-            window.removeEventListener('resize', handleResize);
-        };
-    }, []);
-
     return (
         <Box sx={{ display: 'flex' }}>
             <AppBar 
