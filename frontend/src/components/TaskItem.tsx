@@ -81,10 +81,25 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask, on
         <Card sx={{ mb: 2 }}>
             <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                    <Typography variant="h6" component="div">
+                    <Typography 
+                        variant="h6" 
+                        component="div"
+                        sx={{ 
+                            mr: 2,
+                            flex: '1 1 auto'
+                        }}
+                    >
                         {task.title}
                     </Typography>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Box sx={{ 
+                        display: 'flex', 
+                        gap: 1,
+                        flexWrap: 'wrap',
+                        justifyContent: 'flex-end',
+                        flex: '0 1 auto',
+                        maxWidth: { xs: '100%', sm: '60%' },
+                        mt: { xs: 1, sm: 0 }
+                    }}>
                         {task.status && (
                             <Chip
                                 label={task.status.name}
@@ -94,6 +109,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask, on
                                     color: '#fff',
                                     boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)',
                                     textShadow: '0px 0px 2px rgba(0, 0, 0, 0.7)',
+                                    maxWidth: '100%',
+                                    height: 'auto',
+                                    '& .MuiChip-label': {
+                                        whiteSpace: 'normal',
+                                        display: 'block',
+                                        py: 0.5
+                                    }
                                 }}
                             />
                         )}
@@ -106,6 +128,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask, on
                                     color: '#fff',
                                     boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)',
                                     textShadow: '0px 0px 2px rgba(0, 0, 0, 0.7)',
+                                    maxWidth: '100%',
+                                    height: 'auto',
+                                    '& .MuiChip-label': {
+                                        whiteSpace: 'normal',
+                                        display: 'block',
+                                        py: 0.5
+                                    }
                                 }}
                             />
                         )}
@@ -118,6 +147,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask, on
                                     color: '#fff',
                                     boxShadow: '0 0 5px rgba(0, 0, 0, 0.5)',
                                     textShadow: '0px 0px 2px rgba(0, 0, 0, 0.7)',
+                                    maxWidth: '100%',
+                                    height: 'auto',
+                                    '& .MuiChip-label': {
+                                        whiteSpace: 'normal',
+                                        display: 'block',
+                                        py: 0.5
+                                    }
                                 }}
                             />
                         )}
