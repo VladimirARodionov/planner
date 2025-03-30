@@ -226,6 +226,7 @@ async def show_help(message: Message):
             i18n.format_value("settings_task_types_command_help") + "\n" +
             "\n" +
             i18n.format_value("settings_language_help") + "\n" +
+            i18n.format_value("settings_timezone_help") + "\n" +
             "\n" +
             i18n.format_value("help-help")
     )

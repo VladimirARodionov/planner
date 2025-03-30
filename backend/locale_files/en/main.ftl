@@ -255,6 +255,8 @@ language-change-error = ❌ Error changing language. Please try again later
 
 # Add language to settings menu
 settings_language = Change language
+settings_language_help = /language Change language
+settings_timezone_help = /timezone Change timezone
 settings_timezone = Change timezone
 
 # Common messages for command outputs
