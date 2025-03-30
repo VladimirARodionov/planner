@@ -353,11 +353,25 @@ class TaskService:
         deadline = task_data.get('deadline')
         if isinstance(deadline, str):
             try:
-                deadline = datetime.fromisoformat(deadline.replace('Z', '+00:00'))
-                logger.debug(f"Converted deadline string to datetime: {deadline}")
-                task_data['deadline'] = deadline
+                # Сначала пробуем ISO формат
+                try:
+                    deadline = datetime.fromisoformat(deadline.replace('Z', '+00:00'))
+                    logger.debug(f"Converted ISO deadline string to datetime: {deadline}")
+                except ValueError:
+                    # Пробуем формат '01.04.2025 11:18'
+                    if ' ' in deadline:
+                        # Есть дата и время в формате ДД.ММ.ГГГГ ЧЧ:ММ
+                        deadline = datetime.strptime(deadline, '%d.%m.%Y %H:%M')
+                    else:
+                        # Только дата в формате ДД.ММ.ГГГГ
+                        deadline = datetime.strptime(deadline, '%d.%m.%Y')
+                    logger.debug(f"Converted localized deadline string to datetime: {deadline}")
             except (ValueError, TypeError) as e:
-                logger.error(f"Error converting deadline: {e}")
+                logger.error(f"Error converting deadline: {e}, value: {deadline}, type: {type(deadline)}")
+                # Сохраняем None в случае ошибки конвертации
+                deadline = None
+            task_data['deadline'] = deadline
+            logger.debug(f"Manually updating deadline to: {task_data['deadline']}, type: {type(task_data['deadline']) if task_data['deadline'] else None}")
 
         task = Task(
             user_id=user.telegram_id,
@@ -453,12 +467,25 @@ class TaskService:
             deadline_value = task_data['deadline']
             if isinstance(deadline_value, str):
                 try:
-                    deadline_value = datetime.fromisoformat(deadline_value.replace('Z', '+00:00'))
-                    logger.debug(f"Converted deadline string to datetime: {deadline_value}")
+                    # Сначала пробуем ISO формат
+                    try:
+                        deadline_value = datetime.fromisoformat(deadline_value.replace('Z', '+00:00'))
+                        logger.debug(f"Converted ISO deadline string to datetime: {deadline_value}")
+                    except ValueError:
+                        # Пробуем формат '01.04.2025 11:18'
+                        if ' ' in deadline_value:
+                            # Есть дата и время в формате ДД.ММ.ГГГГ ЧЧ:ММ
+                            deadline_value = datetime.strptime(deadline_value, '%d.%m.%Y %H:%M')
+                        else:
+                            # Только дата в формате ДД.ММ.ГГГГ
+                            deadline_value = datetime.strptime(deadline_value, '%d.%m.%Y')
+                        logger.debug(f"Converted localized deadline string to datetime: {deadline_value}")
                 except (ValueError, TypeError) as e:
-                    logger.error(f"Error converting deadline: {e}")
+                    logger.error(f"Error converting deadline: {e}, value: {deadline_value}, type: {type(deadline_value)}")
+                    # Сохраняем None в случае ошибки конвертации
+                    deadline_value = None
             task.deadline = deadline_value
-            logger.debug(f"Manually updating deadline to: {task.deadline}")
+            logger.debug(f"Manually updating deadline to: {task.deadline}, type: {type(task.deadline) if task.deadline else None}")
         if 'duration_id' in task_data:
             task.duration_id = task_data['duration_id']
             # Вычисляем дедлайн на основе продолжительности только если дедлайн не задан вручную

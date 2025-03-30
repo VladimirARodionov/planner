@@ -227,6 +227,7 @@ task-edit-deadline-prompt = 📅 Select task deadline:
 task-edit-success = Task successfully updated!
 task-edit-error-update = Failed to update task
 task-edit-error-generic = Error: {$error}
+task-edit-error-date-format = Date format error: please use the correct format (DD.MM.YYYY or DD.MM.YYYY HH:MM)
 
 # Edit button in task list
 task-list-edit-button = ✏️ #{$id}
