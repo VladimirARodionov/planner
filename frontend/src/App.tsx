@@ -11,6 +11,7 @@ import { Task } from './types/task';
 import { TasksAPI, CreateTaskDto, UpdateTaskDto } from './api/tasks';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './components/LanguageSwitcher';
+import { TimezoneSwitcher } from './components/TimezoneSwitcher';
 import {
     AppBar,
     Box,
@@ -191,6 +192,7 @@ const AppLayout: React.FC = () => {
                             <AddIcon />
                         </IconButton>
                         <LanguageSwitcher />
+                        <TimezoneSwitcher />
                         <Button 
                             color="inherit" 
                             onClick={handleLogout}

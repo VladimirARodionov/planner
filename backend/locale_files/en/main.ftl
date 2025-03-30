@@ -254,8 +254,8 @@ language-not-supported = ❌ Selected language is not supported
 language-change-error = ❌ Error changing language. Please try again later
 
 # Add language to settings menu
-settings_language = 🌐 Change language
-settings_language_help = /language Change language
+settings_language = Change language
+settings_timezone = Change timezone
 
 # Common messages for command outputs
 common-default = Default
@@ -290,3 +290,20 @@ type_filter = Type: {$type_name}
 deadline_from_filter = Deadline from: {$deadline_from}
 deadline_to_filter = Deadline to: {$deadline_to}
 deadline-overdue = ❗ Overdue
+
+# Language selection
+select-language-message = 🌐 Select language (current: {$current_language}):
+language-changed-message = ✅ Language changed to {$language}
+language-error-message = ❌ Error changing language
+
+# Timezone selection
+select-timezone-message = 🕒 Select timezone (current: {$current_timezone}):
+select-timezone-region = 🌎 Select region:
+select-timezone-from-region = 🔍 Select timezone from region {$region}:
+timezone-changed-message = ✅ Timezone changed to {$timezone}
+timezone-error-message = ❌ Error changing timezone
+timezone-invalid-message = ❌ Invalid timezone
+
+# Common translation keys
+common-error-user-not-found = ❌ User not found
+common-error = ❌ An error occurred

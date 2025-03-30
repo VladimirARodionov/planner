@@ -202,7 +202,7 @@ async def set_user_commands(bot: Bot, user_id: str, user_locale: FluentLocalizat
     """Устанавливает список команд бота для конкретного пользователя"""
     # Обновляем локализацию в кеше
     set_user_locale_cache(user_id, user_locale)
-    logger.debug(f"Обновлены локализации для пользователя {user_id} в кэше на {user_locale.locales}")
+    logger.debug(f"Обновлены локализации для пользователя {user_id} в кэше на {user_locale}")
 
     # Определяем язык пользователя
     from backend.database import get_session

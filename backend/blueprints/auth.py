@@ -130,7 +130,7 @@ async def telegram_login():
     return redirect(telegram_auth_url)
 
 
-@bp.route('/api/users/language', methods=['GET', 'OPTIONS'])
+@bp.route('/api/user/language', methods=['GET', 'OPTIONS'])
 @cross_origin()
 @jwt_required()
 @async_route
@@ -149,7 +149,7 @@ async def get_user_language():
             'language': language
         }), 200
 
-@bp.route('/api/users/language', methods=['POST', 'OPTIONS'])
+@bp.route('/api/user/language', methods=['POST', 'OPTIONS'])
 @cross_origin()
 @jwt_required()
 @async_route
@@ -186,4 +186,70 @@ async def set_user_language():
             }), 200
         else:
             return jsonify({'error': 'Failed to update language'}), 500
+
+
+@bp.route('/api/user/timezone', methods=['GET', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+@async_route
+async def get_user_timezone():
+    """Получение часового пояса пользователя."""
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    user_id = get_jwt_identity()
+    
+    async with get_session() as session:
+        auth_service = AuthService(session)
+        user = await auth_service.get_user_by_id(user_id)
+        
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+        
+    return jsonify({'timezone': user.timezone})
+
+@bp.route('/api/user/timezone', methods=['POST', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+@async_route
+async def update_user_timezone():
+    """Обновление часового пояса пользователя."""
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    timezone = data.get('timezone')
+    
+    if not timezone:
+        return jsonify({'error': 'Timezone is required'}), 400
+    
+    async with get_session() as session:
+        auth_service = AuthService(session)
+        success = await auth_service.update_user_timezone(user_id, timezone)
+        
+    if not success:
+        return jsonify({'error': 'Failed to update timezone'}), 500
+        
+    return '', 201
+
+@bp.route('/api/timezones', methods=['GET', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+async def get_available_timezones():
+    """Получение списка доступных часовых поясов."""
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    import pytz
+    timezones = [
+        {
+            'value': tz,
+            'label': tz.replace('_', ' '),
+            'group': tz.split('/', 1)[0] if '/' in tz else 'Other'
+        }
+        for tz in pytz.all_timezones
+    ]
+    
+    return jsonify(timezones)
 

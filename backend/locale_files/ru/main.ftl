@@ -254,8 +254,9 @@ language-not-supported = ❌ Выбранный язык не поддержив
 language-change-error = ❌ Ошибка при смене языка. Пожалуйста, попробуйте позже
 
 # Добавляем язык в меню настроек
-settings_language = 🌐 Изменить язык
+settings_language = Изменить язык
 settings_language_help = /language Изменить язык
+settings_timezone = Изменить часовой пояс
 
 # Общие сообщения для вывода команд
 common-default = По умолчанию
@@ -290,3 +291,20 @@ type_filter = Тип: {$type_name}
 deadline_from_filter = Дедлайн от: {$deadline_from}
 deadline_to_filter = Дедлайн до: {$deadline_to}
 deadline-overdue = ❗ Просрочено
+
+# Выбор языка
+select-language-message = 🌐 Выберите язык (текущий: {$current_language}):
+language-changed-message = ✅ Язык изменен на {$language}
+language-error-message = ❌ Ошибка при изменении языка
+
+# Выбор часового пояса
+select-timezone-message = 🕒 Выберите часовой пояс (текущий: {$current_timezone}):
+select-timezone-region = 🌎 Выберите регион:
+select-timezone-from-region = 🔍 Выберите часовой пояс из региона {$region}:
+timezone-changed-message = ✅ Часовой пояс изменен на {$timezone}
+timezone-error-message = ❌ Ошибка при изменении часового пояса
+timezone-invalid-message = ❌ Неверный часовой пояс
+
+# Common translation keys
+common-error-user-not-found = ❌ Пользователь не найден
+common-error = ❌ Произошла ошибка

@@ -81,6 +81,7 @@ def get_bot_commands(user_locale: FluentLocalization = None):
         BotCommand(command='add_task', description=user_locale.format_value("add-task-menu")),
         BotCommand(command='settings', description=user_locale.format_value("settings_menu")),
         BotCommand(command='language', description=user_locale.format_value("settings_language")),
+        BotCommand(command='timezone', description=user_locale.format_value("settings_timezone")),
         BotCommand(command='help', description=user_locale.format_value("help-menu")),
         BotCommand(command='stop', description=user_locale.format_value("stop_menu"))
     ]

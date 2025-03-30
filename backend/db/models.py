@@ -63,6 +63,7 @@ class User(Base):
     first_name = Column(String(100))
     last_name = Column(String(100))
     language = Column(String(10), default='ru')  # Предпочитаемый язык пользователя
+    timezone = Column(String(50), default='Europe/Moscow')  # Часовой пояс пользователя
     created_at = Column(DateTime(timezone=True), default=func.now())
     updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
     settings = Column(JSON, default=dict)  # Пользовательские настройки в JSON

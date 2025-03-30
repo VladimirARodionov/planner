@@ -80,6 +80,33 @@ class AuthService:
         await set_user_commands(bot, user_id, locale)
         return True
 
+    async def get_user_timezone(self, user_id: str) -> str:
+        """Получить часовой пояс пользователя"""
+        user = await self.get_user_by_id(user_id)
+        if not user:
+            return 'Europe/Moscow'  # По умолчанию Москва, если пользователь не найден
+        return user.timezone
+
+    async def update_user_timezone(self, user_id: str, timezone: str) -> bool:
+        """Установить часовой пояс пользователя"""
+        user = await self.get_user_by_id(user_id)
+        if not user:
+            return False
+            
+        # Проверка валидности часового пояса
+        import pytz
+        try:
+            pytz.timezone(timezone)
+        except pytz.exceptions.UnknownTimeZoneError:
+            logger.error(f"Неверный часовой пояс: {timezone}")
+            return False
+            
+        stmt = update(User).where(User.telegram_id == int(user_id)).values(timezone=timezone)
+        await self.session.execute(stmt)
+        await self.session.commit()
+        logger.info(f"Часовой пояс пользователя {user_id} изменен на {timezone}")
+        return True
+
     # Функция для добавления состояния авторизации в базу данных
     async def add_auth_state(self, state:str, redirect_url:str):
         """Добавляет состояние авторизации в базу данных"""

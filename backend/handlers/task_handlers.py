@@ -468,25 +468,25 @@ async def language_callback(callback_query: CallbackQuery):
     await callback_query.answer()
     
     user_id = str(callback_query.from_user.id)
-    
+
     # Устанавливаем пользователя в контекст
     set_current_user_id(user_id)
-    
+
     language = callback_query.data.split("_")[1]
-    
+
     if language not in AVAILABLE_LANGUAGES:
         await callback_query.message.answer(i18n.format_value("language_not_supported"))
         return
-    
+
     # Обновляем язык пользователя в кеше
     success = set_user_locale(user_id, language)
-    
+
     if success:
         # Сохраняем выбранный язык в базе данных
         async with get_session() as session:
             auth_service = AuthService(session)
             await auth_service.set_user_language(user_id, language)
-            
+
         # Дополнительно загружаем обновленные локализации в кеш
         from backend.locale_config import reload_user_locale
         reload_success = await reload_user_locale(user_id)
@@ -494,9 +494,9 @@ async def language_callback(callback_query: CallbackQuery):
 
         # Получаем обновленную локализацию
         user_locale = await get_user_locale(user_id)
-        
+
         await callback_query.message.answer(user_locale.format_value("language_changed"))
-        
+
         # Немедленно обновляем команды бота вместо ожидания фоновой задачи
         from backend.run import main_bot, set_user_commands
         try:
@@ -508,3 +508,302 @@ async def language_callback(callback_query: CallbackQuery):
         # Получаем обновленную локализацию с await
         user_locale = await get_user_locale(user_id)
         await callback_query.message.answer(user_locale.format_value("language_change_error"))
+
+
+@router.message(Command("timezone"))
+async def timezone_command(message: Message):
+    """Обработчик команды /timezone, позволяет пользователю изменить часовой пояс"""
+    user_id = message.from_user.id
+    set_current_user_id(str(user_id))
+
+    # Получаем текущий часовой пояс пользователя
+    async with get_session() as session:
+        auth_service = AuthService(session)
+        current_timezone = await auth_service.get_user_timezone(str(user_id))
+
+    # Создаем клавиатуру с кнопками популярных часовых поясов
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="Москва (MSK)",
+                callback_data="timezone_Europe/Moscow"
+            ),
+            InlineKeyboardButton(
+                text="Киев (EET)",
+                callback_data="timezone_Europe/Kiev"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="Минск (MSK)",
+                callback_data="timezone_Europe/Minsk"
+            ),
+            InlineKeyboardButton(
+                text="Лондон (GMT)",
+                callback_data="timezone_Europe/London"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="Нью-Йорк (EST)",
+                callback_data="timezone_America/New_York"
+            ),
+            InlineKeyboardButton(
+                text="Лос-Анджелес (PST)",
+                callback_data="timezone_America/Los_Angeles"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="Токио (JST)",
+                callback_data="timezone_Asia/Tokyo"
+            ),
+            InlineKeyboardButton(
+                text="Сидней (AEST)",
+                callback_data="timezone_Australia/Sydney"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="🔍 Другие часовые пояса",
+                callback_data="timezone_more"
+            )
+        ]
+    ])
+
+    # Отправляем сообщение с кнопками выбора часового пояса
+    await message.answer(
+        i18n.format_value(
+            "select-timezone-message",
+            {
+                "current_timezone": current_timezone
+            }
+        ),
+        reply_markup=keyboard
+    )
+
+
+@router.callback_query(F.data.startswith("timezone_"))
+async def timezone_callback(callback_query: CallbackQuery):
+    """Обработчик нажатия на кнопку выбора часового пояса"""
+    user_id = callback_query.from_user.id
+    set_current_user_id(str(user_id))
+
+    # Получаем выбранный часовой пояс из callback_data
+    selected_timezone = callback_query.data.split("_", 1)[1]
+
+    if selected_timezone == "more":
+        # Показываем больше часовых поясов по регионам
+        await show_timezone_regions(callback_query)
+        return
+    
+    # Проверяем валидность часового пояса
+    import pytz
+    try:
+        pytz.timezone(selected_timezone)
+        
+        # Устанавливаем выбранный часовой пояс для пользователя
+        async with get_session() as session:
+            auth_service = AuthService(session)
+            success = await auth_service.update_user_timezone(str(user_id), selected_timezone)
+        
+        if success:
+            # Отправляем сообщение об успешном изменении часового пояса
+            await callback_query.message.edit_text(
+                i18n.format_value(
+                    "timezone-changed-message",
+                    {
+                        "timezone": selected_timezone
+                    }
+                )
+            )
+        else:
+            # Отправляем сообщение об ошибке
+            await callback_query.message.edit_text(
+                i18n.format_value("timezone-error-message")
+            )
+    except pytz.exceptions.UnknownTimeZoneError:
+        # Отправляем сообщение об ошибке
+        await callback_query.message.edit_text(
+            i18n.format_value("timezone-invalid-message")
+        )
+
+async def show_timezone_regions(callback_query: CallbackQuery):
+    """Показывает регионы часовых поясов"""
+    # Создаем клавиатуру с кнопками регионов
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="Европа",
+                callback_data="timezone_region_Europe"
+            ),
+            InlineKeyboardButton(
+                text="Азия",
+                callback_data="timezone_region_Asia"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="Америка",
+                callback_data="timezone_region_America"
+            ),
+            InlineKeyboardButton(
+                text="Африка",
+                callback_data="timezone_region_Africa"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="Австралия",
+                callback_data="timezone_region_Australia"
+            ),
+            InlineKeyboardButton(
+                text="Тихий океан",
+                callback_data="timezone_region_Pacific"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="Атлантика",
+                callback_data="timezone_region_Atlantic"
+            ),
+            InlineKeyboardButton(
+                text="Индийский океан",
+                callback_data="timezone_region_Indian"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="← Назад",
+                callback_data="timezone_back_to_main"
+            )
+        ]
+    ])
+    
+    # Отправляем сообщение с кнопками выбора региона
+    await callback_query.message.edit_text(
+        i18n.format_value("select-timezone-region"),
+        reply_markup=keyboard
+    )
+
+@router.callback_query(F.data.startswith("timezone_region_"))
+async def timezone_region_callback(callback_query: CallbackQuery):
+    """Обработчик нажатия на кнопку выбора региона часового пояса"""
+    # Получаем выбранный регион из callback_data
+    selected_region = callback_query.data.split("_")[2]
+    
+    # Получаем список часовых поясов для выбранного региона
+    import pytz
+    timezones = [tz for tz in pytz.all_timezones if tz.startswith(selected_region)]
+    
+    # Ограничиваем количество часовых поясов (макс. 20 кнопок)
+    if len(timezones) > 20:
+        timezones = timezones[:20]
+    
+    # Создаем клавиатуру с кнопками часовых поясов
+    keyboard_buttons = []
+    for i in range(0, len(timezones), 2):
+        row = []
+        row.append(InlineKeyboardButton(
+            text=timezones[i].split("/")[-1].replace("_", " "),
+            callback_data=f"timezone_{timezones[i]}"
+        ))
+        if i + 1 < len(timezones):
+            row.append(InlineKeyboardButton(
+                text=timezones[i+1].split("/")[-1].replace("_", " "),
+                callback_data=f"timezone_{timezones[i+1]}"
+            ))
+        keyboard_buttons.append(row)
+    
+    # Добавляем кнопку "Назад"
+    keyboard_buttons.append([
+        InlineKeyboardButton(
+            text="← Назад к регионам",
+            callback_data="timezone_more"
+        )
+    ])
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+    
+    # Отправляем сообщение с кнопками выбора часового пояса
+    await callback_query.message.edit_text(
+        i18n.format_value(
+            "select-timezone-from-region",
+            {
+                "region": selected_region
+            }
+        ),
+        reply_markup=keyboard
+    )
+
+@router.callback_query(F.data == "timezone_back_to_main")
+async def timezone_back_to_main_callback(callback_query: CallbackQuery):
+    """Обработчик нажатия на кнопку возврата к основному меню часовых поясов"""
+    user_id = callback_query.from_user.id
+    set_current_user_id(str(user_id))
+    
+    # Получаем текущий часовой пояс пользователя
+    async with get_session() as session:
+        auth_service = AuthService(session)
+        current_timezone = await auth_service.get_user_timezone(str(user_id))
+    
+    # Создаем клавиатуру с кнопками популярных часовых поясов
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="Москва (MSK)",
+                callback_data="timezone_Europe/Moscow"
+            ),
+            InlineKeyboardButton(
+                text="Киев (EET)",
+                callback_data="timezone_Europe/Kiev"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="Минск (MSK)",
+                callback_data="timezone_Europe/Minsk"
+            ),
+            InlineKeyboardButton(
+                text="Лондон (GMT)",
+                callback_data="timezone_Europe/London"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="Нью-Йорк (EST)",
+                callback_data="timezone_America/New_York"
+            ),
+            InlineKeyboardButton(
+                text="Лос-Анджелес (PST)",
+                callback_data="timezone_America/Los_Angeles"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="Токио (JST)",
+                callback_data="timezone_Asia/Tokyo"
+            ),
+            InlineKeyboardButton(
+                text="Сидней (AEST)",
+                callback_data="timezone_Australia/Sydney"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="🔍 Другие часовые пояса",
+                callback_data="timezone_more"
+            )
+        ]
+    ])
+    
+    # Отправляем сообщение с кнопками выбора часового пояса
+    await callback_query.message.edit_text(
+        i18n.format_value(
+            "select-timezone-message", 
+            {
+                "current_timezone": current_timezone
+            }
+        ),
+        reply_markup=keyboard
+    )
