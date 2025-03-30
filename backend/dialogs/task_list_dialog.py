@@ -485,7 +485,7 @@ async def on_uncompleted_only(c: CallbackQuery, button: Button, manager: DialogM
 async def on_deadline_today(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора фильтра по дедлайну на сегодня"""
     from datetime import datetime
-    today = datetime.now().date().strftime("%Y-%m-%d")
+    today = datetime.now().astimezone().date().strftime("%Y-%m-%d")
     
     filters = manager.dialog_data.get("filters", {})
     filters["deadline_from"] = today
@@ -507,7 +507,7 @@ async def on_deadline_today(c: CallbackQuery, button: Button, manager: DialogMan
 async def on_deadline_tomorrow(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора фильтра по дедлайну на завтра"""
     from datetime import datetime, timedelta
-    tomorrow = (datetime.now().date() + timedelta(days=1)).strftime("%Y-%m-%d")
+    tomorrow = (datetime.now().astimezone().date() + timedelta(days=1)).strftime("%Y-%m-%d")
     
     filters = manager.dialog_data.get("filters", {})
     filters["deadline_from"] = tomorrow
@@ -529,7 +529,7 @@ async def on_deadline_tomorrow(c: CallbackQuery, button: Button, manager: Dialog
 async def on_deadline_week(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора фильтра по дедлайну на текущую неделю"""
     from datetime import datetime, timedelta
-    today = datetime.now().date()
+    today = datetime.now().astimezone().date()
     start_of_week = (today - timedelta(days=today.weekday())).strftime("%Y-%m-%d")
     end_of_week = (today + timedelta(days=6-today.weekday())).strftime("%Y-%m-%d")
     
@@ -542,7 +542,7 @@ async def on_deadline_week(c: CallbackQuery, button: Button, manager: DialogMana
 async def on_deadline_month(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора фильтра по дедлайну на текущий месяц"""
     from datetime import datetime
-    today = datetime.now().date()
+    today = datetime.now().astimezone().date()
     start_of_month = today.replace(day=1).strftime("%Y-%m-%d")
     
     # Определяем последний день месяца
@@ -562,7 +562,7 @@ async def on_deadline_month(c: CallbackQuery, button: Button, manager: DialogMan
 async def on_deadline_overdue(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик выбора фильтра по просроченным задачам"""
     from datetime import datetime
-    yesterday = (datetime.now().date() - timedelta(days=1)).strftime("%Y-%m-%d")
+    yesterday = (datetime.now().astimezone().date() - timedelta(days=1)).strftime("%Y-%m-%d")
     
     filters = manager.dialog_data.get("filters", {})
     filters["deadline_to"] = yesterday

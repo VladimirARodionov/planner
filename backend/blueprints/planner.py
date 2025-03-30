@@ -483,7 +483,7 @@ async def calculate_deadline(duration_id):
                 return jsonify({'error': 'Duration not found'}), 404
                 
             # Получаем начальную дату из запроса или используем текущую дату и время
-            from_date = datetime.now()  # По умолчанию используем текущую дату и время
+            from_date = datetime.now().astimezone()  # По умолчанию используем текущую дату и время
             if request.args.get('from_date'):
                 try:
                     from_date = datetime.fromisoformat(
