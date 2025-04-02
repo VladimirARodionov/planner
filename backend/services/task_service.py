@@ -273,147 +273,150 @@ class TaskService:
         user_id: str,
         task_data: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
-        """Создать новую задачу"""
-        logger.debug(f"Creating task for user {user_id} with data: {task_data}")
+        try:
+            """Создать новую задачу"""
+            logger.debug(f"Creating task for user {user_id} with data: {task_data}")
 
-        user = await self.auth_service.get_user_by_id(user_id)
-        if not user:
-            logger.error(f"User {user_id} not found")
-            return None
-            
-        # Проверяем наличие обязательного поля title
-        if 'title' not in task_data:
-            task_data['title'] = "Новая задача"  # Устанавливаем значение по умолчанию только если поле отсутствует
-            logger.debug("Title not provided, using default: 'Новая задача'")
-        elif not task_data['title']:  # Если поле есть, но пустое
-            task_data['title'] = "Новая задача"
-            logger.debug("Title is empty, using default: 'Новая задача'")
-
-        # Проверяем, принадлежит ли тип задачи пользователю
-        if task_data.get('type_id'):
-            logger.debug(f"Checking if type_id {task_data['type_id']} belongs to user {user_id}")
-            type_query = select(TaskTypeSetting).where(
-                TaskTypeSetting.id == int(task_data['type_id']), # type: ignore
-                TaskTypeSetting.user_id == user.telegram_id # type: ignore
-            )
-            type_result = await self.session.execute(type_query)
-            if not type_result.scalar_one_or_none():
-                logger.error(f"Type {task_data['type_id']} does not belong to user {user_id}")
+            user = await self.auth_service.get_user_by_id(user_id)
+            if not user:
+                logger.error(f"User {user_id} not found")
                 return None
-            logger.debug(f"Type {task_data['type_id']} belongs to user {user_id}")
 
-        # Получаем настройки по умолчанию, если они не указаны
-        if not task_data.get('status_id'):
-            status_query = select(StatusSetting).where(
-                StatusSetting.user_id == user.telegram_id, # type: ignore
-                StatusSetting.is_default == True
-            )
-            status_result = await self.session.execute(status_query)
-            status = status_result.scalar_one_or_none()
-            if status:
-                task_data['status_id'] = status.id
-                logger.debug(f"Using default status with ID: {status.id}")
-            else:
-                logger.debug("No default status found")
-                
-        if not task_data.get('priority_id'):
-            priority_query = select(PrioritySetting).where(
-                PrioritySetting.user_id == user.telegram_id, # type: ignore
-                PrioritySetting.is_default == True
-            )
-            priority_result = await self.session.execute(priority_query)
-            priority = priority_result.scalar_one_or_none()
-            if priority:
-                task_data['priority_id'] = priority.id
-                logger.debug(f"Using default priority with ID: {priority.id}")
-            else:
-                logger.debug("No default priority found")
-                
-        if not task_data.get('type_id'):
-            type_query = select(TaskTypeSetting).where(
-                TaskTypeSetting.user_id == user.telegram_id, # type: ignore
-                TaskTypeSetting.is_default == True
-            )
-            type_result = await self.session.execute(type_query)
-            task_type = type_result.scalar_one_or_none()
-            if task_type:
-                task_data['type_id'] = task_type.id
+            # Проверяем наличие обязательного поля title
+            if 'title' not in task_data:
+                task_data['title'] = "Новая задача"  # Устанавливаем значение по умолчанию только если поле отсутствует
+                logger.debug("Title not provided, using default: 'Новая задача'")
+            elif not task_data['title']:  # Если поле есть, но пустое
+                task_data['title'] = "Новая задача"
+                logger.debug("Title is empty, using default: 'Новая задача'")
 
-        if not task_data.get('duration_id'):
-            type_query = select(DurationSetting).where(
-                DurationSetting.user_id == user.telegram_id, # type: ignore
-                DurationSetting.is_default == True
-            )
-            type_result = await self.session.execute(type_query)
-            task_duration = type_result.scalar_one_or_none()
-            if task_duration:
-                task_data['duration_id'] = task_duration.id
+            # Проверяем, принадлежит ли тип задачи пользователю
+            if task_data.get('type_id'):
+                logger.debug(f"Checking if type_id {task_data['type_id']} belongs to user {user_id}")
+                type_query = select(TaskTypeSetting).where(
+                    TaskTypeSetting.id == int(task_data['type_id']), # type: ignore
+                    TaskTypeSetting.user_id == user.telegram_id # type: ignore
+                )
+                type_result = await self.session.execute(type_query)
+                if not type_result.scalar_one_or_none():
+                    logger.error(f"Type {task_data['type_id']} does not belong to user {user_id}")
+                    return None
+                logger.debug(f"Type {task_data['type_id']} belongs to user {user_id}")
 
-        # Обрабатываем deadline, если он пришел в строковом формате
-        deadline = task_data.get('deadline')
-        if isinstance(deadline, str):
-            try:
-                # Сначала пробуем ISO формат
+            # Получаем настройки по умолчанию, если они не указаны
+            if not task_data.get('status_id'):
+                status_query = select(StatusSetting).where(
+                    StatusSetting.user_id == user.telegram_id, # type: ignore
+                    StatusSetting.is_default == True
+                )
+                status_result = await self.session.execute(status_query)
+                status = status_result.scalar_one_or_none()
+                if status:
+                    task_data['status_id'] = status.id
+                    logger.debug(f"Using default status with ID: {status.id}")
+                else:
+                    logger.debug("No default status found")
+
+            if not task_data.get('priority_id'):
+                priority_query = select(PrioritySetting).where(
+                    PrioritySetting.user_id == user.telegram_id, # type: ignore
+                    PrioritySetting.is_default == True
+                )
+                priority_result = await self.session.execute(priority_query)
+                priority = priority_result.scalar_one_or_none()
+                if priority:
+                    task_data['priority_id'] = priority.id
+                    logger.debug(f"Using default priority with ID: {priority.id}")
+                else:
+                    logger.debug("No default priority found")
+
+            if not task_data.get('type_id'):
+                type_query = select(TaskTypeSetting).where(
+                    TaskTypeSetting.user_id == user.telegram_id, # type: ignore
+                    TaskTypeSetting.is_default == True
+                )
+                type_result = await self.session.execute(type_query)
+                task_type = type_result.scalar_one_or_none()
+                if task_type:
+                    task_data['type_id'] = task_type.id
+
+            if not task_data.get('duration_id'):
+                type_query = select(DurationSetting).where(
+                    DurationSetting.user_id == user.telegram_id, # type: ignore
+                    DurationSetting.is_default == True
+                )
+                type_result = await self.session.execute(type_query)
+                task_duration = type_result.scalar_one_or_none()
+                if task_duration:
+                    task_data['duration_id'] = task_duration.id
+
+            # Обрабатываем deadline, если он пришел в строковом формате
+            deadline = task_data.get('deadline')
+            if isinstance(deadline, str):
                 try:
-                    deadline = datetime.fromisoformat(deadline.replace('Z', '+00:00'))
-                    logger.debug(f"Converted ISO deadline string to datetime: {deadline}")
-                except ValueError:
-                    # Пробуем формат '01.04.2025 11:18'
-                    if ' ' in deadline:
-                        # Есть дата и время в формате ДД.ММ.ГГГГ ЧЧ:ММ
-                        deadline = datetime.strptime(deadline, '%d.%m.%Y %H:%M')
-                    else:
-                        # Только дата в формате ДД.ММ.ГГГГ
-                        deadline = datetime.strptime(deadline, '%d.%m.%Y')
-                    logger.debug(f"Converted localized deadline string to datetime: {deadline}")
-            except (ValueError, TypeError) as e:
-                logger.error(f"Error converting deadline: {e}, value: {deadline}, type: {type(deadline)}")
-                # Сохраняем None в случае ошибки конвертации
-                deadline = None
-            task_data['deadline'] = deadline
-            logger.debug(f"Manually updating deadline to: {task_data['deadline']}, type: {type(task_data['deadline']) if task_data['deadline'] else None}")
+                    # Сначала пробуем ISO формат
+                    try:
+                        deadline = datetime.fromisoformat(deadline.replace('Z', '+00:00'))
+                        logger.debug(f"Converted ISO deadline string to datetime: {deadline}")
+                    except ValueError:
+                        # Пробуем формат '01.04.2025 11:18'
+                        if ' ' in deadline:
+                            # Есть дата и время в формате ДД.ММ.ГГГГ ЧЧ:ММ
+                            deadline = datetime.strptime(deadline, '%d.%m.%Y %H:%M')
+                        else:
+                            # Только дата в формате ДД.ММ.ГГГГ
+                            deadline = datetime.strptime(deadline, '%d.%m.%Y')
+                        logger.debug(f"Converted localized deadline string to datetime: {deadline}")
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Error converting deadline: {e}, value: {deadline}, type: {type(deadline)}")
+                    # Сохраняем None в случае ошибки конвертации
+                    deadline = None
+                task_data['deadline'] = deadline
+                logger.debug(f"Manually updating deadline to: {task_data['deadline']}, type: {type(task_data['deadline']) if task_data['deadline'] else None}")
 
-        task = Task(
-            user_id=user.telegram_id,
-            title=task_data['title'],
-            description=task_data.get('description'),
-            type_id=int(task_data.get('type_id')),
-            priority_id=int(task_data.get('priority_id')),
-            duration_id=int(task_data.get('duration_id')),
-            deadline=task_data.get('deadline')
-        )
-        logger.debug(f"Created task object: {task}")
+            task = Task(
+                user_id=user.telegram_id,
+                title=task_data['title'],
+                description=task_data.get('description'),
+                type_id=int(task_data.get('type_id')),
+                priority_id=int(task_data.get('priority_id')),
+                duration_id=int(task_data.get('duration_id')),
+                deadline=task_data.get('deadline')
+            )
+            logger.debug(f"Created task object: {task}")
 
-        # Устанавливаем статус и проверяем, является ли он финальным
-        if task_data.get('status_id'):
-            status_query = select(StatusSetting).where(StatusSetting.id == int(task_data['status_id'])) # type: ignore
-            status_result = await self.session.execute(status_query)
-            status = status_result.scalar_one_or_none()
-            if status:
-                task.change_status(status)
-            else:
-                task.status_id = task_data.get('status_id')
+            # Устанавливаем статус и проверяем, является ли он финальным
+            if task_data.get('status_id'):
+                status_query = select(StatusSetting).where(StatusSetting.id == int(task_data['status_id'])) # type: ignore
+                status_result = await self.session.execute(status_query)
+                status = status_result.scalar_one_or_none()
+                if status:
+                    task.change_status(status)
+                else:
+                    task.status_id = task_data.get('status_id')
 
-        if task.duration_id and not task.deadline:
-            logger.debug(f"Task has duration_id {task.duration_id}, calculating deadline")
-            duration = await self.session.get(DurationSetting, int(task.duration_id))
-            if duration:
-                task.deadline = await duration.calculate_deadline_async(self.session)
-                logger.debug(f"Calculated deadline: {task.deadline}")
-            else:
-                logger.warning(f"Duration {task.duration_id} not found")
-        elif task.deadline:
-            logger.debug(f"Using manually set deadline: {task.deadline}")
+            if task.duration_id and not task.deadline:
+                logger.debug(f"Task has duration_id {task.duration_id}, calculating deadline")
+                duration = await self.session.get(DurationSetting, int(task.duration_id))
+                if duration:
+                    task.deadline = await duration.calculate_deadline_async(self.session)
+                    logger.debug(f"Calculated deadline: {task.deadline}")
+                else:
+                    logger.warning(f"Duration {task.duration_id} not found")
+            elif task.deadline:
+                logger.debug(f"Using manually set deadline: {task.deadline}")
 
-        logger.debug("Adding task to session")
-        self.session.add(task)
-        logger.debug("Committing session")
-        await self.session.commit()
-        logger.debug("Refreshing task")
-        await self.session.refresh(task)
-        logger.debug(f"Task created with ID: {task.id}")
+            logger.debug("Adding task to session")
+            self.session.add(task)
+            logger.debug("Committing session")
+            await self.session.commit()
+            logger.debug("Refreshing task")
+            await self.session.refresh(task)
+            logger.debug(f"Task created with ID: {task.id}")
 
-        return await self._task_to_dict(task)
+            return await self._task_to_dict(task)
+        except Exception as e:
+            logger.exception(f"Error creating task: {e}")
 
     async def update_task(
         self,
