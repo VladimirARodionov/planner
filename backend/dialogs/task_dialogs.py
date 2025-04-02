@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, date
 
+import pytz
 from aiogram.fsm.state import State, StatesGroup
 from aiogram_dialog import Dialog, Window, Data
 from aiogram_dialog.widgets.text import Format, Const
@@ -17,7 +18,7 @@ from backend.services.task_service import TaskService
 from backend.services.settings_service import SettingsService
 from backend.database import get_session
 from backend.utils import escape_html
-from backend.db.models import DurationSetting
+from backend.db.models import DurationSetting, User
 
 logger = logging.getLogger(__name__)
 
@@ -129,21 +130,25 @@ async def on_duration_selected(callback: CallbackQuery, widget: Any, manager: Di
     logger.debug(f"on_duration_selected called with item_id: {item_id}, type: {type(item_id)}")
     manager.dialog_data["duration_id"] = str(item_id)
     logger.debug(f"Selected duration_id: {item_id}, dialog_data: {manager.dialog_data}")
+    user_id = manager.event.from_user.id if hasattr(manager.event, 'from_user') else None
 
     # Расчитываем и устанавливаем дедлайн на основе длительности
+    timezone = "Europe/Moscow"
     async with get_session() as session:
         try:
             duration = await session.get(DurationSetting, int(item_id))
-            if duration:
-                # Расчитываем дедлайн
-                # Используем datetime.now() чтобы сохранить текущее время
-                deadline = await duration.calculate_deadline_async(session, datetime.now().astimezone())
-                logger.debug(f"Calculated deadline based on duration: {deadline}")
-                # Устанавливаем дедлайн в данные диалога
-                manager.dialog_data["deadline"] = deadline
-                logger.debug(f"Set deadline: {deadline} in dialog_data")
+            user = await session.get(User, user_id)
+            timezone = user.timezone
         except Exception as e:
-            logger.error(f"Error calculating deadline: {e}")
+            logger.exception(f"Error calculating deadline: {e}")
+    if duration:
+        # Расчитываем дедлайн
+        # Используем datetime.now() чтобы сохранить текущее время
+        deadline = await duration.calculate_deadline_async(session, datetime.now(tz=pytz.timezone(timezone)))
+        logger.debug(f"Calculated deadline based on duration: {deadline}")
+        # Устанавливаем дедлайн в данные диалога
+        manager.dialog_data["deadline"] = deadline
+        logger.debug(f"Set deadline: {deadline} in dialog_data")
 
     # Переходим к экрану подтверждения
     await manager.switch_to(TaskDialog.confirm)
@@ -170,11 +175,20 @@ async def on_deadline_selected(c: CallbackQuery, widget: Any, manager: DialogMan
         manager.dialog_data["deadline"] = deadline_date
     else:
         # Преобразуем date в datetime с текущим временем
-        now = datetime.now().astimezone()
+        user_id = manager.event.from_user.id if hasattr(manager.event, 'from_user') else None
+        timezone = "Europe/Moscow"
+        async with get_session() as session:
+            try:
+                user = await session.get(User, user_id)
+                timezone = user.timezone
+
+            except Exception as e:
+                logger.exception(f"Error selecting deadline: {e}")
+
+        now = datetime.now(tz=pytz.timezone(timezone))
         date_with_time = datetime.combine(deadline_date, now.time())
         manager.dialog_data["deadline"] = date_with_time
         logger.debug(f"Установлен дедлайн с текущим временем: {date_with_time}")
-
     logger.debug(f"Установлен дедлайн: {manager.dialog_data['deadline']}, тип: {type(manager.dialog_data['deadline'])}, dialog_data: {manager.dialog_data}")
 
     # Возвращаемся к экрану длительности после выбора дедлайна
@@ -312,67 +326,66 @@ async def main_process_result(start_data: Data, result: Any,
     logger.debug("Dialog data: %s", dialog_manager.dialog_data)
 
     # Создаем задачу при завершении диалога
-    if result:
-        try:
-            logger.debug("Creating task...")
-            async with get_session() as session:
-                task_service = TaskService(session)
-                user_id = str(dialog_manager.event.from_user.id)
-                logger.debug(f"User ID: {user_id}")
+    try:
+        logger.debug("Creating task...")
+        async with get_session() as session:
+            task_service = TaskService(session)
+            user_id = str(dialog_manager.event.from_user.id)
+            logger.debug(f"User ID: {user_id}")
 
-                # Получаем данные из dialog_data, а не из result
-                task_data = {
-                    "title": dialog_manager.dialog_data.get("title", "Новая задача"),
-                    "description": dialog_manager.dialog_data.get("description"),
-                    "type_id": dialog_manager.dialog_data.get("type_id"),
-                    "status_id": dialog_manager.dialog_data.get("status_id"),
-                    "priority_id": dialog_manager.dialog_data.get("priority_id"),
-                    "duration_id": dialog_manager.dialog_data.get("duration_id"),
-                    "deadline": dialog_manager.dialog_data.get("deadline")  # Добавляем дедлайн
-                }
+            # Получаем данные из dialog_data, а не из result
+            task_data = {
+                "title": dialog_manager.dialog_data.get("title", "Новая задача"),
+                "description": dialog_manager.dialog_data.get("description"),
+                "type_id": dialog_manager.dialog_data.get("type_id"),
+                "status_id": dialog_manager.dialog_data.get("status_id"),
+                "priority_id": dialog_manager.dialog_data.get("priority_id"),
+                "duration_id": dialog_manager.dialog_data.get("duration_id"),
+                "deadline": dialog_manager.dialog_data.get("deadline")  # Добавляем дедлайн
+            }
 
-                logger.debug(f"Task data for creation: {task_data}")
+            logger.debug(f"Task data for creation: {task_data}")
 
-                task = await task_service.create_task(
-                    user_id,
-                    task_data
+            task = await task_service.create_task(
+                user_id,
+                task_data
+            )
+            logger.debug(f"Task created: {task}")
+
+            if task:
+                task_type = task['type']['name'] if task['type'] else i18n.format_value("type-not-set")
+                status = task['status']['name'] if task['status'] else i18n.format_value("status-not-set")
+                priority = task['priority']['name'] if task['priority'] else i18n.format_value("priority-not-set")
+                duration = task['duration']['name'] if task['duration'] else i18n.format_value("duration-not-set")
+
+                # Правильно форматируем дедлайн в понятном формате
+                deadline_display = i18n.format_value("deadline-not-set")
+                if task['deadline']:
+                    if isinstance(task['deadline'], (datetime, date)):
+                        if isinstance(task['deadline'], datetime):
+                            deadline_display = task['deadline'].strftime("%d.%m.%Y %H:%M")
+                        else:
+                            deadline_display = task['deadline'].strftime("%d.%m.%Y")
+                    elif isinstance(task['deadline'], str):
+                        deadline_display = task['deadline']
+
+                logger.debug(f"Sending task created message...")
+                await dialog_manager.event.answer(
+                    i18n.format_value("task-created") + "\n\n" +
+                    i18n.format_value("task-created-details", {
+                        "title": task['title'],
+                        "description": task['description'] or i18n.format_value("description-not-set"),
+                        "type": task_type,
+                        "status": status,
+                        "priority": priority,
+                        "duration": duration,
+                        "deadline": deadline_display
+                    })
                 )
-                logger.debug(f"Task created: {task}")
-
-                if task:
-                    task_type = task['type']['name'] if task['type'] else i18n.format_value("type-not-set")
-                    status = task['status']['name'] if task['status'] else i18n.format_value("status-not-set")
-                    priority = task['priority']['name'] if task['priority'] else i18n.format_value("priority-not-set")
-                    duration = task['duration']['name'] if task['duration'] else i18n.format_value("duration-not-set")
-
-                    # Правильно форматируем дедлайн в понятном формате
-                    deadline_display = i18n.format_value("deadline-not-set")
-                    if task['deadline']:
-                        if isinstance(task['deadline'], (datetime, date)):
-                            if isinstance(task['deadline'], datetime):
-                                deadline_display = task['deadline'].strftime("%d.%m.%Y %H:%M")
-                            else:
-                                deadline_display = task['deadline'].strftime("%d.%m.%Y")
-                        elif isinstance(task['deadline'], str):
-                            deadline_display = task['deadline']
-
-                    logger.debug(f"Sending task created message...")
-                    await dialog_manager.event.answer(
-                        i18n.format_value("task-created") + "\n\n" +
-                        i18n.format_value("task-created-details", {
-                            "title": task['title'],
-                            "description": task['description'] or i18n.format_value("description-not-set"),
-                            "type": task_type,
-                            "status": status,
-                            "priority": priority,
-                            "duration": duration,
-                            "deadline": deadline_display
-                        })
-                    )
-                    logger.debug("Task created message sent")
-        except Exception as e:
-            logger.exception(f"Error creating task: {e}")
-            await dialog_manager.event.answer(i18n.format_value("error"))
+                logger.debug("Task created message sent")
+    except Exception as e:
+        logger.exception(f"Error creating task: {e}")
+        await dialog_manager.event.answer(i18n.format_value("error"))
 
 async def on_confirm_back(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик кнопки назад в окне подтверждения - переход к окну длительности"""
