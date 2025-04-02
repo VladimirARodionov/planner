@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta, date
 
 import pytz
@@ -9,6 +10,8 @@ import enum
 
 Base = declarative_base()
 metadata = Base.metadata
+
+logger = logging.getLogger(__name__)
 
 class DurationType(enum.Enum):
     """Типы продолжительности"""
@@ -134,30 +137,33 @@ class DurationSetting(Base):
     tasks = relationship('Task', back_populates='duration')
 
     async def calculate_deadline_async(self, session, from_date=None):
-        """Рассчитать дедлайн на основе продолжительности (асинхронный метод)"""
-        if from_date is None:
-            # Используем текущую дату и время
-            from_date = datetime.now(tz=pytz.timezone(self.user.timezone))
-        elif isinstance(from_date, date) and not isinstance(from_date, datetime):
-            # Если передана только дата (без времени), добавляем текущее время
-            now = datetime.now(tz=pytz.timezone(self.user.timezone))
-            from_date = datetime.combine(from_date, now.time())
+        try:
+            """Рассчитать дедлайн на основе продолжительности (асинхронный метод)"""
+            if from_date is None:
+                # Используем текущую дату и время
+                from_date = datetime.now(tz=pytz.timezone(self.user.timezone))
+            elif isinstance(from_date, date) and not isinstance(from_date, datetime):
+                # Если передана только дата (без времени), добавляем текущее время
+                now = datetime.now(tz=pytz.timezone(self.user.timezone))
+                from_date = datetime.combine(from_date, now.time())
 
-        # Получаем актуальные значения из базы данных
-        duration = await session.get(DurationSetting, self.id)
-        if not duration:
+            # Получаем актуальные значения из базы данных
+            duration = await session.get(DurationSetting, self.id)
+            if not duration:
+                return from_date
+
+            if duration.duration_type == DurationType.DAYS:
+                return from_date + timedelta(days=duration.value)
+            elif duration.duration_type == DurationType.WEEKS:
+                return from_date + timedelta(weeks=duration.value)
+            elif duration.duration_type == DurationType.MONTHS:
+                return from_date + relativedelta(months=duration.value)
+            elif duration.duration_type == DurationType.YEARS:
+                return from_date + relativedelta(years=duration.value)
+
             return from_date
-
-        if duration.duration_type == DurationType.DAYS:
-            return from_date + timedelta(days=duration.value)
-        elif duration.duration_type == DurationType.WEEKS:
-            return from_date + timedelta(weeks=duration.value)
-        elif duration.duration_type == DurationType.MONTHS:
-            return from_date + relativedelta(months=duration.value)
-        elif duration.duration_type == DurationType.YEARS:
-            return from_date + relativedelta(years=duration.value)
-
-        return from_date
+        except Exception as e:
+            logger.exception(f"Ошибка при расчете дедлайна: {e}")
 
 class Task(Base):
     """Модель задачи"""
