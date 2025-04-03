@@ -53,6 +53,20 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask, on
         return dateString;
     };
     
+    const formatDateTime = (dateString: string) => {
+        // Проверяем, в ISO формате ли строка (содержит T и, возможно, символ Z)
+        if (dateString.includes('T')) {
+            return new Date(dateString).toLocaleDateString(t('locale_code'), {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        return dateString;
+    };
+
     // Функция для получения человекочитаемого названия типа длительности
     const getDurationTypeLabel = (type: DurationType | string): string => {
         switch (type) {
@@ -169,7 +183,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onTaskUpdated, onEditTask, on
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                     {task.deadline && (
                         <Typography variant="body2" color={task.is_overdue ? "error" : "text.secondary"}>
-                            {t('tasks.deadline')}: {formatDate(task.deadline)}
+                            {t('tasks.deadline')}: {formatDateTime(task.deadline)}
                             {task.is_overdue && ` (${t('tasks.overdue')})`}
                         </Typography>
                     )}
