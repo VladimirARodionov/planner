@@ -181,7 +181,7 @@ async def get_tasks_data(dialog_manager: DialogManager, **kwargs):
             status = escape_html(task['status']['name'] if task['status'] else i18n.format_value("status-not-set"))
             priority = escape_html(task['priority']['name'] if task['priority'] else i18n.format_value("priority-not-set"))
             task_type = escape_html(task['type']['name'] if task['type'] else i18n.format_value("type-not-set"))
-            deadline = escape_html((task['deadline'].strftime("%d.%m.%Y %H:%M") if task['deadline'] else "") + ((" " + i18n.format_value("deadline-overdue")) if task['deadline'] and not task['completed_at'] and task['deadline'] < datetime.now(tz=pytz.timezone(user.timezone)) else "") if task['deadline'] else i18n.format_value("deadline-not-set"))
+            deadline = escape_html((task['deadline'].astimezone(pytz.timezone(user.timezone)).strftime("%d.%m.%Y %H:%M") if task['deadline'] else "") + ((" " + i18n.format_value("deadline-overdue")) if task['deadline'] and not task['completed_at'] and task['deadline'] < datetime.now(tz=pytz.timezone(user.timezone)) else "") if task['deadline'] else i18n.format_value("deadline-not-set"))
             completed = "✅" if task['completed_at'] is not None else "❌"
             
             task_info = {
