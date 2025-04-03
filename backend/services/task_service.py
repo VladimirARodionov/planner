@@ -1,5 +1,6 @@
 from typing import List, Optional, Dict, Any, Tuple
 
+import pytz
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -473,15 +474,18 @@ class TaskService:
                     # Сначала пробуем ISO формат
                     try:
                         deadline_value = datetime.fromisoformat(deadline_value.replace('Z', '+00:00'))
+                        deadline_value = deadline_value.replace(tzinfo=pytz.timezone(user.timezone))
                         logger.debug(f"Converted ISO deadline string to datetime: {deadline_value}")
                     except ValueError:
                         # Пробуем формат '01.04.2025 11:18'
                         if ' ' in deadline_value:
                             # Есть дата и время в формате ДД.ММ.ГГГГ ЧЧ:ММ
                             deadline_value = datetime.strptime(deadline_value, '%d.%m.%Y %H:%M')
+                            deadline_value = deadline_value.replace(tzinfo=pytz.timezone(user.timezone))
                         else:
                             # Только дата в формате ДД.ММ.ГГГГ
                             deadline_value = datetime.strptime(deadline_value, '%d.%m.%Y')
+                            deadline_value = deadline_value.replace(tzinfo=pytz.timezone(user.timezone))
                         logger.debug(f"Converted localized deadline string to datetime: {deadline_value}")
                 except (ValueError, TypeError) as e:
                     logger.error(f"Error converting deadline: {e}, value: {deadline_value}, type: {type(deadline_value)}")
