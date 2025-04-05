@@ -87,7 +87,7 @@ export interface UpdateTaskDto {
     status_id?: number;
     priority_id?: number;
     duration_id?: number;
-    deadline?: string;
+    deadline?: Date;
     completed?: boolean;
 }
 
