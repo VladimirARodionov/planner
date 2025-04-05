@@ -24,7 +24,7 @@
     "@types/react-router-dom": "^5.3.3",
     "axios": "^1.6.7",
     "date-fns": "^2.30.0",
-    "date-fns-tz": "^3.2.0",
+    "date-fns-tz": "^2.0.0",
     "i18next": "^23.7.11",
     "i18next-browser-languagedetector": "^7.2.0",
     "react": "^18.2.0",
