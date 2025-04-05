@@ -270,7 +270,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
             status_id: formData.status_id !== '' ? Number(formData.status_id) : undefined,
             priority_id: formData.priority_id !== '' ? Number(formData.priority_id) : undefined,
             duration_id: formData.duration_id !== '' ? Number(formData.duration_id) : undefined,
-            deadline: formData.deadline ? formData.deadline.toISOString() : undefined,
+            deadline: formData.deadline ? formData.deadline : undefined,
             completed: formData.completed
         };
         
