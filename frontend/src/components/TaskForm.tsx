@@ -194,7 +194,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 
                 if (deadline) {
                     // Преобразуем дату дедлайна в часовой пояс пользователя
-                    console.log('Deadline in user timezone:', formatInTimeZone(zonedDeadline, userTimezone, 'yyyy-MM-dd HH:mm:ss zzz'));
+                    console.log('Deadline in user timezone:', formatInTimeZone(deadline, userTimezone, 'yyyy-MM-dd HH:mm:ss zzz'));
                     
                     // Получаем текущее время в часовом поясе пользователя
                     const nowInUserTZ = utcToZonedTime(new Date(), userTimezone);
