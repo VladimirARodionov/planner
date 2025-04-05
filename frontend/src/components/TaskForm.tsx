@@ -193,22 +193,27 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 console.log(`API response for deadline:`, deadline);
                 
                 if (deadline) {
+                    // Преобразуем дату дедлайна в часовой пояс пользователя
+                    const zonedDeadline = utcToZonedTime(deadline, userTimezone);
+                    console.log('Deadline in user timezone:', formatInTimeZone(zonedDeadline, userTimezone, 'yyyy-MM-dd HH:mm:ss'));
+                    
                     // Получаем текущее время в часовом поясе пользователя
-                    const now = utcToZonedTime(new Date(), userTimezone);
-                    // Создаем дату дедлайна в часовом поясе пользователя
-                    const deadlineInUserTZ = utcToZonedTime(deadline, userTimezone);
-                    // Устанавливаем время из текущего момента
-                    deadlineInUserTZ.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
-                    // Преобразуем в UTC для хранения
-                    const deadlineInUTC = deadlineInUserTZ.toISOString();
+                    const nowInUserTZ = utcToZonedTime(new Date(), userTimezone);
+                    
+                    // Устанавливаем текущее время для даты дедлайна
+                    zonedDeadline.setHours(
+                        nowInUserTZ.getHours(),
+                        nowInUserTZ.getMinutes(),
+                        nowInUserTZ.getSeconds()
+                    );
+                    console.log('Deadline with current time:', formatInTimeZone(zonedDeadline, userTimezone, 'yyyy-MM-dd HH:mm:ss'));
                     
                     setFormData({
                         ...updatedFormData,
-                        deadline: new Date(deadlineInUTC)
+                        deadline: zonedDeadline
                     });
-                    console.log(`Deadline calculated:`, formatInTimeZone(deadlineInUserTZ, userTimezone, 'yyyy-MM-dd HH:mm:ss'));
                     
-                    setSelectedDate(new Date(deadlineInUTC));
+                    setSelectedDate(zonedDeadline);
                 } else {
                     console.error('Deadline calculation returned null');
                 }
@@ -228,22 +233,23 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         if (date) {
             console.log('User timezone from server:', userTimezone);
             
+            // Получаем дату в часовом поясе пользователя
+            const zonedDate = utcToZonedTime(date, userTimezone);
+            console.log('Zoned date:', formatInTimeZone(zonedDate, userTimezone, 'yyyy-MM-dd HH:mm:ss'));
+            
             // Получаем текущее время в часовом поясе пользователя
-            const now = utcToZonedTime(new Date(), userTimezone);
-            console.log('Current time in user timezone:', formatInTimeZone(now, userTimezone, 'yyyy-MM-dd HH:mm:ss'));
+            const nowInUserTZ = utcToZonedTime(new Date(), userTimezone);
             
-            // Создаем новую дату в часовом поясе пользователя
-            const newDate = utcToZonedTime(date, userTimezone);
-            // Устанавливаем время из текущего момента
-            newDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
-            console.log('New date with current time:', formatInTimeZone(newDate, userTimezone, 'yyyy-MM-dd HH:mm:ss'));
-            
-            // Преобразуем в UTC для хранения
-            const dateInUTC = newDate.toISOString();
-            console.log('Date converted to UTC:', dateInUTC);
+            // Устанавливаем текущее время для выбранной даты
+            zonedDate.setHours(
+                nowInUserTZ.getHours(),
+                nowInUserTZ.getMinutes(),
+                nowInUserTZ.getSeconds()
+            );
+            console.log('Zoned date with current time:', formatInTimeZone(zonedDate, userTimezone, 'yyyy-MM-dd HH:mm:ss'));
             
             // Сохраняем дату в состоянии формы
-            setFormData({ ...formData, deadline: new Date(dateInUTC) });
+            setFormData({ ...formData, deadline: zonedDate });
         } else {
             setFormData({ ...formData, deadline: null });
         }
