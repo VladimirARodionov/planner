@@ -28,7 +28,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { ru } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
-import { format, zonedTimeToUtc, utcToZonedTime } from 'date-fns-tz';
+import { formatInTimeZone, utcToZonedTime } from 'date-fns-tz';
 
 interface TaskFormProps {
     open: boolean;
@@ -199,16 +199,16 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                     const deadlineInUserTZ = utcToZonedTime(deadline, userTimezone);
                     // Устанавливаем время из текущего момента
                     deadlineInUserTZ.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
-                    // Преобразуем обратно в UTC для хранения
-                    const deadlineInUTC = zonedTimeToUtc(deadlineInUserTZ, userTimezone);
+                    // Преобразуем в UTC для хранения
+                    const deadlineInUTC = deadlineInUserTZ.toISOString();
                     
                     setFormData({
                         ...updatedFormData,
-                        deadline: deadlineInUTC
+                        deadline: new Date(deadlineInUTC)
                     });
-                    console.log(`Deadline calculated: ${deadlineInUTC.toLocaleString()}`);
+                    console.log(`Deadline calculated:`, formatInTimeZone(deadlineInUserTZ, userTimezone, 'yyyy-MM-dd HH:mm:ss'));
                     
-                    setSelectedDate(deadlineInUTC);
+                    setSelectedDate(new Date(deadlineInUTC));
                 } else {
                     console.error('Deadline calculation returned null');
                 }
@@ -230,20 +230,20 @@ export const TaskForm: React.FC<TaskFormProps> = ({
             
             // Получаем текущее время в часовом поясе пользователя
             const now = utcToZonedTime(new Date(), userTimezone);
-            console.log('Current time in user timezone:', now);
+            console.log('Current time in user timezone:', formatInTimeZone(now, userTimezone, 'yyyy-MM-dd HH:mm:ss'));
             
             // Создаем новую дату в часовом поясе пользователя
             const newDate = utcToZonedTime(date, userTimezone);
             // Устанавливаем время из текущего момента
             newDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
-            console.log('New date with current time:', newDate);
+            console.log('New date with current time:', formatInTimeZone(newDate, userTimezone, 'yyyy-MM-dd HH:mm:ss'));
             
-            // Преобразуем обратно в UTC для хранения
-            const dateInUTC = zonedTimeToUtc(newDate, userTimezone);
+            // Преобразуем в UTC для хранения
+            const dateInUTC = newDate.toISOString();
             console.log('Date converted to UTC:', dateInUTC);
             
             // Сохраняем дату в состоянии формы
-            setFormData({ ...formData, deadline: dateInUTC });
+            setFormData({ ...formData, deadline: new Date(dateInUTC) });
         } else {
             setFormData({ ...formData, deadline: null });
         }
