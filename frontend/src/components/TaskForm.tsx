@@ -194,19 +194,19 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 
                 if (deadline) {
                     // Преобразуем дату дедлайна в часовой пояс пользователя
-                    const zonedDeadline = deadline;
-                    console.log('Deadline in user timezone:', formatInTimeZone(zonedDeadline, userTimezone, 'yyyy-MM-dd HH:mm:ss'));
+                    console.log('Deadline in user timezone:', formatInTimeZone(zonedDeadline, userTimezone, 'yyyy-MM-dd HH:mm:ss zzz'));
                     
                     // Получаем текущее время в часовом поясе пользователя
                     const nowInUserTZ = utcToZonedTime(new Date(), userTimezone);
                     
                     // Устанавливаем текущее время для даты дедлайна
-                    zonedDeadline.setHours(
-                        nowInUserTZ.getHours(),
-                        nowInUserTZ.getMinutes(),
-                        nowInUserTZ.getSeconds()
+                    nowInUserTZ.setFullYear(
+                        deadline.getFullYear(),
+                        deadline.getMonth(),
+                        deadline.getDate()
                     );
-                    console.log('Deadline with current time:', formatInTimeZone(zonedDeadline, userTimezone, 'yyyy-MM-dd HH:mm:ss'));
+                    const zonedDeadline = nowInUserTZ
+                    console.log('Deadline with current time:', formatInTimeZone(zonedDeadline, userTimezone, 'yyyy-MM-dd HH:mm:ss zzz'));
                     
                     setFormData({
                         ...updatedFormData,
