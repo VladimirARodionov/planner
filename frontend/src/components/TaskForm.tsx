@@ -110,7 +110,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 const priorityId = task.priority && task.priority.id ? task.priority.id : '';
                 const durationId = task.duration && task.duration.id ? task.duration.id : '';
                 
-                const deadlineDate = task.deadline_iso ? new Date(task.deadline_iso) : (task.deadline ? new Date(task.deadline) : null);
+                const deadlineDate = task.deadline ? new Date(task.deadline) : null);
                 
                 const isCompleted = !!(task.completed || 
                                     task.completed_at || 
