@@ -291,7 +291,7 @@ class I18nProxy:
         
         # Проверяем кеш локализаций
         if user_id and user_id in user_locales:
-            logger.debug(f"[I18nProxy] Локализация: {user_locales[user_id].locales}")
+            #logger.debug(f"[I18nProxy] Локализация: {user_locales[user_id]}")
             return user_locales[user_id].format_value(tag_id, args)
         
         # Если не нашли пользователя или его нет в кеше, используем локализацию по умолчанию

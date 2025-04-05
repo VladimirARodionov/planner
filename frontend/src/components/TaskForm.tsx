@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Task, Status, Priority, Duration, TaskType, DurationType } from '../types/task';
 import { TasksAPI, CreateTaskDto, UpdateTaskDto } from '../api/tasks';
+import { AuthAPI } from '../api/auth';
 import {
     Box,
     Button,
@@ -27,6 +28,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { ru } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
+import { formatInTimeZone, utcToZonedTime } from 'date-fns-tz';
 
 interface TaskFormProps {
     open: boolean;
@@ -75,22 +77,41 @@ export const TaskForm: React.FC<TaskFormProps> = ({
     const [calculatingDeadline, setCalculatingDeadline] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const [userTimezone, setUserTimezone] = useState<string>('Europe/Moscow');
 
     useEffect(() => {
+        // Загружаем настройки и информацию о пользователе при открытии формы
         if (open) {
-            loadSettings();
+            loadSettingsAndUser();
+        }
+    }, [open]);
+
+    const loadSettingsAndUser = async () => {
+        try {
+            setLoading(true);
+            const [types, settings, timezone] = await Promise.all([
+                TasksAPI.getTaskTypes(),
+                TasksAPI.getSettings(),
+                AuthAPI.getUserTimezone()
+            ]);
+            setTaskTypes(types);
+            setStatuses(settings.statuses);
+            setPriorities(settings.priorities);
+            setDurations(settings.durations);
+            setUserTimezone(timezone || 'Europe/Moscow');
+            setError(null);
+
+            // Если есть задача для редактирования, загружаем её данные
             if (task) {
                 console.log('Task for edit:', task);
                 
-                // Проверяем, что объекты существуют и имеют id
                 const typeId = task.type && task.type.id ? task.type.id.toString() : '';
                 const statusId = task.status && task.status.id ? task.status.id : '';
                 const priorityId = task.priority && task.priority.id ? task.priority.id : '';
                 const durationId = task.duration && task.duration.id ? task.duration.id : '';
                 
-                const deadlineDate = task.deadline_iso ? new Date(task.deadline_iso) : (task.deadline ? new Date(task.deadline) : null);
+                const deadlineDate = task.deadline ? new Date(task.deadline) : null;
                 
-                // Определяем, является ли задача завершенной на основе completed_at или статуса
                 const isCompleted = !!(task.completed || 
                                     task.completed_at || 
                                     (task.status && task.status.is_final));
@@ -106,19 +127,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                     completed: !!isCompleted
                 });
                 
-                // Синхронизируем selectedDate с deadline
                 setSelectedDate(deadlineDate);
-                
-                console.log('Form data after set:', {
-                    title: task.title,
-                    description: task.description || '',
-                    type_id: typeId,
-                    status_id: statusId,
-                    priority_id: priorityId,
-                    duration_id: durationId,
-                    deadline: deadlineDate,
-                    completed: !!isCompleted
-                });
             } else {
                 setFormData({
                     title: '',
@@ -132,23 +141,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 });
                 setSelectedDate(null);
             }
-        }
-    }, [open, task]);
-
-    const loadSettings = async () => {
-        try {
-            setLoading(true);
-            const [types, settings] = await Promise.all([
-                TasksAPI.getTaskTypes(),
-                TasksAPI.getSettings()
-            ]);
-            setTaskTypes(types);
-            setStatuses(settings.statuses);
-            setPriorities(settings.priorities);
-            setDurations(settings.durations);
-            setError(null);
         } catch (err) {
-            setError('Ошибка при загрузке настроек');
+            setError('Ошибка при загрузке данных');
             console.error(err);
         } finally {
             setLoading(false);
@@ -173,13 +167,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         
         console.log(`Select changed: ${field} = ${newValue}, type: ${typeof newValue}`);
         
-        // Обновляем форму с новым значением
         const updatedFormData = {
             ...formData,
             [field]: newValue
         };
         
-        // Если изменился статус, проверяем, является ли он финальным
         if (field === 'status_id' && newValue !== '') {
             const selectedStatus = statuses.find(status => status.id === Number(newValue));
             if (selectedStatus) {
@@ -187,39 +179,41 @@ export const TaskForm: React.FC<TaskFormProps> = ({
             }
         }
         
-        // Сразу устанавливаем обновленные данные формы
         setFormData(updatedFormData);
 
-        // Если выбрана длительность, автоматически рассчитываем дедлайн
         if (field === 'duration_id' && newValue !== '') {
             try {
                 console.log(`Calculating deadline for duration_id: ${newValue}`);
-                // Показываем спиннер при расчете дедлайна
                 setCalculatingDeadline(true);
                 
-                // Преобразуем строку в число для API
                 const durationId = parseInt(String(newValue), 10);
                 console.log(`Parsed duration ID for API: ${durationId}`);
                 
-                // Рассчитываем дедлайн на основе выбранной длительности
                 const deadline = await TasksAPI.calculateDeadline(durationId);
                 console.log(`API response for deadline:`, deadline);
                 
-                // Устанавливаем дедлайн в форму, сохраняя обновленное значение длительности
                 if (deadline) {
-                    // Получаем текущее время
-                    const now = new Date();
-                    // Устанавливаем время для дедлайна
-                    deadline.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+                    // Преобразуем дату дедлайна в часовой пояс пользователя
+                    console.log('Deadline in user timezone:', formatInTimeZone(deadline, userTimezone, 'yyyy-MM-dd HH:mm:ss zzz'));
+                    
+                    // Получаем текущее время в часовом поясе пользователя
+                    const nowInUserTZ = utcToZonedTime(new Date(), userTimezone);
+                    
+                    // Устанавливаем текущее время для даты дедлайна
+                    nowInUserTZ.setFullYear(
+                        deadline.getFullYear(),
+                        deadline.getMonth(),
+                        deadline.getDate()
+                    );
+                    const zonedDeadline = nowInUserTZ
+                    console.log('Deadline with current time:', formatInTimeZone(zonedDeadline, userTimezone, 'yyyy-MM-dd HH:mm:ss zzz'));
                     
                     setFormData({
-                        ...updatedFormData, // Используем обновленные данные с новой длительностью
-                        deadline: deadline
+                        ...updatedFormData,
+                        deadline: zonedDeadline
                     });
-                    console.log(`Deadline calculated: ${deadline.toLocaleString()}`);
                     
-                    // Обновляем также состояние выбранной даты для DatePicker
-                    setSelectedDate(deadline);
+                    setSelectedDate(zonedDeadline);
                 } else {
                     console.error('Deadline calculation returned null');
                 }
@@ -237,13 +231,29 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         setSelectedDate(date);
         
         if (date) {
-            // Преобразуем дату в ISO строку для внутреннего использования
-            setFormData({ ...formData, deadline: date });
+            console.log('User timezone from server:', userTimezone);
+            
+            // Получаем дату в часовом поясе пользователя
+            const zonedDate = utcToZonedTime(date, userTimezone);
+            console.log('Zoned date:', formatInTimeZone(zonedDate, userTimezone, 'yyyy-MM-dd HH:mm:ss'));
+            
+            // Получаем текущее время в часовом поясе пользователя
+            const nowInUserTZ = utcToZonedTime(new Date(), userTimezone);
+            
+            // Устанавливаем текущее время для выбранной даты
+            zonedDate.setHours(
+                nowInUserTZ.getHours(),
+                nowInUserTZ.getMinutes(),
+                nowInUserTZ.getSeconds()
+            );
+            console.log('Zoned date with current time:', formatInTimeZone(zonedDate, userTimezone, 'yyyy-MM-dd HH:mm:ss'));
+            
+            // Сохраняем дату в состоянии формы
+            setFormData({ ...formData, deadline: zonedDate });
         } else {
             setFormData({ ...formData, deadline: null });
         }
         
-        // Если поле было с ошибкой, убираем ошибку
         if (error) {
             setError(null);
         }
@@ -260,7 +270,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
             status_id: formData.status_id !== '' ? Number(formData.status_id) : undefined,
             priority_id: formData.priority_id !== '' ? Number(formData.priority_id) : undefined,
             duration_id: formData.duration_id !== '' ? Number(formData.duration_id) : undefined,
-            deadline: formData.deadline ? formData.deadline.toISOString() : undefined,
+            deadline: formData.deadline ? formData.deadline : undefined,
             completed: formData.completed
         };
         

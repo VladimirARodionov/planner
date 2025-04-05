@@ -1,6 +1,8 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 
+import pytz
 from aiogram.fsm.state import State, StatesGroup
 from aiogram_dialog import Dialog, Window
 from aiogram_dialog.widgets.text import Format
@@ -12,6 +14,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram_dialog.widgets.widget_event import SimpleEventProcessor
 
 from backend.custom_widgets import I18NFormat
+from backend.db.models import User
 from backend.locale_config import i18n
 from backend.services.task_service import TaskService
 from backend.services.settings_service import SettingsService
@@ -251,10 +254,43 @@ async def on_duration_selected(callback: CallbackQuery, widget: Any, manager: Di
             user_id = str(manager.event.from_user.id)
             settings = await settings_service.get_settings(user_id)
             
+            # Находим выбранную продолжительность
+            selected_duration = None
             for duration in settings["durations"]:
                 if str(duration["id"]) == str(item_id):
+                    selected_duration = duration
                     task["duration"] = duration
                     break
+            
+            # Если нашли продолжительность и у задачи нет установленного вручную дедлайна,
+            # пересчитываем дедлайн на основе новой продолжительности
+            logger.debug(f"selected_duration: {selected_duration}")
+            if selected_duration:
+                try:
+                    # Получаем текущий часовой пояс пользователя
+                    user = await session.get(User, int(user_id))
+                    timezone = user.timezone if user else "Europe/Moscow"
+                    
+                    # Создаем объект datetime в часовом поясе пользователя
+                    current_time = datetime.now(pytz.timezone(timezone))
+                    
+                    # Рассчитываем новый дедлайн на основе продолжительности
+                    duration_type = selected_duration.get("type")
+                    duration_value = int(selected_duration.get("value", 0))
+
+                    if duration_type == "years":
+                        task["deadline"] = current_time + relativedelta(years=duration_value)
+                    elif duration_type == "days":
+                        task["deadline"] = current_time + timedelta(days=duration_value)
+                    elif duration_type == "weeks":
+                        task["deadline"] = current_time + timedelta(weeks=duration_value)
+                    elif duration_type == "months":
+                        # Для месяцев используем relativedelta
+                        task["deadline"] = current_time + relativedelta(months=duration_value)
+
+                    logger.debug(f"Calculated new deadline based on duration: {task['deadline']}")
+                except Exception as e:
+                    logger.exception(f"Error calculating deadline: {e}")
     
     manager.dialog_data["task"] = task
     await manager.switch_to(TaskEditStates.main)
@@ -262,7 +298,16 @@ async def on_duration_selected(callback: CallbackQuery, widget: Any, manager: Di
 async def on_deadline_selected(c: CallbackQuery, widget: Any, manager: DialogManager, date: datetime):
     """Обработчик выбора дедлайна"""
     task = manager.dialog_data.get("task", {})
-    date_now = datetime.now().astimezone()
+    user_id = manager.event.from_user.id if hasattr(manager.event, 'from_user') else None
+    timezone = "Europe/Moscow"
+    async with get_session() as session:
+        try:
+            user = await session.get(User, user_id)
+            timezone = user.timezone
+
+        except Exception as e:
+            logger.exception(f"Error on_deadline_selected: {e}")
+    date_now = datetime.now(tz=pytz.timezone(timezone))
     task["deadline"] = date_now.replace(year=date.year, month=date.month, day=date.day)
     manager.dialog_data["task"] = task
     await manager.switch_to(TaskEditStates.main)
@@ -277,12 +322,21 @@ async def on_deadline_clear(callback: CallbackQuery, button: Button, manager: Di
 async def on_toggle_completed(callback: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик переключения статуса завершения"""
     task = manager.dialog_data.get("task", {})
-    
+
+    user_id = manager.event.from_user.id if hasattr(manager.event, 'from_user') else None
+    timezone = "Europe/Moscow"
+    async with get_session() as session:
+        try:
+            user = await session.get(User, user_id)
+            timezone = user.timezone
+
+        except Exception as e:
+            logger.exception(f"Error on_toggle_completed: {e}")
+
     if task.get("completed_at") is None:
-        task["completed_at"] = datetime.now().astimezone()
+        task["completed_at"] = datetime.now(tz=pytz.timezone(timezone))
     else:
         task["completed_at"] = None
-    
     manager.dialog_data["task"] = task
     await manager.update(data={})
 
@@ -317,7 +371,7 @@ async def on_save_changes(callback: CallbackQuery, button: Button, manager: Dial
                 await callback.answer(i18n.format_value("task-edit-error-update"))
     except Exception as e:
         logger.exception(f"Ошибка при обновлении задачи: {e}")
-        await callback.answer(i18n.format_value("task-edit-error-generic", {"error": str(e)}))
+        await callback.answer(i18n.format_value("task-edit-error-generic", {"error": "Ошибка при обновлении"}))
 
 # Функции для условий when
 def has_error(data: dict, widget: Any, manager: DialogManager) -> bool:

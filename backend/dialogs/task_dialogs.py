@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, date
 
+import pytz
 from aiogram.fsm.state import State, StatesGroup
 from aiogram_dialog import Dialog, Window, Data
 from aiogram_dialog.widgets.text import Format, Const
@@ -17,7 +18,7 @@ from backend.services.task_service import TaskService
 from backend.services.settings_service import SettingsService
 from backend.database import get_session
 from backend.utils import escape_html
-from backend.db.models import DurationSetting
+from backend.db.models import DurationSetting, User
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ class TaskDialog(StatesGroup):
 
 async def get_task_types(dialog_manager: DialogManager, **kwargs):
     user_id = dialog_manager.event.from_user.id if hasattr(dialog_manager.event, 'from_user') else None
-    
+
     async with get_session() as session:
         settings_service = SettingsService(session)
         settings = await settings_service.get_settings(str(user_id) if user_id else None)
@@ -41,7 +42,7 @@ async def get_task_types(dialog_manager: DialogManager, **kwargs):
 
 async def get_statuses(dialog_manager: DialogManager, **kwargs):
     user_id = dialog_manager.event.from_user.id if hasattr(dialog_manager.event, 'from_user') else None
-    
+
     async with get_session() as session:
         settings_service = SettingsService(session)
         settings = await settings_service.get_settings(str(user_id) if user_id else None)
@@ -49,7 +50,7 @@ async def get_statuses(dialog_manager: DialogManager, **kwargs):
 
 async def get_priorities(dialog_manager: DialogManager, **kwargs):
     user_id = dialog_manager.event.from_user.id if hasattr(dialog_manager.event, 'from_user') else None
-    
+
     async with get_session() as session:
         settings_service = SettingsService(session)
         settings = await settings_service.get_settings(str(user_id) if user_id else None)
@@ -57,11 +58,11 @@ async def get_priorities(dialog_manager: DialogManager, **kwargs):
 
 async def get_durations(dialog_manager: DialogManager, **kwargs):
     user_id = dialog_manager.event.from_user.id if hasattr(dialog_manager.event, 'from_user') else None
-    
+
     # Добавляем информацию о выбранном дедлайне
     deadline = dialog_manager.dialog_data.get("deadline")
     logger.debug(f"get_durations: deadline в dialog_data = {deadline}, тип: {type(deadline)}")
-    
+
     deadline_display = "Не установлен"
     if deadline is not None:
         if isinstance(deadline, (datetime, date)):
@@ -75,7 +76,7 @@ async def get_durations(dialog_manager: DialogManager, **kwargs):
             logger.debug(f"Используем строковое представление дедлайна: {deadline_display}")
         else:
             logger.warning(f"Неизвестный тип дедлайна: {type(deadline)}")
-    
+
     async with get_session() as session:
         settings_service = SettingsService(session)
         settings = await settings_service.get_settings(str(user_id) if user_id else None)
@@ -129,22 +130,26 @@ async def on_duration_selected(callback: CallbackQuery, widget: Any, manager: Di
     logger.debug(f"on_duration_selected called with item_id: {item_id}, type: {type(item_id)}")
     manager.dialog_data["duration_id"] = str(item_id)
     logger.debug(f"Selected duration_id: {item_id}, dialog_data: {manager.dialog_data}")
-    
+    user_id = manager.event.from_user.id if hasattr(manager.event, 'from_user') else None
+
     # Расчитываем и устанавливаем дедлайн на основе длительности
+    timezone = "Europe/Moscow"
     async with get_session() as session:
         try:
             duration = await session.get(DurationSetting, int(item_id))
-            if duration:
-                # Расчитываем дедлайн
-                # Используем datetime.now() чтобы сохранить текущее время
-                deadline = await duration.calculate_deadline_async(session, datetime.now().astimezone())
-                logger.debug(f"Calculated deadline based on duration: {deadline}")
-                # Устанавливаем дедлайн в данные диалога
-                manager.dialog_data["deadline"] = deadline
-                logger.debug(f"Set deadline: {deadline} in dialog_data")
+            user = await session.get(User, user_id)
+            timezone = user.timezone
         except Exception as e:
-            logger.error(f"Error calculating deadline: {e}")
-    
+            logger.exception(f"Error calculating deadline: {e}")
+    if duration:
+        # Расчитываем дедлайн
+        # Используем datetime.now() чтобы сохранить текущее время
+        deadline = await duration.calculate_deadline_async(session, datetime.now(tz=pytz.timezone(timezone)))
+        logger.debug(f"Calculated deadline based on duration: {deadline}")
+        # Устанавливаем дедлайн в данные диалога
+        manager.dialog_data["deadline"] = deadline
+        logger.debug(f"Set deadline: {deadline} in dialog_data")
+
     # Переходим к экрану подтверждения
     await manager.switch_to(TaskDialog.confirm)
 
@@ -162,7 +167,7 @@ async def on_skip_duration(event, widget, manager: DialogManager):
 async def on_deadline_selected(c: CallbackQuery, widget: Any, manager: DialogManager, deadline_date: datetime):
     """Обработчик выбора дедлайна"""
     logger.debug(f"on_deadline_selected called with date: {deadline_date}, type: {type(deadline_date)}")
-    
+
     # Сохраняем время в выбранной дате
     # Проверяем, что date - это datetime, а не date
     if isinstance(deadline_date, datetime):
@@ -170,13 +175,22 @@ async def on_deadline_selected(c: CallbackQuery, widget: Any, manager: DialogMan
         manager.dialog_data["deadline"] = deadline_date
     else:
         # Преобразуем date в datetime с текущим временем
-        now = datetime.now().astimezone()
+        user_id = manager.event.from_user.id if hasattr(manager.event, 'from_user') else None
+        timezone = "Europe/Moscow"
+        async with get_session() as session:
+            try:
+                user = await session.get(User, user_id)
+                timezone = user.timezone
+
+            except Exception as e:
+                logger.exception(f"Error selecting deadline: {e}")
+
+        now = datetime.now(tz=pytz.timezone(timezone))
         date_with_time = datetime.combine(deadline_date, now.time())
         manager.dialog_data["deadline"] = date_with_time
         logger.debug(f"Установлен дедлайн с текущим временем: {date_with_time}")
-    
     logger.debug(f"Установлен дедлайн: {manager.dialog_data['deadline']}, тип: {type(manager.dialog_data['deadline'])}, dialog_data: {manager.dialog_data}")
-    
+
     # Возвращаемся к экрану длительности после выбора дедлайна
     await manager.switch_to(TaskDialog.duration)
 
@@ -187,7 +201,7 @@ async def on_skip_deadline(event, widget, manager: DialogManager):
     if "deadline" in manager.dialog_data:
         del manager.dialog_data["deadline"]
     logger.debug(f"Дедлайн сброшен, dialog_data: {manager.dialog_data}")
-    
+
     # Остаемся на текущем экране
     await manager.update(data={})
 
@@ -201,16 +215,16 @@ async def get_task_summary(dialog_manager: DialogManager, **kwargs):
     """Получить сводку о создаваемой задаче"""
     user_id = dialog_manager.event.from_user.id if hasattr(dialog_manager.event, 'from_user') else None
     logger.debug(f"get_task_summary called, user_id: {user_id}, dialog_data: {dialog_manager.dialog_data}")
-    
+
     async with get_session() as session:
         settings_service = SettingsService(session)
         settings = await settings_service.get_settings(str(user_id) if user_id else None)
         logger.debug(f"Settings: {settings}")
-        
+
         # Получаем данные о выбранных параметрах
         task_data = dialog_manager.dialog_data
         logger.debug(f"Task data: {task_data}")
-        
+
         # Выводим типы данных ID
         if task_data.get("type_id"):
             logger.debug(f"type_id: {task_data['type_id']}, type: {type(task_data['type_id'])}")
@@ -220,7 +234,7 @@ async def get_task_summary(dialog_manager: DialogManager, **kwargs):
             logger.debug(f"priority_id: {task_data['priority_id']}, type: {type(task_data['priority_id'])}")
         if task_data.get("duration_id"):
             logger.debug(f"duration_id: {task_data['duration_id']}, type: {type(task_data['duration_id'])}")
-        
+
         # Выводим типы данных ID в настройках
         if settings.get("task_types") and len(settings["task_types"]) > 0:
             logger.debug(f"First task_type id: {settings['task_types'][0]['id']}, type: {type(settings['task_types'][0]['id'])}")
@@ -230,13 +244,13 @@ async def get_task_summary(dialog_manager: DialogManager, **kwargs):
             logger.debug(f"First priority id: {settings['priorities'][0]['id']}, type: {type(settings['priorities'][0]['id'])}")
         if settings.get("durations") and len(settings["durations"]) > 0:
             logger.debug(f"First duration id: {settings['durations'][0]['id']}, type: {type(settings['durations'][0]['id'])}")
-        
+
         # Находим названия выбранных параметров
         type_name = "Не выбран"
         status_name = "Не выбран"
         priority_name = "Не выбран"
         duration_name = "Не выбрана"
-        
+
         if task_data.get("type_id"):
             logger.debug(f"Looking for type_id: {task_data['type_id']} in {len(settings['task_types'])} task types")
             for task_type in settings["task_types"]:
@@ -244,7 +258,7 @@ async def get_task_summary(dialog_manager: DialogManager, **kwargs):
                     type_name = escape_html(task_type["name"])
                     logger.debug(f"Found type name: {type_name}")
                     break
-                    
+
         if task_data.get("status_id"):
             logger.debug(f"Looking for status_id: {task_data['status_id']} in {len(settings['statuses'])} statuses")
             for status in settings["statuses"]:
@@ -252,7 +266,7 @@ async def get_task_summary(dialog_manager: DialogManager, **kwargs):
                     status_name = escape_html(status["name"])
                     logger.debug(f"Found status name: {status_name}")
                     break
-                    
+
         if task_data.get("priority_id"):
             logger.debug(f"Looking for priority_id: {task_data['priority_id']} in {len(settings['priorities'])} priorities")
             for priority in settings["priorities"]:
@@ -260,7 +274,7 @@ async def get_task_summary(dialog_manager: DialogManager, **kwargs):
                     priority_name = escape_html(priority["name"])
                     logger.debug(f"Found priority name: {priority_name}")
                     break
-                    
+
         if task_data.get("duration_id"):
             logger.debug(f"Looking for duration_id: {task_data['duration_id']} in {len(settings['durations'])} durations")
             for duration in settings["durations"]:
@@ -268,15 +282,15 @@ async def get_task_summary(dialog_manager: DialogManager, **kwargs):
                     duration_name = escape_html(duration["name"])
                     logger.debug(f"Found duration name: {duration_name}")
                     break
-        
+
         # Экранируем все текстовые поля
         title = escape_html(task_data.get("title", "Новая задача"))
         description = escape_html(task_data.get("description", "Нет описания") or "Нет описания")
-        
+
         # Формируем отображение дедлайна
         deadline = task_data.get("deadline")
         logger.debug(f"get_task_summary: deadline = {deadline}, тип: {type(deadline)}")
-        
+
         deadline_display = "Не установлен"
         if deadline is not None:
             if isinstance(deadline, (datetime, date)):
@@ -291,7 +305,7 @@ async def get_task_summary(dialog_manager: DialogManager, **kwargs):
             else:
                 logger.warning(f"Неизвестный тип дедлайна: {type(deadline)}")
                 deadline_display = str(deadline)
-        
+
         result = {
             "title": title,
             "description": description,
@@ -310,69 +324,68 @@ async def main_process_result(start_data: Data, result: Any,
     logger.debug("Start data: %s", start_data)
     logger.debug("Result: %s", result)
     logger.debug("Dialog data: %s", dialog_manager.dialog_data)
-    
+
     # Создаем задачу при завершении диалога
-    if result:
-        try:
-            logger.debug("Creating task...")
-            async with get_session() as session:
-                task_service = TaskService(session)
-                user_id = str(dialog_manager.event.from_user.id)
-                logger.debug(f"User ID: {user_id}")
-                
-                # Получаем данные из dialog_data, а не из result
-                task_data = {
-                    "title": dialog_manager.dialog_data.get("title", "Новая задача"),
-                    "description": dialog_manager.dialog_data.get("description"),
-                    "type_id": dialog_manager.dialog_data.get("type_id"),
-                    "status_id": dialog_manager.dialog_data.get("status_id"),
-                    "priority_id": dialog_manager.dialog_data.get("priority_id"),
-                    "duration_id": dialog_manager.dialog_data.get("duration_id"),
-                    "deadline": dialog_manager.dialog_data.get("deadline")  # Добавляем дедлайн
-                }
-                
-                logger.debug(f"Task data for creation: {task_data}")
-                
-                task = await task_service.create_task(
-                    user_id,
-                    task_data
+    try:
+        logger.debug("Creating task...")
+        async with get_session() as session:
+            task_service = TaskService(session)
+            user_id = str(dialog_manager.event.from_user.id)
+            logger.debug(f"User ID: {user_id}")
+
+            # Получаем данные из dialog_data, а не из result
+            task_data = {
+                "title": dialog_manager.dialog_data.get("title", "Новая задача"),
+                "description": dialog_manager.dialog_data.get("description"),
+                "type_id": dialog_manager.dialog_data.get("type_id"),
+                "status_id": dialog_manager.dialog_data.get("status_id"),
+                "priority_id": dialog_manager.dialog_data.get("priority_id"),
+                "duration_id": dialog_manager.dialog_data.get("duration_id"),
+                "deadline": dialog_manager.dialog_data.get("deadline")  # Добавляем дедлайн
+            }
+
+            logger.debug(f"Task data for creation: {task_data}")
+
+            task = await task_service.create_task(
+                user_id,
+                task_data
+            )
+            logger.debug(f"Task created: {task}")
+
+            if task:
+                task_type = task['type']['name'] if task['type'] else i18n.format_value("type-not-set")
+                status = task['status']['name'] if task['status'] else i18n.format_value("status-not-set")
+                priority = task['priority']['name'] if task['priority'] else i18n.format_value("priority-not-set")
+                duration = task['duration']['name'] if task['duration'] else i18n.format_value("duration-not-set")
+
+                # Правильно форматируем дедлайн в понятном формате
+                deadline_display = i18n.format_value("deadline-not-set")
+                if task['deadline']:
+                    if isinstance(task['deadline'], (datetime, date)):
+                        if isinstance(task['deadline'], datetime):
+                            deadline_display = task['deadline'].strftime("%d.%m.%Y %H:%M")
+                        else:
+                            deadline_display = task['deadline'].strftime("%d.%m.%Y")
+                    elif isinstance(task['deadline'], str):
+                        deadline_display = task['deadline']
+
+                logger.debug(f"Sending task created message...")
+                await dialog_manager.event.answer(
+                    i18n.format_value("task-created") + "\n\n" +
+                    i18n.format_value("task-created-details", {
+                        "title": task['title'],
+                        "description": task['description'] or i18n.format_value("description-not-set"),
+                        "type": task_type,
+                        "status": status,
+                        "priority": priority,
+                        "duration": duration,
+                        "deadline": deadline_display
+                    })
                 )
-                logger.debug(f"Task created: {task}")
-                
-                if task:
-                    task_type = task['type']['name'] if task['type'] else i18n.format_value("type-not-set")
-                    status = task['status']['name'] if task['status'] else i18n.format_value("status-not-set")
-                    priority = task['priority']['name'] if task['priority'] else i18n.format_value("priority-not-set")
-                    duration = task['duration']['name'] if task['duration'] else i18n.format_value("duration-not-set")
-                    
-                    # Правильно форматируем дедлайн в понятном формате
-                    deadline_display = i18n.format_value("deadline-not-set")
-                    if task['deadline']:
-                        if isinstance(task['deadline'], (datetime, date)):
-                            if isinstance(task['deadline'], datetime):
-                                deadline_display = task['deadline'].strftime("%d.%m.%Y %H:%M")
-                            else:
-                                deadline_display = task['deadline'].strftime("%d.%m.%Y")
-                        elif isinstance(task['deadline'], str):
-                            deadline_display = task['deadline']
-                    
-                    logger.debug(f"Sending task created message...")
-                    await dialog_manager.event.answer(
-                        i18n.format_value("task-created") + "\n\n" +
-                        i18n.format_value("task-created-details", {
-                            "title": task['title'],
-                            "description": task['description'] or i18n.format_value("description-not-set"),
-                            "type": task_type,
-                            "status": status,
-                            "priority": priority,
-                            "duration": duration,
-                            "deadline": deadline_display
-                        })
-                    )
-                    logger.debug("Task created message sent")
-        except Exception as e:
-            logger.exception(f"Error creating task: {e}")
-            await dialog_manager.event.answer(i18n.format_value("error"))
+                logger.debug("Task created message sent")
+    except Exception as e:
+        logger.exception(f"Error creating task: {e}")
+        await dialog_manager.event.answer(i18n.format_value("error"))
 
 async def on_confirm_back(c: CallbackQuery, button: Button, manager: DialogManager):
     """Обработчик кнопки назад в окне подтверждения - переход к окну длительности"""

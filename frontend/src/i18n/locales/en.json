@@ -28,6 +28,14 @@
     "settings": "Settings",
     "about": "About"
   },
+  "timezone": {
+    "select": "Select Timezone",
+    "select_timezone": "Select Timezone",
+    "current": "Current Timezone",
+    "search": "Search timezone",
+    "group": "Group",
+    "no_results": "No timezones found"
+  },
   "tasks": {
     "task_list": "Task List",
     "new_task": "New Task",

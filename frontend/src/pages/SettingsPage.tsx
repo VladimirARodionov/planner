@@ -1,13 +1,17 @@
 import React, { useEffect } from 'react';
-import { Box, Container, Typography } from '@mui/material';
+import { Box, Container, Typography, Paper, Divider } from '@mui/material';
 import { TaskTypeSettings } from '../components/TaskTypeSettings';
 import { StatusSettings } from '../components/StatusSettings';
 import { PrioritySettings } from '../components/PrioritySettings';
 import { DurationSettings } from '../components/DurationSettings';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
+import { TimezoneSwitcher } from '../components/TimezoneSwitcher';
 import { TasksAPI } from '../api/tasks';
 import { DurationType } from '../types/task';
+import { useTranslation } from 'react-i18next';
 
 export const SettingsPage: React.FC = () => {
+    const { t } = useTranslation();
     
     // Добавляем отладочную функцию для проверки настроек продолжительностей
     useEffect(() => {
@@ -52,7 +56,29 @@ export const SettingsPage: React.FC = () => {
         <Container maxWidth="md">
             <Box py={4}>
                 <Typography variant="h4" gutterBottom>
-                    Настройки
+                    {t('settings.general')}
+                </Typography>
+                
+                <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
+                    <Typography variant="h6" gutterBottom>
+                        {t('settings.language')}
+                    </Typography>
+                    <Box sx={{ mb: 2 }}>
+                        <LanguageSwitcher />
+                    </Box>
+                    
+                    <Divider sx={{ my: 2 }} />
+                    
+                    <Typography variant="h6" gutterBottom>
+                        {t('timezone.select')}
+                    </Typography>
+                    <Box>
+                        <TimezoneSwitcher />
+                    </Box>
+                </Paper>
+                
+                <Typography variant="h4" gutterBottom sx={{ mt: 4 }}>
+                    {t('settings.customization')}
                 </Typography>
                 
                 <Box mb={4}>

@@ -1,4 +1,7 @@
+import logging
 from datetime import datetime, timedelta, date
+
+import pytz
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, Enum, JSON, Text, BigInteger
 from sqlalchemy.orm import relationship, declarative_base
@@ -7,6 +10,8 @@ import enum
 
 Base = declarative_base()
 metadata = Base.metadata
+
+logger = logging.getLogger(__name__)
 
 class DurationType(enum.Enum):
     """Типы продолжительности"""
@@ -63,6 +68,7 @@ class User(Base):
     first_name = Column(String(100))
     last_name = Column(String(100))
     language = Column(String(10), default='ru')  # Предпочитаемый язык пользователя
+    timezone = Column(String(50), default='Europe/Moscow')  # Часовой пояс пользователя
     created_at = Column(DateTime(timezone=True), default=func.now())
     updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
     settings = Column(JSON, default=dict)  # Пользовательские настройки в JSON
@@ -131,30 +137,33 @@ class DurationSetting(Base):
     tasks = relationship('Task', back_populates='duration')
 
     async def calculate_deadline_async(self, session, from_date=None):
-        """Рассчитать дедлайн на основе продолжительности (асинхронный метод)"""
-        if from_date is None:
-            # Используем текущую дату и время
-            from_date = datetime.now().astimezone()
-        elif isinstance(from_date, date) and not isinstance(from_date, datetime):
-            # Если передана только дата (без времени), добавляем текущее время
-            now = datetime.now().astimezone()
-            from_date = datetime.combine(from_date, now.time())
+        try:
+            """Рассчитать дедлайн на основе продолжительности (асинхронный метод)"""
+            if from_date is None:
+                # Используем текущую дату и время
+                from_date = datetime.now(tz=pytz.timezone(self.user.timezone))
+            elif isinstance(from_date, date) and not isinstance(from_date, datetime):
+                # Если передана только дата (без времени), добавляем текущее время
+                now = datetime.now(tz=pytz.timezone(self.user.timezone))
+                from_date = datetime.combine(from_date, now.time())
 
-        # Получаем актуальные значения из базы данных
-        duration = await session.get(DurationSetting, self.id)
-        if not duration:
+            # Получаем актуальные значения из базы данных
+            duration = await session.get(DurationSetting, self.id)
+            if not duration:
+                return from_date
+
+            if duration.duration_type == DurationType.DAYS:
+                return from_date + timedelta(days=duration.value)
+            elif duration.duration_type == DurationType.WEEKS:
+                return from_date + timedelta(weeks=duration.value)
+            elif duration.duration_type == DurationType.MONTHS:
+                return from_date + relativedelta(months=duration.value)
+            elif duration.duration_type == DurationType.YEARS:
+                return from_date + relativedelta(years=duration.value)
+
             return from_date
-
-        if duration.duration_type == DurationType.DAYS:
-            return from_date + timedelta(days=duration.value)
-        elif duration.duration_type == DurationType.WEEKS:
-            return from_date + timedelta(weeks=duration.value)
-        elif duration.duration_type == DurationType.MONTHS:
-            return from_date + relativedelta(months=duration.value)
-        elif duration.duration_type == DurationType.YEARS:
-            return from_date + relativedelta(years=duration.value)
-
-        return from_date
+        except Exception as e:
+            logger.exception(f"Ошибка при расчете дедлайна: {e}")
 
 class Task(Base):
     """Модель задачи"""
@@ -208,7 +217,7 @@ class Task(Base):
         """Получить следующее напоминание"""
         if not self.reminders:
             return None
-        now = datetime.now().astimezone()
+        now = datetime.now(tz=pytz.timezone(self.user.timezone))
         future_reminders = [
             datetime.fromisoformat(r) for r in self.reminders
             if datetime.fromisoformat(r) > now
@@ -219,7 +228,7 @@ class Task(Base):
         """Изменить статус задачи"""
         self.status = new_status
         if new_status.is_final:
-            self.completed_at = datetime.now().astimezone()
+            self.completed_at = datetime.now(tz=pytz.timezone(self.user.timezone))
         else:
             self.completed_at = None
 
@@ -227,7 +236,7 @@ class Task(Base):
         """Проверить, просрочена ли задача"""
         if not self.deadline or self.completed_at or (self.status and self.status.is_final):
             return False
-        return datetime.now().astimezone().timestamp() > self.deadline.timestamp()
+        return datetime.now(tz=pytz.timezone(self.user.timezone)).timestamp() > self.deadline.timestamp()
 
 
 class TaskTypeSetting(Base):
